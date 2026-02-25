@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+build/
+scalpel/scalpel_schedule.html
+tw_today.html
+*.bak
+*.rej

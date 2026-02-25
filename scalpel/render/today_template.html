@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Today • Taskwarrior Schedule</title>
+<style>
+:root{
+  --bg:#0b0d10; --panel:#11151b; --panel2:#0f1318; --text:#e8edf2; --muted:#9aa6b2;
+  --line:#263141; --shadow: rgba(0,0,0,0.35);
+  --radius: 14px;
+  --accent: #58a6ff;
+  --now: #ff6b6b;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font: 14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{
+  position: sticky; top:0; z-index:50;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #0d1015, #0b0d10);
+  border-bottom: 1px solid var(--line);
+}
+.hrow{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
+.title{ font-weight:850; letter-spacing:0.2px; font-size:16px; }
+.meta{ color:var(--muted); font-size:12px; text-align:right; }
+.controls{
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  margin-top: 10px;
+}
+.pill{
+  border:1px solid rgba(154,166,178,0.28);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.slider{
+  display:flex; align-items:center; gap:8px;
+  padding: 6px 10px;
+  border:1px solid rgba(154,166,178,0.28);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.03);
+}
+.slider label{ color:var(--muted); font-size:12px; }
+.slider input{ width: 140px; }
+main{ padding: 12px; max-width: 980px; margin: 0 auto; }
+
+.card{
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px var(--shadow);
+  overflow: hidden;
+}
+.card-h{
+  padding: 10px 12px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-weight: 760;
+}
+.card-h small{ color:var(--muted); font-weight:600; }
+.pad{ padding: 10px 10px 14px; }
+
+.timeline{
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(38,49,65,0.60);
+  background: rgba(0,0,0,0.10);
+}
+.rail{
+  position:absolute; top:0; left:0; bottom:0;
+  width: 66px;
+  border-right: 1px solid rgba(38,49,65,0.55);
+  background: rgba(255,255,255,0.02);
+}
+.events{
+  position:absolute; top:0; left:66px; right:0; bottom:0;
+}
+
+.hlabel{
+  position:absolute; left:0;
+  width:66px;
+  padding-left: 10px;
+  transform: translateY(-8px);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.hline{
+  position:absolute; left:0; right:0; height:0;
+  border-top: 1px solid rgba(38,49,65,0.45);
+}
+.hline.major{ border-top: 1px solid rgba(154,166,178,0.35); }
+
+.now{
+  position:absolute; left:66px; right:0;
+  height:0;
+  border-top: 2px solid rgba(255, 107, 107, 0.95);
+  box-shadow: 0 0 18px rgba(255, 107, 107, 0.35);
+  z-index: 100;
+  pointer-events:none;
+}
+.now .lbl{
+  position:absolute;
+  left: 10px;
+  top: -11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 107, 107, 0.55);
+  background: rgba(255,107,107,0.10);
+  color: #ffd9d9;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.blk{
+  position:absolute;
+  border-radius: 10px;
+  border: 1px solid rgba(38,49,65,0.55);
+  background: rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+.gap{
+  border-style: dashed;
+  border-color: rgba(240, 246, 252, 0.42);
+  background: rgba(88, 166, 255, 0.10);
+  z-index: 2;
+  pointer-events: none;
+}
+.gap .gl{
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 850;
+  color: rgba(232, 237, 242, 0.92);
+  text-shadow: 0 2px 10px rgba(0,0,0,0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-full{
+  left: 10px; right: 10px;
+  border-left: 5px solid var(--a, var(--accent));
+  z-index: 10;
+  padding: 8px 10px;
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+  cursor: pointer;
+}
+.task-full.compact{
+  padding: 3px 8px;
+  gap: 2px;
+  border-radius: 8px;
+}
+.task-full.micro{
+  padding: 2px 6px;
+  gap: 0;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.16);
+}
+.task-full.micro .t2{ display:none; }
+.task-full.micro .t1{ font-size: 12px; opacity: 0.95; }
+
+.task-full .t1{
+  font-weight: 800;
+  white-space: nowrap;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.task-full .t2{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.badge{
+  border:1px solid rgba(154,166,178,0.30);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.03);
+  font-size: 12px;
+}
+.badge.dur{ color:#cfe9ff; border-color: rgba(99,179,255,0.35); background: rgba(99,179,255,0.08); }
+.badge.id{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+
+.task-slot{
+  border-left: 5px solid var(--a, var(--accent));
+  background: rgba(0,0,0,0.20);
+  z-index: 20;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.task-slot .sid{
+  position:absolute; right:6px; top:4px;
+  font-size: 11px; color: rgba(232,237,242,0.75);
+  font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+}
+.selected{
+  outline: 2px solid rgba(255,255,255,0.55);
+  outline-offset: 2px;
+}
+.empty{ padding: 12px 10px; color: var(--muted); }
+
+/* Details drawer */
+.backdrop{
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 200;
+}
+.backdrop.show{ opacity: 1; pointer-events: auto; }
+.drawer{
+  position: fixed; left: 0; right: 0; bottom: 0;
+  max-height: 72vh;
+  background: linear-gradient(180deg, rgba(17,21,27,0.96), rgba(15,19,24,0.98));
+  border-top: 1px solid rgba(38,49,65,0.75);
+  box-shadow: 0 -12px 36px rgba(0,0,0,0.55);
+  transform: translateY(105%);
+  transition: transform 200ms ease;
+  z-index: 210;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.drawer.show{ transform: translateY(0); }
+.drawer .handle{
+  width: 44px; height: 5px;
+  border-radius: 999px;
+  background: rgba(154,166,178,0.35);
+  margin: 10px auto 6px;
+}
+.drawer .head{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  padding: 8px 14px 10px;
+  border-bottom: 1px solid rgba(38,49,65,0.55);
+}
+.drawer .head .h1{ font-weight: 900; font-size: 15px; line-height: 1.2; margin: 0; }
+.drawer .close{
+  border: 1px solid rgba(154,166,178,0.25);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+}
+.drawer .close:disabled{ opacity:0.45; }
+.drawer .body{ padding: 12px 14px 16px; }
+.drow{ display:flex; gap: 10px; flex-wrap: wrap; align-items:center; margin-bottom: 10px; }
+.k{ color: var(--muted); font-size: 12px; }
+.v{ font-weight: 750; }
+.mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+.descFull{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(38,49,65,0.55);
+  background: rgba(0,0,0,0.18);
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div>
+      <div class="title" id="title">Today</div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="meta" id="stats"></div>
+  </div>
+
+  <div class="controls">
+    <div class="slider">
+      <label for="zoom">Zoom</label>
+      <input id="zoom" type="range" min="0.8" max="4.0" step="0.1" value="1.5" />
+      <span class="pill mono" id="zoomVal">1.5 px/min</span>
+    </div>
+    <span class="pill" id="chipTasks"></span>
+    <span class="pill" id="chipLoad"></span>
+    <span class="pill" id="chipOverlap"></span>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-h">
+      <div>Timeline</div>
+      <small id="sum"></small>
+    </div>
+    <div class="pad">
+      <div class="timeline" id="tl" style="height: 420px;">
+        <div class="rail" id="rail"></div>
+        <div class="events" id="events"></div>
+      </div>
+      <div id="emptyTL" class="empty" style="display:none;">No scheduled tasks found for this day.</div>
+    </div>
+  </div>
+</main>
+
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Task details">
+  <div class="handle"></div>
+  <div class="head">
+    <div>
+      <div class="h1" id="dTitle">(task)</div>
+      <div class="meta" id="dSub"></div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="close" id="btnPrev" title="Previous task">Prev</button>
+      <button class="close" id="btnNext" title="Next task">Next</button>
+      <button class="close" id="btnClose">Close</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="drow">
+      <span class="k">Time</span><span class="v" id="dTime"></span>
+      <span class="k">Duration</span><span class="v" id="dDur"></span>
+    </div>
+    <div class="drow">
+      <span class="k">Gap before</span><span class="v" id="dGapBefore"></span>
+      <span class="k">Gap after</span><span class="v" id="dGapAfter"></span>
+    </div>
+    <div class="drow">
+      <span class="k">UUID</span><span class="v mono" id="dUuid"></span>
+      <span class="k">Overlap</span><span class="v" id="dOverlap"></span>
+    </div>
+    <div class="drow">
+      <span class="k">Project</span><span class="v" id="dProj"></span>
+      <span class="k">Tags</span><span class="v" id="dTags"></span>
+    </div>
+    <div class="descFull" id="dDesc"></div>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"days":[],"day_index":0}</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const DAYS = Array.isArray(DATA.days) ? DATA.days : [DATA];
+  let dayIndex = Number.isFinite(DATA.day_index) ? DATA.day_index : Math.min(1, DAYS.length - 1);
+  if (dayIndex < 0) dayIndex = 0;
+  if (dayIndex >= DAYS.length) dayIndex = DAYS.length - 1;
+  let CUR = DAYS[dayIndex];
+
+  const pad2 = n => n < 10 ? "0"+n : ""+n;
+  const fmtHm = ms => { const d=new Date(ms); return pad2(d.getHours())+":"+pad2(d.getMinutes()); };
+  const fmtDur = mins => mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h${(mins%60)?pad2(mins%60)+"m":""}`;
+  const esc = s => String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+
+  let projectColors = CUR.palette?.projectColors || {};
+  let tagColors = CUR.palette?.tagColors || {};
+  function resolveAccent(task){
+    const tags = task.tags || [];
+    for(const tag of tags){
+      const c = tagColors["tag:"+tag] || tagColors[tag];
+      if(c) return c;
+    }
+    const p = (task.project||"").trim();
+    if(p){
+      let cur=p;
+      while(true){
+        const c = projectColors["project:"+cur] || projectColors[cur];
+        if(c) return c;
+        const idx=cur.lastIndexOf(".");
+        if(idx<0) break;
+        cur=cur.slice(0,idx);
+      }
+    }
+    return null;
+  }
+
+  const tl = document.getElementById("tl");
+  const rail = document.getElementById("rail");
+  const events = document.getElementById("events");
+
+  let workStartMin = CUR.work_start_min;
+  let workEndMin = CUR.work_end_min;
+  let totalMin = workEndMin - workStartMin;
+  let dayStartMs = CUR.day_start_ms;
+
+  // Drawer
+  const backdrop = document.getElementById("backdrop");
+  const drawer = document.getElementById("drawer");
+  const btnClose = document.getElementById("btnClose");
+  const btnPrev = document.getElementById("btnPrev");
+  const btnNext = document.getElementById("btnNext");
+
+  const dTitle = document.getElementById("dTitle");
+  const dSub = document.getElementById("dSub");
+  const dTime = document.getElementById("dTime");
+  const dDur = document.getElementById("dDur");
+  const dGapBefore = document.getElementById("dGapBefore");
+  const dGapAfter = document.getElementById("dGapAfter");
+  const dUuid = document.getElementById("dUuid");
+  const dOverlap = document.getElementById("dOverlap");
+  const dProj = document.getElementById("dProj");
+  const dTags = document.getElementById("dTags");
+  const dDesc = document.getElementById("dDesc");
+
+  function openDrawer(task, opts={scroll:false}){
+    dTitle.textContent = task.description || "(no description)";
+    const sub = [];
+    if(task.short) sub.push(task.short);
+    if(task.project) sub.push(task.project);
+    dSub.textContent = sub.join(" • ");
+
+    dTime.textContent = `${fmtHm(task.start_ms_vis)}–${fmtHm(task.end_ms_vis)}`;
+    dDur.textContent = fmtDur(task.dur_min);
+
+    drawerUuid = task.uuid;
+    const idx = idxByUuid.get(task.uuid);
+    const prev = (idx !== undefined && idx > 0) ? tasks[idx-1] : null;
+    const next = (idx !== undefined && idx < tasks.length-1) ? tasks[idx+1] : null;
+
+    const prevEnd = prev ? prev.end_ms_vis : workStartMs;
+    const nextStart = next ? next.start_ms_vis : workEndMs;
+
+    if(dGapBefore) dGapBefore.textContent = fmtGap((task.start_ms_vis - prevEnd) / 60000);
+    if(dGapAfter)  dGapAfter.textContent  = fmtGap((nextStart - task.end_ms_vis) / 60000);
+
+    if(btnPrev){ btnPrev.disabled = !(idx !== undefined && idx > 0); }
+    if(btnNext){ btnNext.disabled = !(idx !== undefined && idx < tasks.length-1); }
+    dUuid.textContent = task.uuid;
+    dOverlap.textContent = task.overlap ? `Yes (lane ${task.lane+1}/${task.total_lanes})` : "No";
+    dProj.textContent = task.project || "No Project";
+    dTags.textContent = (task.tags && task.tags.length) ? task.tags.join(", ") : "No Tag";
+    dDesc.textContent = task.description || "";
+
+    backdrop.classList.add("show");
+    drawer.classList.add("show");
+    if(opts && opts.scroll){ setTimeout(() => scrollToTask(task.uuid), 0); }
+  }
+  function closeDrawer(){
+    backdrop.classList.remove("show");
+    drawer.classList.remove("show");
+    drawerUuid = null;
+  }
+  btnClose.addEventListener("click", closeDrawer);
+  if(btnPrev) btnPrev.addEventListener("click", () => navTo(-1));
+  if(btnNext) btnNext.addEventListener("click", () => navTo(1));
+  if(backdrop) backdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") { closeDrawer(); return; }
+    const open = drawer.classList.contains("show");
+    if(!open) return;
+    if(e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); navTo(-1); return; }
+    if(e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); navTo(1); return; }
+  });
+
+  // Zoom persisted
+  const zoomKey = "twmobile.ppm";
+  const zoom = document.getElementById("zoom");
+  const zoomVal = document.getElementById("zoomVal");
+  let ppm = Number(localStorage.getItem(zoomKey) || CUR.px_per_min || 1.5);
+  ppm = Math.min(4.0, Math.max(0.8, ppm));
+  zoom.value = String(ppm);
+  zoomVal.textContent = `${ppm.toFixed(1)} px/min`;
+  if(zoom) zoom.addEventListener("input", () => {
+    ppm = Number(zoom.value);
+    localStorage.setItem(zoomKey, String(ppm));
+    zoomVal.textContent = `${ppm.toFixed(1)} px/min`;
+    renderAll();
+  });
+
+  function setTimelineHeight(){
+    tl.style.height = Math.round(totalMin * ppm) + "px";
+  }
+  function clearMarkers(){
+    rail.innerHTML = "";
+    [...tl.querySelectorAll(".hline,.now")].forEach(n => n.remove());
+  }
+  function renderMarkers(){
+    clearMarkers();
+    const startHour = Math.floor(workStartMin / 60);
+    const endHour = Math.ceil(workEndMin / 60);
+    for(let h=startHour; h<=endHour; h++){
+      const min = h*60;
+      if(min < workStartMin || min > workEndMin) continue;
+      const y = (min - workStartMin) * ppm;
+
+      const lab = document.createElement("div");
+      lab.className = "hlabel";
+      lab.style.top = `${y}px`;
+      lab.textContent = `${pad2(h)}:00`;
+      rail.appendChild(lab);
+
+      const ln = document.createElement("div");
+      ln.className = "hline major";
+      ln.style.top = `${y}px`;
+      tl.appendChild(ln);
+    }
+    for(let min = workStartMin; min <= workEndMin; min += 30){
+      if(min % 60 === 0) continue;
+      const y = (min - workStartMin) * ppm;
+      const ln = document.createElement("div");
+      ln.className = "hline";
+      ln.style.top = `${y}px`;
+      tl.appendChild(ln);
+    }
+
+    const now = Date.now();
+    const isToday = (new Date(now)).toDateString() === (new Date(dayStartMs)).toDateString();
+    if(isToday){
+      const nowMin = Math.floor((now - dayStartMs) / 60000);
+      if(nowMin >= workStartMin && nowMin <= workEndMin){
+        const y = (nowMin - workStartMin) * ppm;
+        const nl = document.createElement("div");
+        nl.className = "now";
+        nl.style.top = `${y}px`;
+        nl.innerHTML = `<div class="lbl">Now ${esc(fmtHm(now))}</div>`;
+        tl.appendChild(nl);
+      }
+    }
+  }
+
+  const LEGIBLE_PX = 34;
+  let tasks = CUR.tasks || [];
+  let gaps = CUR.gaps || [];
+
+  // Navigation index (tasks are sorted by start_ms_vis in the generator)
+  let idxByUuid = new Map();
+  let drawerUuid = null;
+
+  let workStartMs = dayStartMs + (workStartMin * 60000);
+  let workEndMs = dayStartMs + (workEndMin * 60000);
+
+  function fmtGap(mins){
+    const m = Math.round(mins);
+    if (m > 0) return `Free ${fmtDur(m)}`;
+    if (m === 0) return "0m";
+    return `Overlap ${fmtDur(-m)}`;
+  }
+
+  function scrollToTask(uuid){
+    const el = elByUuid.get(uuid);
+    if(!el) return;
+    try{
+      el.scrollIntoView({block:"center", inline:"nearest", behavior:"smooth"});
+    }catch(_){
+      el.scrollIntoView();
+    }
+  }
+
+  function navTo(delta){
+    if(!drawerUuid) return;
+    const idx = idxByUuid.get(drawerUuid);
+    if(idx === undefined) return;
+    const j = idx + delta;
+    if(j < 0 || j >= tasks.length) return;
+    const t = tasks[j];
+    select(t.uuid);
+    openDrawer(t, {scroll:true});
+  }
+
+  let selectedUuid = null;
+  const elByUuid = new Map();
+
+  function clearSel(){
+    if(!selectedUuid) return;
+    elByUuid.get(selectedUuid)?.classList.remove("selected");
+    selectedUuid = null;
+  }
+  function select(uuid){
+    if(selectedUuid === uuid) return;
+    clearSel();
+    selectedUuid = uuid;
+    elByUuid.get(uuid)?.classList.add("selected");
+  }
+
+  function renderTimeline(){
+    events.innerHTML = "";
+    elByUuid.clear();
+
+    for(const g of gaps){
+      const top = (((g.start_ms - dayStartMs)/60000) - workStartMin) * ppm;
+      const height = ((g.end_ms - g.start_ms)/60000) * ppm;
+      const div = document.createElement("div");
+      div.className = "blk gap";
+      div.style.top = `${top}px`;
+      div.style.height = `${Math.max(1, height)}px`;
+      div.style.left = "10px";
+      div.style.right = "10px";
+      // Label gaps when there is enough vertical space to read.
+      if(height >= 26){
+        const mins = (g.dur_min ?? Math.round((g.end_ms - g.start_ms)/60000));
+        div.innerHTML = `<div class=\"gl\">Free ${esc(fmtDur(mins))}</div>`;
+      }
+      events.appendChild(div);
+    }
+
+    const eventsWidth = events.getBoundingClientRect().width || 320;
+    const pad = 10;
+
+    for(const t of tasks){
+      const top = (((t.start_ms_vis - dayStartMs)/60000) - workStartMin) * ppm;
+      const rawH = ((t.end_ms_vis - t.start_ms_vis)/60000) * ppm;
+      const height = Math.max(1, rawH);
+      const accent = resolveAccent(t) || "var(--accent)";
+
+      if(t.overlap){
+        const total = Math.max(1, t.total_lanes || 1);
+        const lane = Math.max(0, t.lane || 0);
+        const gap = total >= 8 ? 3 : (total >= 5 ? 4 : 6);
+        const usable = Math.max(0, eventsWidth - pad*2 - gap*(total-1));
+        const laneW = Math.max(14, Math.floor(usable / total));
+        const left = pad + lane * (laneW + gap);
+
+        const slot = document.createElement("div");
+        slot.className = "blk task-slot";
+        slot.style.top = `${top}px`;
+        slot.style.height = `${height}px`;
+        slot.style.left = `${left}px`;
+        slot.style.width = `${laneW}px`;
+        slot.style.setProperty("--a", accent);
+        slot.innerHTML = `<div class="sid">${esc(t.short)}</div>`;
+        slot.addEventListener("click", () => { select(t.uuid); openDrawer(t); });
+        events.appendChild(slot);
+        elByUuid.set(t.uuid, slot);
+      } else {
+        const blk = document.createElement("div");
+        blk.className = "blk task-full";
+        blk.style.top = `${top}px`;
+        blk.style.height = `${height}px`;
+        blk.style.setProperty("--a", accent);
+
+        if(height < LEGIBLE_PX){
+          blk.classList.add("micro");
+          blk.innerHTML = `<div class="t1">${esc(t.description||"(no description)")}</div>`;
+        } else if(height < 52){
+          blk.classList.add("compact");
+          blk.innerHTML = `
+            <div class="t1">${esc(t.description||"(no description)")}</div>
+            <div class="t2">
+              <span class="badge dur">${esc(fmtHm(t.start_ms_vis))}–${esc(fmtHm(t.end_ms_vis))} • ${esc(fmtDur(t.dur_min))}</span>
+              <span class="badge id">${esc(t.short)}</span>
+            </div>`;
+        } else {
+          blk.innerHTML = `
+            <div class="t1">${esc(t.description||"(no description)")}</div>
+            <div class="t2">
+              <span class="badge dur">${esc(fmtHm(t.start_ms_vis))}–${esc(fmtHm(t.end_ms_vis))} • ${esc(fmtDur(t.dur_min))}</span>
+              <span class="badge id">${esc(t.short)}</span>
+              ${t.project ? `<span class="badge">${esc(t.project)}</span>` : `<span class="badge">No Project</span>`}
+              ${(t.tags && t.tags.length) ? t.tags.slice(0,3).map(x=>`<span class="badge">${esc(x)}</span>`).join("") : `<span class="badge">No Tag</span>`}
+            </div>`;
+        }
+
+        blk.addEventListener("click", () => { select(t.uuid); openDrawer(t); });
+        events.appendChild(blk);
+        elByUuid.set(t.uuid, blk);
+      }
+    }
+
+    if(CUR.summary.task_count === 0){
+      document.getElementById("emptyTL").style.display = "";
+    } else {
+      document.getElementById("emptyTL").style.display = "none";
+    }
+  }
+
+  function applyDayUI(){
+    document.getElementById("title").textContent = CUR.day_label;
+    document.getElementById("meta").textContent = `${CUR.filter_label} • Workhours ${CUR.workhours}`;
+    document.getElementById("stats").textContent = CUR.date_iso;
+    document.getElementById("chipTasks").textContent = `${CUR.summary.task_count} task(s)`;
+    document.getElementById("chipLoad").textContent = `Load ${fmtDur(CUR.summary.load_min)}`;
+    document.getElementById("chipOverlap").textContent = `Overlap ${CUR.summary.overlap_count}`;
+  }
+
+  function bindDay(idx){
+    if (!DAYS.length) return;
+    dayIndex = Math.max(0, Math.min(DAYS.length - 1, idx));
+    CUR = DAYS[dayIndex];
+    tasks = CUR.tasks || [];
+    gaps = CUR.gaps || [];
+    idxByUuid = new Map();
+    for (let i = 0; i < tasks.length; i++) idxByUuid.set(tasks[i].uuid, i);
+
+    workStartMin = CUR.work_start_min;
+    workEndMin = CUR.work_end_min;
+    totalMin = workEndMin - workStartMin;
+    dayStartMs = CUR.day_start_ms;
+    workStartMs = dayStartMs + (workStartMin * 60000);
+    workEndMs = dayStartMs + (workEndMin * 60000);
+
+    const p = CUR.palette || {};
+    projectColors = p.projectColors || {};
+    tagColors = p.tagColors || {};
+
+    closeDrawer();
+    clearSel();
+    applyDayUI();
+    renderAll();
+  }
+
+  function renderAll(){
+    setTimelineHeight();
+    renderMarkers();
+    renderTimeline();
+    document.getElementById("sum").textContent = `${CUR.date_iso} • Workhours ${CUR.workhours}`;
+    if(selectedUuid){
+      elByUuid.get(selectedUuid)?.classList.add("selected");
+    }
+  }
+
+  function bindSwipe(){
+    let sx = 0, sy = 0;
+    const minDx = 50;
+    const maxDy = 60;
+    document.addEventListener("touchstart", (ev) => {
+      const t = ev.changedTouches && ev.changedTouches[0];
+      if (!t) return;
+      sx = t.clientX;
+      sy = t.clientY;
+    }, { passive: true });
+    document.addEventListener("touchend", (ev) => {
+      const t = ev.changedTouches && ev.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      if (Math.abs(dx) < minDx || Math.abs(dy) > maxDy) return;
+      if (dx < 0) bindDay(dayIndex + 1);
+      else bindDay(dayIndex - 1);
+    }, { passive: true });
+  }
+
+  bindDay(dayIndex);
+  bindSwipe();
+  requestAnimationFrame(() => renderAll());
+  window.addEventListener("resize", () => renderAll());
+})();
+</script>
+</body>
+</html>

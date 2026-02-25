@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "goals": [
+    {
+      "id": "deep-work",
+      "name": "Deep Work",
+      "color": "#7CFF6B",
+      "projects": [
+        "ApexBody",
+        "AoR.research"
+      ],
+      "tags": [
+        "focus",
+        "deep"
+      ],
+      "tags_all": [],
+      "mode": "any"
+    },
+    {
+      "id": "maintenance",
+      "name": "Testing",
+      "color": "#d902a0",
+      "projects": [
+        "Farm",
+        "Master"
+      ],
+      "tags": [
+        "Memory",
+        "admin",
+        "chores"
+      ],
+      "tags_all": [],
+      "mode": "any"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "taskwarrior-scalpel"
+version = "1.0.0"
+description = "SCALPEL: Strategic Calendar Action Layer for Planning, Execution, and Logistics."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = []
+authors = [{ name = "SCALPEL contributors" }]
+keywords = ["taskwarrior", "timewarrior", "calendar", "planning", "scheduling", "cli"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Office/Business :: Scheduling",
+  "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6",
+]
+release = [
+  "build>=1.2",
+  "twine>=5",
+]
+
+[project.scripts]
+scalpel = "scalpel.cli:main"
+scalpel-ci = "scalpel.tools.ci:main"
+scalpel-doctor = "scalpel.tools.doctor:main"
+scalpel-check = "scalpel.tools.check:main"
+scalpel-smoke-build = "scalpel.tools.smoke_build:main"
+scalpel-gen-fixtures = "scalpel.tools.gen_fixtures:main"
+scalpel-minify-fixture = "scalpel.tools.minify_fixture:main"
+scalpel-validate-payload = "scalpel.tools.validate_payload:main"
+scalpel-render-payload = "scalpel.tools.render_payload:main"
+scalpel-filter-payload = "scalpel.tools.filter_payload:main"
+scalpel-ddmin-shrink = "scalpel.tools.ddmin_shrink:main"
+scalpel-bench = "scalpel.tools.bench:main"
+scalpel-plan-ops = "scalpel.tools.plan_ops:main"
+scalpel-apply-plan-result = "scalpel.tools.apply_plan_result:main"
+scalpel-ai-plan-stub = "scalpel.tools.ai_plan_stub:main"
+scalpel-validate-plan-result = "scalpel.tools.validate_plan_result:main"
+scalpel-ai-plan-lmstudio = "scalpel.tools.ai_plan_lmstudio:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scalpel*"]
+
+[tool.setuptools.package-data]
+scalpel = [
+  "goals.json",
+  "render/*.html",
+  "render/*.patch",
+  "render/*.md",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+# Start with a conservative ruleset to minimize churn.
+[tool.ruff.lint]
+select = ["F", "E9", "W6"]
+# Keep unused-import noise low during pre-release; enforce later if desired.
+ignore = ["F401"]

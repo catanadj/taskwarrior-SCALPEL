@@ -1,0 +1,103 @@
+--- template.py
++++ template.py
+@@ -1605,7 +1605,7 @@
+       if (t && t.local) continue;
+       const b = baseline.get(t.uuid) || { scheduled_ms: null, due_ms: null };
+       const d = baselineDur.get(t.uuid) ?? (DEFAULT_DUR * 60000);
+-      plan.set(t.uuid, { scheduled_ms: b.scheduled_ms, due_ms: b.due_ms, dur_ms: d });
++      plan.set(t.uuid, { due_ms: b.due_ms, dur_ms: d });
+     }
+   }
+   resetPlanToBaseline();
+@@ -1629,11 +1629,11 @@
+       const b = baseline.get(u) || { scheduled_ms: null, due_ms: null };
+       const bd = baselineDur.get(u) ?? (DEFAULT_DUR * 60000);
+ 
+-      const changedSD = (cur.scheduled_ms !== b.scheduled_ms) || (cur.due_ms !== b.due_ms);
++      const changedDue = (cur.due_ms !== b.due_ms);
+       const changedDur = (cur.dur_ms !== bd);
+ 
+-      if (changedSD || changedDur) {
+-        diffs[u] = { scheduled_ms: cur.scheduled_ms, due_ms: cur.due_ms, dur_ms: cur.dur_ms };
++      if (changedDue || changedDur) {
++        diffs[u] = { due_ms: cur.due_ms, dur_ms: cur.dur_ms };
+       }
+     }
+     try { localStorage.setItem(viewKey, JSON.stringify(diffs)); } catch (_) {}
+@@ -1645,17 +1645,19 @@
+ 
+     for (const [u, v] of Object.entries(obj)) {
+       if (!plan.has(u) || !v || typeof v !== "object") continue;
+-      const sm = v.scheduled_ms == null ? null : Number(v.scheduled_ms);
+       const dm = v.due_ms == null ? null : Number(v.due_ms);
+       const dur = v.dur_ms == null ? null : Number(v.dur_ms);
++      // Backward compat: older payloads stored scheduled_ms as well.
++      const sm = v.scheduled_ms == null ? null : Number(v.scheduled_ms);
+ 
+       const cur = plan.get(u);
+-      plan.set(u, {
+-        scheduled_ms: Number.isFinite(sm) ? sm : cur.scheduled_ms,
+-        due_ms: Number.isFinite(dm) ? dm : cur.due_ms,
+-        dur_ms: Number.isFinite(dur) ? dur : cur.dur_ms,
+-      });
+-    }
++      let dueMs = Number.isFinite(dm) ? dm : cur.due_ms;
++      let durMs = Number.isFinite(dur) ? dur : cur.dur_ms;
++      if (!Number.isFinite(dueMs) && Number.isFinite(sm) && Number.isFinite(durMs)) {
++        dueMs = sm + durMs;
++      }
++      plan.set(u, { due_ms: dueMs, dur_ms: durMs });
++      }
+   }
+   loadEdits();
+ 
+@@ -2340,8 +2342,7 @@
+       if (Number.isFinite(endMs)) {
+         startMs = endMs - durMs;
+       } else {
+-        startMs = (cur && Number.isFinite(cur.scheduled_ms)) ? cur.scheduled_ms :
+-          (t && Number.isFinite(Number(t.start_calc_ms))) ? Number(t.start_calc_ms) :
++        startMs = (t && Number.isFinite(Number(t.start_calc_ms))) ? Number(t.start_calc_ms) :
+           (t && Number.isFinite(t.scheduled_ms)) ? t.scheduled_ms : null;
+ 
+         if (Number.isFinite(startMs)) endMs = startMs + durMs;
+@@ -2635,7 +2636,7 @@
+         const changes = {};
+ 
+         for (const uuid of uuids) {
+-          const cur = plan.get(uuid) || { scheduled_ms: null, due_ms: null, dur_ms: DEFAULT_DUR * 60000 };
++          const cur = plan.get(uuid) || { due_ms: null, dur_ms: DEFAULT_DUR * 60000 };
+           const durMs = Number.isFinite(cur.dur_ms) ? cur.dur_ms : (DEFAULT_DUR * 60000);
+ 
+           let sMs = startMs;
+@@ -3851,10 +3852,10 @@
+     const cmds = [];
+     for (const t of (DATA.tasks || [])) {
+       const b = baseline.get(t.uuid) || { scheduled_ms: null, due_ms: null };
+-      const cur = plan.get(t.uuid) || { scheduled_ms: null, due_ms: null, dur_ms: DEFAULT_DUR * 60000 };
++      const cur = plan.get(t.uuid) || { due_ms: null, dur_ms: DEFAULT_DUR * 60000 };
+       const bd = baselineDur.get(t.uuid) ?? (DEFAULT_DUR * 60000);
+ 
+-      const changed = (cur.due_ms !== b.due_ms) || (cur.scheduled_ms !== b.scheduled_ms) || (cur.dur_ms !== bd);
++      const changed = (cur.due_ms !== b.due_ms) || (cur.dur_ms !== bd);
+       if (!changed) continue;
+ 
+       if (!Number.isFinite(cur.due_ms) || !Number.isFinite(cur.dur_ms) || cur.dur_ms <= 0) continue;
+@@ -3924,7 +3925,7 @@
+ 
+     for (const uuid of Object.keys(valid)) {
+       const ch = valid[uuid];
+-      plan.set(uuid, { scheduled_ms: ch.scheduledMs, due_ms: ch.dueMs, dur_ms: ch.durMs });
++      plan.set(uuid, { due_ms: ch.dueMs, dur_ms: ch.durMs });
+       applied++;
+     }
+ 
+@@ -4662,7 +4663,7 @@
+       tasksByUuid.set(uuid, t);
+       baseline.set(uuid, { scheduled_ms: startMs, due_ms: dueMs });
+       baselineDur.set(uuid, durMs);
+-      plan.set(uuid, { scheduled_ms: startMs, due_ms: dueMs, dur_ms: durMs });
++      plan.set(uuid, { due_ms: dueMs, dur_ms: durMs });
+ 
+       return uuid;
+     }

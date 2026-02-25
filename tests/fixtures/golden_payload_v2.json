@@ -1,0 +1,91 @@
+{
+  "cfg": {
+    "days": 7,
+    "default_duration_min": 30,
+    "display_tz": "local",
+    "max_infer_duration_min": 180,
+    "px_per_min": 2,
+    "snap_min": 5,
+    "tz": "UTC",
+    "view_key": "smoke",
+    "view_start_ms": 1577836800000,
+    "work_end_min": 1020,
+    "work_start_min": 480
+  },
+  "generated_at": "1970-01-01T00:00:00Z",
+  "indices": {
+    "by_day": {
+      "2020-01-01": [
+        0
+      ]
+    },
+    "by_project": {
+      "smoke": [
+        0,
+        1
+      ]
+    },
+    "by_status": {
+      "pending": [
+        0,
+        1
+      ]
+    },
+    "by_tag": {
+      "smoke": [
+        0,
+        1
+      ]
+    },
+    "by_uuid": {
+      "00000000-0000-0000-0000-000000000001": 0,
+      "00000000-0000-0000-0000-000000000002": 1
+    }
+  },
+  "meta": {
+    "generated_at": "1970-01-01T00:00:00Z",
+    "generated_by": "scalpel.tools.smoke_build",
+    "schema": {
+      "name": "scalpel.payload",
+      "version": 2
+    },
+    "start_ymd": "2020-01-01"
+  },
+  "schema_version": 2,
+  "tasks": [
+    {
+      "day_key": "2020-01-01",
+      "description": "SMOKE: Planned task",
+      "due_ms": 1577871000000,
+      "duration": "PT30M",
+      "duration_min": 30,
+      "id": 1,
+      "priority": "",
+      "project": "smoke",
+      "scheduled_ms": 1577869200000,
+      "status": "pending",
+      "tags": [
+        "smoke"
+      ],
+      "urgency": 1.0,
+      "uuid": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "day_key": null,
+      "description": "SMOKE: Unplanned task (no due/scheduled)",
+      "due_ms": null,
+      "duration": "PT10M",
+      "duration_min": 10,
+      "id": 2,
+      "priority": "",
+      "project": "smoke",
+      "scheduled_ms": null,
+      "status": "pending",
+      "tags": [
+        "smoke"
+      ],
+      "urgency": 1.0,
+      "uuid": "00000000-0000-0000-0000-000000000002"
+    }
+  ]
+}

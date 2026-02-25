@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Plan Tasks — CLI Wrapper</title>
+  <style>
+    :root{
+      --bg: #0b1220;
+      --bg2: #0f1d2e;
+      --ink: #f3f6fb;
+      --muted: #a9b6c8;
+      --card: #101a2a;
+      --line: #26344a;
+      --accent: #56c0a6;
+      --accent2: #e6b35a;
+      --danger: #e07373;
+      --neon: #6bff6b;
+    }
+    *{ box-sizing: border-box; }
+    html, body{ height:100%; }
+    body{
+      margin:0;
+      font-family: "IBM Plex Serif", "Georgia", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 70% -20%, #1a2c45 0%, transparent 70%),
+        radial-gradient(900px 500px at 10% 110%, #14233a 0%, transparent 65%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+    }
+    .wrap{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+    .hero{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:24px;
+      margin-bottom:28px;
+    }
+    .title{
+      font-size: 34px;
+      letter-spacing: 0.4px;
+      margin:0;
+    }
+    .subtitle{
+      margin:8px 0 0;
+      color: var(--muted);
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    .badge{
+      border:1px solid var(--line);
+      color: var(--muted);
+      padding:6px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap:18px;
+    }
+    .card{
+      background: rgba(16, 26, 42, 0.92);
+      border:1px solid var(--line);
+      border-radius: 16px;
+      padding:18px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.25);
+    }
+    .card.collapsed{
+      display:none;
+    }
+    .card h3{
+      margin:0 0 12px;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .modes{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:10px;
+    }
+    .mode{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      cursor:pointer;
+      transition: all .15s ease;
+      background: #0f1726;
+    }
+    .mode.active{
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(86,192,166,0.2), 0 10px 24px rgba(86,192,166,0.08);
+    }
+    .mode strong{ display:block; font-size: 14px; }
+    .mode span{ display:block; color: var(--muted); font-size: 12px; margin-top:6px; }
+    label{
+      display:block;
+      margin:12px 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    input, textarea, select{
+      width:100%;
+      background:#0b1422;
+      color: var(--ink);
+      border:1px solid var(--line);
+      padding:10px 12px;
+      border-radius:10px;
+      font-size:14px;
+      font-family: "IBM Plex Mono", "Courier New", monospace;
+    }
+    textarea{ min-height: 96px; }
+    .row{ display:flex; gap:10px; }
+    .row > *{ flex:1; }
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top:16px;
+      flex-wrap: wrap;
+    }
+    button{
+      border:0;
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      letter-spacing:0.03em;
+    }
+    .primary{
+      background: var(--accent);
+      color:#0b1220;
+    }
+    .ghost{
+      background: transparent;
+      color: var(--ink);
+      border:1px solid var(--line);
+    }
+    .cmd{
+      background: #0b1422;
+      border:1px dashed var(--line);
+      border-radius:12px;
+      padding:12px;
+      font-family: "IBM Plex Mono", "Courier New", monospace;
+      font-size: 13px;
+      color: #d7e2f3;
+      white-space: normal;
+      word-break: break-all;
+      min-height: 80px;
+    }
+    .line{
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 2px 0;
+    }
+    .line.section{ color: var(--accent2); }
+    .line.prompt{ color: var(--accent); }
+    .line.diff{ color: #7fd0ff; }
+    .line.err{ color: var(--danger); }
+    .payload{
+      background: linear-gradient(180deg, #0e1828, #0b1422);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      min-height: 420px;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.35);
+    }
+    .payload h2{
+      margin:0 0 16px;
+      font-size: 24px;
+      color: var(--neon);
+      letter-spacing: 0.04em;
+    }
+    .payload .section{
+      margin: 14px 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .payload .row{
+      display:flex;
+      gap:10px;
+      flex-wrap: wrap;
+    }
+    .pill{
+      background: #0c1f1b;
+      border: 1px solid rgba(107,255,107,0.25);
+      color: var(--neon);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+    .payload pre{
+      margin:10px 0 0;
+      padding:12px;
+      border-radius: 12px;
+      background: #0b1220;
+      border:1px solid var(--line);
+      color: #d9e7ff;
+      font-family: "IBM Plex Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    details{
+      margin-top: 12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 12px;
+      background:#0f1726;
+    }
+    details summary{
+      cursor:pointer;
+      color: var(--muted);
+      font-size:12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .note{
+      color: var(--muted);
+      font-size: 12px;
+      margin-top:8px;
+    }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+      .modes{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1 class="title">AI Plan Tasks — CLI Wrapper</h1>
+        <p class="subtitle">Generate a clean command for the interactive planner with minimal inputs. Defaults are pre‑filled; advanced options are tucked away.</p>
+      </div>
+      <div class="badge">CLI Builder</div>
+    </div>
+
+    <div class="grid">
+      <div class="card" id="setupCard">
+        <h3>Plan Setup</h3>
+        <div class="modes" id="modeGrid">
+          <div class="mode active" data-mode="project"><strong>Project</strong><span>Select by project prefix</span></div>
+          <div class="mode" data-mode="filter"><strong>Filter</strong><span>Use Taskwarrior filter string</span></div>
+          <div class="mode" data-mode="goal"><strong>Goal</strong><span>Use goals config ID</span></div>
+          <div class="mode" data-mode="new"><strong>New Project</strong><span>Plan tasks from scratch</span></div>
+        </div>
+
+        <div id="modeFields">
+          <div data-field="project">
+            <label>Project Prefix</label>
+            <input id="project" placeholder="e.g. Maintenance">
+          </div>
+          <div data-field="filter" style="display:none">
+            <label>Taskwarrior Filter</label>
+            <input id="filter" placeholder="e.g. project:Work status:pending">
+          </div>
+          <div data-field="goal" style="display:none">
+            <label>Goal ID</label>
+            <input id="goal" placeholder="e.g. meditation">
+            <label>Goals Config Path</label>
+            <input id="goalsConfig" value="scalpel/goals.json">
+          </div>
+          <div data-field="new" style="display:none">
+            <label>Default Project (optional)</label>
+            <input id="newProject" placeholder="e.g. NewProject">
+          </div>
+        </div>
+
+        <label>Prompt</label>
+        <textarea id="prompt" placeholder="Describe what you want to plan..."></textarea>
+
+        <details>
+          <summary>Advanced</summary>
+          <label>Out Mode</label>
+          <select id="outMode">
+            <option value="selected">selected</option>
+            <option value="delta">delta</option>
+            <option value="full">full</option>
+          </select>
+          <label>Output Path</label>
+          <input id="outPath" value="build/task_import.json">
+          <div class="row">
+            <div>
+              <label>Base URL</label>
+              <input id="baseUrl" value="http://127.0.0.1:1234">
+            </div>
+            <div>
+              <label>Model</label>
+              <input id="model" value="ministral-3-14b-reasoning">
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Max Prompt Chars</label>
+              <input id="maxPrompt" value="9000">
+            </div>
+            <div>
+              <label>Max Selected</label>
+              <input id="maxSelected" value="60">
+            </div>
+            <div>
+              <label>Max Ops</label>
+              <input id="maxOps" value="5">
+            </div>
+          </div>
+          <label>Min Confidence</label>
+          <input id="minConfidence" value="0.6">
+        </details>
+
+        <div class="actions">
+          <button class="primary" id="buildBtn">Build Command</button>
+          <button class="ghost" id="copyBtn">Copy</button>
+          <button class="ghost" id="runBtn">Run (Bridge)</button>
+        </div>
+        <div class="note">Bridge runs at <code>http://127.0.0.1:8765</code> (start with <code>python3 tools/ai_plan_tasks_bridge.py</code>).</div>
+      </div>
+
+      <div class="card" id="outputCard">
+        <h3>Output</h3>
+        <div id="output" class="cmd"></div>
+        <div class="row" style="margin-top:10px">
+          <input id="stdin" placeholder="Type reply (e.g., clarification or :accept)">
+          <button class="ghost" id="sendBtn">Send</button>
+        </div>
+        <div class="actions" style="margin-top:12px">
+          <button class="ghost" id="toggleSetupBtn">Show Setup</button>
+        </div>
+        <details style="margin-top:12px">
+          <summary>Command</summary>
+          <div id="cmd" class="cmd"></div>
+        </details>
+        <div class="note">Tip: use <code>:accept</code> to finalize and write the import JSON.</div>
+      </div>
+        <div class="payload" id="payloadCard">
+          <h2>Complete Pretty Task Payload</h2>
+          <div class="section">Mode</div>
+          <div class="row" id="payloadMode"></div>
+          <div class="section">Selection Summary</div>
+          <pre id="payloadSummary"></pre>
+          <div class="section">Prompt</div>
+          <pre id="payloadPrompt"></pre>
+          <div class="section">Selection</div>
+          <div class="row" id="payloadSelection"></div>
+          <div class="section">Runtime</div>
+          <div class="row" id="payloadRuntime"></div>
+          <div class="section">Limits</div>
+          <div class="row" id="payloadLimits"></div>
+          <div class="section">Model Payload JSON</div>
+          <pre id="payloadJson"></pre>
+        </div>
+    </div>
+  </div>
+  </div>
+
+  <script>
+    const modeGrid = document.getElementById("modeGrid");
+    const fields = document.querySelectorAll("[data-field]");
+    const cmdEl = document.getElementById("cmd");
+    const payloadMode = document.getElementById("payloadMode");
+    const payloadPrompt = document.getElementById("payloadPrompt");
+    const payloadSelection = document.getElementById("payloadSelection");
+    const payloadRuntime = document.getElementById("payloadRuntime");
+    const payloadLimits = document.getElementById("payloadLimits");
+    const payloadJson = document.getElementById("payloadJson");
+    const payloadSummary = document.getElementById("payloadSummary");
+
+    function setMode(mode){
+      for (const el of modeGrid.querySelectorAll(".mode")) {
+        el.classList.toggle("active", el.dataset.mode === mode);
+      }
+      fields.forEach(f => {
+        f.style.display = f.dataset.field === mode ? "block" : "none";
+      });
+      cmdEl.textContent = "";
+      renderPayload();
+    }
+
+    modeGrid.addEventListener("click", (e) => {
+      const target = e.target.closest(".mode");
+      if (!target) return;
+      setMode(target.dataset.mode);
+    });
+
+    function shellQuote(s){
+      const str = String(s);
+      if (!str) return "''";
+      return "'" + str.replace(/'/g, "'\"'\"'") + "'";
+    }
+
+    function buildCmd(){
+      const active = modeGrid.querySelector(".mode.active").dataset.mode;
+      const prompt = document.getElementById("prompt").value.trim();
+      const outPath = document.getElementById("outPath").value.trim() || "build/task_import.json";
+      const outMode = document.getElementById("outMode").value;
+      const baseUrl = document.getElementById("baseUrl").value.trim() || "http://127.0.0.1:1234";
+      const model = document.getElementById("model").value.trim() || "ministral-3-14b-reasoning";
+      const maxPrompt = document.getElementById("maxPrompt").value.trim() || "9000";
+      const maxSelected = document.getElementById("maxSelected").value.trim() || "60";
+      const maxOps = document.getElementById("maxOps").value.trim() || "5";
+      const minConfidence = document.getElementById("minConfidence").value.trim() || "0.6";
+
+      const args = [
+        "python3 -m scalpel.tools.ai_plan_tasks",
+        "--interactive",
+        "--prompt", shellQuote(prompt),
+        "--out", shellQuote(outPath),
+        "--out-mode", outMode,
+        "--base-url", shellQuote(baseUrl),
+        "--model", shellQuote(model),
+        "--max-prompt-chars", maxPrompt,
+        "--max-selected", maxSelected,
+        "--max-ops", maxOps,
+        "--min-confidence", minConfidence
+      ];
+
+      if (active === "project") {
+        const project = document.getElementById("project").value.trim();
+        if (project) args.push("--project", shellQuote(project));
+      } else if (active === "filter") {
+        const filter = document.getElementById("filter").value.trim();
+        if (filter) args.push("--filter", shellQuote(filter));
+      } else if (active === "goal") {
+        const goal = document.getElementById("goal").value.trim();
+        const goalsConfig = document.getElementById("goalsConfig").value.trim() || "scalpel/goals.json";
+        if (goal) args.push("--goal", shellQuote(goal), "--goals-config", shellQuote(goalsConfig));
+      } else if (active === "new") {
+        const project = document.getElementById("newProject").value.trim();
+        if (project) args.push("--project", shellQuote(project));
+        args.push("--new-project");
+      }
+
+      cmdEl.textContent = args.join(" ");
+      renderPayload();
+    }
+
+    document.getElementById("buildBtn").addEventListener("click", buildCmd);
+    document.getElementById("copyBtn").addEventListener("click", () => {
+      if (!cmdEl.textContent) return;
+      navigator.clipboard.writeText(cmdEl.textContent);
+    });
+    let currentSession = null;
+    let currentStream = null;
+    let lastPayload = null;
+
+    function renderPayload(){
+      const active = modeGrid.querySelector(".mode.active").dataset.mode;
+      const prompt = document.getElementById("prompt").value.trim();
+      const outPath = document.getElementById("outPath").value.trim() || "build/task_import.json";
+      const outMode = document.getElementById("outMode").value;
+      const baseUrl = document.getElementById("baseUrl").value.trim() || "http://127.0.0.1:1234";
+      const model = document.getElementById("model").value.trim() || "ministral-3-14b-reasoning";
+      const maxPrompt = document.getElementById("maxPrompt").value.trim() || "9000";
+      const maxSelected = document.getElementById("maxSelected").value.trim() || "60";
+      const maxOps = document.getElementById("maxOps").value.trim() || "5";
+      const minConfidence = document.getElementById("minConfidence").value.trim() || "0.6";
+
+      payloadMode.innerHTML = "";
+      payloadSelection.innerHTML = "";
+      payloadRuntime.innerHTML = "";
+      payloadLimits.innerHTML = "";
+      payloadSummary.textContent = lastPayload && lastPayload.summary ? lastPayload.summary : "(not available)";
+
+      const modeLabel = active === "new" ? "new-project" : active;
+      payloadMode.innerHTML += '<span class="pill">' + modeLabel + "</span>";
+      payloadPrompt.textContent = prompt || "(no prompt yet)";
+      payloadJson.textContent = lastPayload && lastPayload.json ? lastPayload.json : "(not requested yet)";
+
+      if (active === "project") {
+        const project = document.getElementById("project").value.trim();
+        payloadSelection.innerHTML += '<span class="pill">project:' + (project || "unset") + "</span>";
+      } else if (active === "filter") {
+        const filter = document.getElementById("filter").value.trim();
+        payloadSelection.innerHTML += '<span class="pill">filter:' + (filter || "unset") + "</span>";
+      } else if (active === "goal") {
+        const goal = document.getElementById("goal").value.trim();
+        const goalsConfig = document.getElementById("goalsConfig").value.trim() || "scalpel/goals.json";
+        payloadSelection.innerHTML += '<span class="pill">goal:' + (goal || "unset") + "</span>";
+        payloadSelection.innerHTML += '<span class="pill">config:' + goalsConfig + "</span>";
+      } else if (active === "new") {
+        const project = document.getElementById("newProject").value.trim();
+        payloadSelection.innerHTML += '<span class="pill">default project:' + (project || "none") + "</span>";
+      }
+
+      payloadRuntime.innerHTML += '<span class="pill">out:' + outPath + "</span>";
+      payloadRuntime.innerHTML += '<span class="pill">out-mode:' + outMode + "</span>";
+      payloadRuntime.innerHTML += '<span class="pill">base-url:' + baseUrl + "</span>";
+      payloadRuntime.innerHTML += '<span class="pill">model:' + model + "</span>";
+
+      payloadLimits.innerHTML += '<span class="pill">max-prompt:' + maxPrompt + "</span>";
+      payloadLimits.innerHTML += '<span class="pill">max-selected:' + maxSelected + "</span>";
+      payloadLimits.innerHTML += '<span class="pill">max-ops:' + maxOps + "</span>";
+      payloadLimits.innerHTML += '<span class="pill">min-confidence:' + minConfidence + "</span>";
+    }
+
+    document.getElementById("runBtn").addEventListener("click", async () => {
+      document.getElementById("setupCard").classList.add("collapsed");
+      const output = document.getElementById("output");
+      const active = modeGrid.querySelector(".mode.active").dataset.mode;
+      const prompt = document.getElementById("prompt").value.trim();
+      const outPath = document.getElementById("outPath").value.trim() || "build/task_import.json";
+      const outMode = document.getElementById("outMode").value;
+      const baseUrl = document.getElementById("baseUrl").value.trim() || "http://127.0.0.1:1234";
+      const model = document.getElementById("model").value.trim() || "ministral-3-14b-reasoning";
+      const maxPrompt = document.getElementById("maxPrompt").value.trim() || "9000";
+      const maxSelected = document.getElementById("maxSelected").value.trim() || "60";
+      const maxOps = document.getElementById("maxOps").value.trim() || "5";
+      const minConfidence = document.getElementById("minConfidence").value.trim() || "0.6";
+
+      const args = [
+        "--interactive",
+        "--prompt", prompt,
+        "--out", outPath,
+        "--out-mode", outMode,
+        "--base-url", baseUrl,
+        "--model", model,
+        "--max-prompt-chars", maxPrompt,
+        "--max-selected", maxSelected,
+        "--max-ops", maxOps,
+        "--min-confidence", minConfidence
+      ];
+
+      if (active === "project") {
+        const project = document.getElementById("project").value.trim();
+        if (project) args.push("--project", project);
+      } else if (active === "filter") {
+        const filter = document.getElementById("filter").value.trim();
+        if (filter) args.push("--filter", filter);
+      } else if (active === "goal") {
+        const goal = document.getElementById("goal").value.trim();
+        const goalsConfig = document.getElementById("goalsConfig").value.trim() || "scalpel/goals.json";
+        if (goal) args.push("--goal", goal, "--goals-config", goalsConfig);
+      } else if (active === "new") {
+        const project = document.getElementById("newProject").value.trim();
+        if (project) args.push("--project", project);
+        args.push("--new-project");
+      }
+
+      output.textContent = "Running...";
+      try {
+        const res = await fetch("http://127.0.0.1:8765/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ args })
+        });
+        const data = await res.json();
+        currentSession = data.session_id;
+        output.textContent = "cmd: " + (data.cmd ? data.cmd.join(" ") : "") + "\n\n[stream connected]\n";
+        lastPayload = { args, json: data.payload || "", summary: data.selection_summary || "" };
+        payloadJson.textContent = data.payload || "(no payload)";
+        payloadSummary.textContent = data.selection_summary || "(not available)";
+        if (currentStream) currentStream.close();
+        currentStream = new EventSource("http://127.0.0.1:8765/stream?id=" + currentSession);
+        currentStream.onmessage = (ev) => {
+          const line = ev.data || "";
+          if (line.startsWith("Prompt (or :accept / :quit):")) {
+            output.innerHTML += '<div class="line prompt">' + line + "</div>";
+          } else if (line.startsWith("Ops summary:")) {
+            output.innerHTML += '<div class="line section">' + line + "</div>";
+          } else if (line.startsWith("Diff:")) {
+            output.innerHTML += '<div class="line diff">' + line + "</div>";
+          } else if (line.startsWith("[stderr]")) {
+            output.innerHTML += '<div class="line err">' + line + "</div>";
+          } else if (line.trim() !== "") {
+            output.innerHTML += '<div class="line">' + line + "</div>";
+          }
+          output.scrollTop = output.scrollHeight;
+        };
+        currentStream.addEventListener("done", () => {
+          output.textContent += "\n[done]\n";
+          currentStream.close();
+        });
+      } catch (e) {
+        output.textContent = String(e);
+      }
+    });
+
+    document.getElementById("sendBtn").addEventListener("click", async () => {
+      const input = document.getElementById("stdin");
+      const text = input.value.trim();
+      if (!text || !currentSession) return;
+      input.value = "";
+      await fetch("http://127.0.0.1:8765/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: currentSession, text })
+      });
+    });
+
+    document.getElementById("toggleSetupBtn").addEventListener("click", () => {
+      const setup = document.getElementById("setupCard");
+      const btn = document.getElementById("toggleSetupBtn");
+      const hidden = setup.classList.contains("collapsed");
+      if (hidden) {
+        setup.classList.remove("collapsed");
+        btn.textContent = "Hide Setup";
+      } else {
+        setup.classList.add("collapsed");
+        btn.textContent = "Show Setup";
+      }
+    });
+
+    setMode("project");
+    renderPayload();
+  </script>
+</body>
+</html>

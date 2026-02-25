@@ -1,0 +1,77 @@
+{
+  "cfg": {
+    "tz": "UTC",
+    "work_start_min": 540,
+    "work_end_min": 1020,
+    "default_duration_min": 10,
+    "max_infer_duration_min": 480
+  },
+  "tasks": [
+    {
+      "uuid": "a",
+      "start_calc_ms": 1577869200000,
+      "end_calc_ms": 1577872800000,
+      "dur_calc_min": 60
+    },
+    {
+      "uuid": "b",
+      "start_calc_ms": 1577872800000,
+      "end_calc_ms": 1577876400000,
+      "dur_calc_min": 60
+    },
+    {
+      "uuid": "c",
+      "start_calc_ms": 1577865600000,
+      "end_calc_ms": 1577869200000,
+      "dur_calc_min": 60
+    },
+    {
+      "uuid": "d",
+      "start_calc_ms": 1577894400000,
+      "end_calc_ms": 1577901600000,
+      "dur_calc_min": 120
+    }
+  ],
+  "overrides": {
+    "b": {
+      "start_ms": 1577871000000,
+      "due_ms": 1577874600000,
+      "duration_min": 60
+    }
+  },
+  "expected": {
+    "events": {
+      "a": [1577869200000, 1577872800000, 60],
+      "b": [1577871000000, 1577874600000, 60],
+      "c": [1577865600000, 1577869200000, 60],
+      "d": [1577894400000, 1577901600000, 120]
+    },
+    "conflicts": [
+      {
+        "start_ms": 1577871000000,
+        "end_ms": 1577872800000,
+        "uuids": ["a", "b"],
+        "kind": "overlap"
+      },
+      {
+        "start_ms": 1577865600000,
+        "end_ms": 1577869200000,
+        "uuids": ["c"],
+        "kind": "out_of_hours"
+      },
+      {
+        "start_ms": 1577898000000,
+        "end_ms": 1577901600000,
+        "uuids": ["d"],
+        "kind": "out_of_hours"
+      }
+    ],
+    "selection_metrics": {
+      "uuids": ["a", "b", "d"],
+      "count": 3,
+      "duration_min": 240,
+      "span_min": 540,
+      "gap_min": 330
+    }
+  }
+}

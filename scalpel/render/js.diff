@@ -1,0 +1,201 @@
+--- a/scalpel/render/template.py
++++ b/scalpel/render/template.py
+@@ -2652,7 +2652,7 @@
+           if (sMin < WORK_START || dMin > WORK_END) break;
+ 
+           // due-dominant: store due; scheduled computed at command time as due - duration
+-          changes[uuid] = { scheduledMs: sMs, dueMs: dMs, durMs };
++          changes[uuid] = { dueMs: dMs, durMs };
+           startMs = dMs;
+         }
+ 
+@@ -3898,42 +3898,60 @@
+   // Commit (batch)
+   // -----------------------------
+   function commitPlanMany(changes) {
+-    const uuids = Object.keys(changes || {});
+-    if (!uuids.length) return;
+-
+-    let applied = 0;
+-    let skipped = 0;
+-
+-    const valid = {};
+-    for (const uuid of uuids) {
+-      const ch = changes[uuid];
+-      if (!tasksByUuid.has(uuid)) { skipped++; continue; }
+-      if (!Number.isFinite(ch.scheduledMs) || !Number.isFinite(ch.dueMs) || ch.dueMs <= ch.scheduledMs) { skipped++; continue; }
+-      if (!Number.isFinite(ch.durMs) || ch.durMs <= 0) { skipped++; continue; }
+-      if (startOfLocalDayMs(ch.scheduledMs) !== startOfLocalDayMs(ch.dueMs)) { skipped++; continue; }
+-      const di = dayIndexFromMs(ch.dueMs);
+-      if (di === null) { skipped++; continue; }
+-      const sMin = minuteOfDayFromMs(ch.scheduledMs);
+-      const dMin = minuteOfDayFromMs(ch.dueMs);
+-      if (sMin < WORK_START || dMin > WORK_END) { skipped++; continue; }
+-      valid[uuid] = ch;
+-    }
+-
+-    for (const uuid of Object.keys(valid)) {
+-      const ch = valid[uuid];
+-      plan.set(uuid, { due_ms: ch.dueMs, dur_ms: ch.durMs });
+-      applied++;
+-    }
+-
+-    if (applied) saveEdits();
+-    rerenderAll();
+-
+-    if (skipped && applied) elStatus.textContent = `Applied ${applied} change(s); skipped ${skipped} (out of bounds).`;
+-    else if (skipped && !applied) elStatus.textContent = `Skipped ${skipped} change(s) (out of bounds).`;
++    const uuids = Object.keys(changes || {});
++    if (!uuids.length) return;
++
++    let applied = 0;
++    let skipped = 0;
++
++    const valid = {};
++    for (const uuid of uuids) {
++      const ch = changes[uuid] || {};
++      if (!tasksByUuid.has(uuid)) { skipped++; continue; }
++
++      const durMs = Number(ch.durMs);
++      if (!Number.isFinite(durMs) || durMs <= 0) { skipped++; continue; }
++
++      // New format: { dueMs, durMs }
++      let dueMs = (ch.dueMs == null ? null : Number(ch.dueMs));
++
++      // Legacy support (temporary): { scheduledMs, durMs } -> derive due
++      if (!Number.isFinite(dueMs)) {
++        const schLegacy = (ch.scheduledMs == null ? null : Number(ch.scheduledMs));
++        if (Number.isFinite(schLegacy)) dueMs = schLegacy + durMs;
++      }
++
++      if (!Number.isFinite(dueMs)) { skipped++; continue; }
++
++      const startMs = dueMs - durMs;
++      if (!Number.isFinite(startMs) || dueMs <= startMs) { skipped++; continue; }
++
++      // No cross-day spans (current constraint)
++      if (startOfLocalDayMs(startMs) !== startOfLocalDayMs(dueMs)) { skipped++; continue; }
++
++      const di = dayIndexFromMs(dueMs);
++      if (di === null) { skipped++; continue; }
++
++      const sMin = minuteOfDayFromMs(startMs);
++      const dMin = minuteOfDayFromMs(dueMs);
++      if (sMin < WORK_START || dMin > WORK_END) { skipped++; continue; }
++
++      valid[uuid] = { dueMs, durMs };
++    }
++
++    for (const uuid of Object.keys(valid)) {
++      const v = valid[uuid];
++      plan.set(uuid, { due_ms: v.dueMs, dur_ms: v.durMs });
++      applied++;
++    }
++
++    if (applied) saveEdits();
++    rerenderAll();
++
++    if (skipped && applied) elStatus.textContent = `Applied ${applied} change(s); skipped ${skipped} (out of bounds).`;
++    else if (skipped && !applied) elStatus.textContent = `Skipped ${skipped} change(s) (out of bounds).`;
+   }
+ 
+@@ -4058,7 +4076,7 @@
+       const dueClamped = clamp(dueMs, s0 + MIN_DRAG_MS, e0 - MIN_DRAG_MS);
+       if (dueClamped === dueMs) return;
+       const newDur = dueClamped - lead.startMs;
+-      drag.preview = { [drag.leadUuid]: { scheduledMs: lead.startMs, dueMs: dueClamped, durMs: newDur } };
++      drag.preview = { [drag.leadUuid]: { dueMs: dueClamped, durMs: newDur } };
+       rerenderAll(true);
+     }
+ 
+@@ -4084,7 +4102,7 @@
+       // keep lead in its new slot; shift followers by same delta
+       const preview = {};
+       for (const [u, b] of Object.entries(blocks)) {
+         const ns = b.startMs + deltaMs;
+         const nd = b.endMs + deltaMs;
+-        preview[u] = { scheduledMs: ns, dueMs: nd, durMs: b.durMs };
++        preview[u] = { dueMs: nd, durMs: b.durMs };
+       }
+       drag.preview = preview;
+       rerenderAll(true);
+@@ -4095,7 +4113,7 @@
+       const di = dayIndexFromMs(p.dueMs);
+       if (di == null) continue;
+-      previewBlock(b.el, p.scheduledMs, p.dueMs, di);
++      previewBlock(b.el, (p.dueMs - p.durMs), p.dueMs, di);
+     }
+   }
+ 
+@@ -4216,7 +4234,7 @@
+     const changes = {};
+     for (const u of selUuids) {
+       const eff = effectiveInterval(u);
+       if (!eff) continue;
+       const ns = clamp(eff.startMs + deltaMs, startLimit, endLimit - eff.durMs);
+       const nd = ns + eff.durMs;
+-      changes[u] = { scheduledMs: ns, dueMs: nd, durMs: eff.durMs };
++      changes[u] = { dueMs: nd, durMs: eff.durMs };
+     }
+     commitPlanMany(changes);
+   }
+@@ -4245,7 +4263,7 @@
+     const changes = {};
+     for (const u of selUuids) {
+       const eff = effectiveInterval(u);
+       if (!eff) continue;
+       const nd = clamp(eff.endMs + deltaMs, startLimit + eff.durMs, endLimit);
+       const startMs = nd - eff.durMs;
+-      changes[u] = { scheduledMs: startMs, dueMs: nd, durMs: eff.durMs };
++      changes[u] = { dueMs: nd, durMs: eff.durMs };
+     }
+     commitPlanMany(changes);
+   }
+@@ -4282,7 +4300,7 @@
+       const changes = {};
+       for (const u of selUuids) {
+         const e = effectiveInterval(u);
+         if (!e) continue;
+         const ns = clamp(e.startMs, startLimit, endLimit - e.durMs);
+         const nd = ns + e.durMs;
+-        changes[u] = { scheduledMs: ns, dueMs: nd, durMs: e.durMs };
++        changes[u] = { dueMs: nd, durMs: e.durMs };
+       }
+       commitPlanMany(changes);
+     });
+@@ -4320,7 +4338,7 @@
+       const changes = {};
+       for (const u of selUuids) {
+         const e = effectiveInterval(u);
+         if (!e) continue;
+         const ns = clamp(e.startMs, startLimit, endLimit - e.durMs);
+         const nd = ns + e.durMs;
+-        changes[u] = { scheduledMs: ns, dueMs: nd, durMs: e.durMs };
++        changes[u] = { dueMs: nd, durMs: e.durMs };
+       }
+       commitPlanMany(changes);
+     });
+@@ -4344,7 +4362,7 @@
+     const changes = {};
+     for (const it of items) {
+       const e = it.e;
+       const ns = clamp(cursor, startLimit, endLimit - e.durMs);
+       const nd = ns + e.durMs;
+-      changes[it.u] = { scheduledMs: ns, dueMs: nd, durMs: it.e.durMs };
++      changes[it.u] = { dueMs: nd, durMs: it.e.durMs };
+       cursor = nd;
+     }
+     commitPlanMany(changes);
+   }
+@@ -4380,7 +4398,7 @@
+     const changes = {};
+     for (const it of items) {
+       const e = it.e;
+       const ns = clamp(cursor, startLimit, endLimit - e.durMs);
+       const nd = ns + e.durMs;
+-      changes[it.u] = { scheduledMs: ns, dueMs: nd, durMs: it.e.durMs };
++      changes[it.u] = { dueMs: nd, durMs: it.e.durMs };
+       cursor = nd;
+     }
+     commitPlanMany(changes);
+   }
