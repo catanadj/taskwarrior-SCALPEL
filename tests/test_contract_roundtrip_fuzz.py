@@ -43,7 +43,6 @@ def _mutate_tw_data_script_tag(html: str, rng: random.Random) -> str:
     if not m:
         return html
 
-    tag = m.group(0)
     attrs = [
         ("type", "application/json"),
         ("id", "tw-data"),

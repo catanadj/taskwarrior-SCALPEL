@@ -72,7 +72,6 @@ def _fails(cmd: str, payload: Dict[str, Any], schema: int, timeout_s: int) -> bo
     # Write candidate payload to a temp file and run command.
     with tempfile.TemporaryDirectory(prefix="scalpel-ddmin-") as td:
         p = Path(td) / "payload.json"
-        obj = _with_tasks(payload, _get_tasks(payload), schema=schema) if False else payload
         # NOTE: payload already prepared by caller; just dump it.
         p.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
 

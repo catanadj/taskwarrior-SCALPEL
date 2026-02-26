@@ -506,14 +506,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             return _die(f"Failed to load export JSON: {e}")
         filter_uuids = None
-        base_tasks = list(tasks_full)
     else:
         tasks_full = run_task_export("")
         filter_uuids = None
         if ns.filter and ns.filter.strip():
             filtered = run_task_export(ns.filter)
             filter_uuids = {u for u in (_task_uuid(t) for t in filtered) if u}
-        base_tasks = list(tasks_full)
 
     goal = None
     if ns.goal:
@@ -712,7 +710,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         try:
             if ns.out_mode == "full":
-                before_full = copy.deepcopy(list(tasks_full))
                 merged = _apply_ops(list(tasks_full), ops, default_project=default_project)
                 out_tasks = merged
             else:
@@ -814,7 +811,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             ops = last_plan.get("ops") if isinstance(last_plan.get("ops"), list) else []
             try:
                 if ns.out_mode == "full":
-                    before_full = copy.deepcopy(list(tasks_full))
                     merged = _apply_ops(list(tasks_full), ops, default_project=default_project)
                     out_tasks = merged
                 else:

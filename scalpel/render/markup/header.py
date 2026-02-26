@@ -4,7 +4,7 @@ from __future__ import annotations
 MARKUP = r"""<header>
   <div class="header-primary">
     <div class="title-wrap">
-      <div class="title">S  C  A  L  P  E  L</div>
+      <div class="title"> < < S  C  A  L  P  E  L > ></div>
       <div class="subtitle">    Discipline is Freedom</div>
     </div>
     <div class="meta-row">

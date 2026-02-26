@@ -119,10 +119,10 @@ def _import_upgrade_payload(repo: Path):
 
 def _upgrade_to_version(repo: Path, payload: Dict[str, Any], target_version: int) -> Dict[str, Any]:
     """Upgrade payload to target schema version (best-effort across signatures)."""
-    upgrade_payload = _import_upgrade_payload(repo)
+    upgrade_payload_fn = _import_upgrade_payload(repo)
 
     p = copy.deepcopy(payload)
-    sig = inspect.signature(upgrade_payload)
+    sig = inspect.signature(upgrade_payload_fn)
 
     # Try common parameter names used in prior iterations.
     kwargs: Dict[str, Any] = {}
@@ -131,7 +131,7 @@ def _upgrade_to_version(repo: Path, payload: Dict[str, Any], target_version: int
             kwargs[name] = target_version
             break
 
-    res = upgrade_payload(p, **kwargs)  # may mutate in place or return a dict
+    res = upgrade_payload_fn(p, **kwargs)  # may mutate in place or return a dict
     out = res if isinstance(res, dict) else p
 
     # Enforce requested target when possible (makes failures loud).

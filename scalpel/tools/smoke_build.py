@@ -26,6 +26,11 @@ from scalpel.util.tz import normalize_tz_name, resolve_tz, midnight_epoch_ms, to
 
 MARKER = "__DATA_JSON__"
 
+
+def _die(msg: str, rc: int = 2) -> int:
+    print(f"[scalpel-smoke-build] ERROR: {msg}", file=sys.stderr)
+    return rc
+
 def _embed_payload_html(payload: dict, *, pretty: bool) -> str:
     n = HTML_TEMPLATE.count(MARKER)
     if n != 1:

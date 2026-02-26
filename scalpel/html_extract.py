@@ -43,7 +43,6 @@ def _extract_payload_json_from_data_assignment(html_text: str):
     Uses a balanced-brace scan to isolate the JSON object/array.
     """
     import html as _html
-    import json
     import re
 
     m = re.search(r'\b(?:const|var)?\s*(?:window\.)?DATA\s*=\s*', html_text)
@@ -102,7 +101,6 @@ def extract_payload_json_from_html_text(html_text: str):
       3) Fallback:  DATA = {...}  assignment
     """
     import html as _html
-    import json
     import re
 
     # 1) script#tw-data (type-agnostic)

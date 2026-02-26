@@ -29,7 +29,7 @@ def build_html(payload: dict) -> str:
     else:
         data_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
-    data_json = data_json.replace('</', '<\/')  # script-safe injection
+    data_json = data_json.replace("</", r"<\/")  # script-safe injection
     html = HTML_TEMPLATE.replace(_DATA_MARKER, data_json)
 
     if _DATA_MARKER in html:

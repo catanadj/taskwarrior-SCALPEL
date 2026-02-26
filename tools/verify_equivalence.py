@@ -328,9 +328,6 @@ def check_cfg_time_sanity(cfg: Dict[str, Any]) -> None:
 
 
 def check_task_time_sanity(tasks: List[Dict[str, Any]], cfg: Dict[str, Any]) -> None:
-    max_infer = int(cfg.get("max_infer_duration_min", 480))
-    max_infer_ms = max_infer * MIN_MS
-
     for i, t in enumerate(tasks):
         name = f"tasks[{i}]"
         sched = t.get("scheduled_ms")
@@ -486,4 +483,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
