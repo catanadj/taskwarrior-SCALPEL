@@ -18,8 +18,8 @@ Stable `1.0.0` release line. Core payload/schema/rendering interfaces are versio
 - Use optional nautical anchor/CP preview hooks if your Taskwarrior setup includes those fields
 - Task actions: Add, Complete, Delete
 - Notes
-- Arrange functions for tasks
-- 
+- Time alignment functions for tasks
+- Keyboard shortcuts with quick commands panel (CTRL+K)
 
 SCALPEL is designed to grow into a broader personal planning system. Future development is intended to support military-inspired planning concepts such as Commander’s Intent, End State, PACE planning and alternative timelines, while remaining practical for individual use.
 
