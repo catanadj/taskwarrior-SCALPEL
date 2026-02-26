@@ -1,6 +1,4 @@
-# SCALPEL
-
-**Strategic Calendar Action Layer for Planning, Execution, and Logistics**
+<img width="1220" height="252" alt="image" src="https://github.com/user-attachments/assets/0c87aec3-ca3c-4a4e-9b94-dce3c9c88689" />
 
 Mission-grade personal planning with Taskwarrior + calendar.
 
