@@ -6,7 +6,7 @@ HTML_SHELL = r"""<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Taskwarrior Calendar</title>
+<title>SCALPEL</title>
 <style>
 __CSS_BLOCK__
 </style>

@@ -74,7 +74,7 @@ class TestAiFlowEndToEndContract(unittest.TestCase):
             self.assertEqual(p3.returncode, 0, combined3)
 
             html = out_html.read_text(encoding="utf-8", errors="replace")
-            self.assertIn("<title>Taskwarrior Calendar</title>", html)
+            self.assertIn("<title>SCALPEL</title>", html)
 
 
 if __name__ == "__main__":

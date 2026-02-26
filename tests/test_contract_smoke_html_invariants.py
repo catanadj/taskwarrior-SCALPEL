@@ -36,7 +36,7 @@ class TestSmokeHtmlInvariantsContract(unittest.TestCase):
 
             # Shell invariants
             self.assertIn("<!doctype html>", html.lower())
-            self.assertIn("<title>Taskwarrior Calendar</title>", html)
+            self.assertIn("<title>SCALPEL</title>", html)
             self.assertIn('meta charset="utf-8"', html.lower())
 
             # No template markers

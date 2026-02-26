@@ -142,8 +142,8 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
     # Shell invariants
     if "<!doctype html>" not in html.lower():
         raise RuntimeError("Strict: missing <!doctype html>.")
-    if "<title>Taskwarrior Calendar</title>" not in html:
-        raise RuntimeError("Strict: missing expected <title>Taskwarrior Calendar</title>.")
+    if "<title>SCALPEL</title>" not in html:
+        raise RuntimeError("Strict: missing expected <title>SCALPEL</title>.")
     if '<meta charset="utf-8"' not in html.lower():
         raise RuntimeError("Strict: missing meta charset utf-8.")
 

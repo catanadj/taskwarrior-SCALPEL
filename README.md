@@ -1,81 +1,64 @@
-<img width="1220" height="252" alt="image" src="https://github.com/user-attachments/assets/0c87aec3-ca3c-4a4e-9b94-dce3c9c88689" />
+<img width="1220" height="252" alt="SCALPEL banner" src="https://github.com/user-attachments/assets/0c87aec3-ca3c-4a4e-9b94-dce3c9c88689" />
 
-![Screenshot](https://github.com/user-attachments/assets/516dc7fb-ff6e-4754-a996-7805533763db)
+![SCALPEL planning UI screenshot](https://github.com/user-attachments/assets/516dc7fb-ff6e-4754-a996-7805533763db)
 
+# SCALPEL
 
-# Mission-grade personal planning with Taskwarrior + calendar.
+Mission-grade personal planning with Taskwarrior + calendar.
 
-SCALPEL is a CLI-first planning and rendering toolchain for Taskwarrior users. It exports tasks, normalizes them into a versioned calendar payload, validates the payload/contracts, and renders a self-contained interactive HTML planning view.
+SCALPEL is a CLI-first planning and rendering toolchain for Taskwarrior users. It turns `task export` data into a validated, versioned calendar payload and renders a self-contained interactive HTML planning view.
+
+It is designed for people who want:
+
+- A visual planning surface without giving up CLI workflows
+- A reproducible pipeline (payload JSON + replay rendering)
+- A safe way to test schedule changes before applying them in Taskwarrior
+- Optional AI-assisted planning on top of a stable payload/render contract
+
+Important: SCALPEL generates command output and plan JSON. It does not execute Taskwarrior commands automatically.
 
 ## Status
 
 Stable `1.0.0` release line.
 
 - Core payload/schema/rendering interfaces are versioned and contract-tested.
-- Replay/validation/filtering tooling is part of the supported workflow.
-- Planner/AI helpers (stub + optional LM Studio integration) sit on top of the stable payload pipeline.
+- Replay/validation/filtering is part of the supported workflow.
+- Planner/AI helpers (stub + optional LM Studio integration) are layered on top of the stable payload pipeline.
 
-SCALPEL is designed to grow into a broader personal planning system. Future development is intended to support military-inspired planning concepts such as Commander’s Intent, End State, PACE planning and alternative timelines, while remaining practical for individual use.
+## What It Feels Like To Use
 
-## What SCALPEL Actually Ships
+1. Run `scalpel` to export your Taskwarrior tasks and open a planning page in your browser.
+2. Drag/resize tasks, queue adds/completes/deletes, and shape the schedule visually.
+3. Copy the generated `task ... modify` / action commands or export a plan JSON for later replay/apply.
 
-SCALPEL is more than a single HTML renderer. It includes:
+## Product Highlights
 
-- A primary CLI (`scalpel`) that runs a live `task export` and produces an interactive schedule HTML.
-- A versioned payload pipeline (schema validation, upgrades, extraction from HTML, replay rendering).
-- A query/filter toolchain for payload JSON using `scalpel` query syntax.
-- Planner operations (`align-starts`, `align-ends`, `stack`, `distribute`, `nudge`) via CLI tools and AI plan formats.
-- Optional local AI planning via LM Studio (OpenAI-compatible API).
-- Diagnostics, smoke-build, fixture, benchmark, delta-debugging, and CI helper commands.
-- A small public Python API for loading/normalizing/querying payloads.
+### Interactive planning UI
 
-## Core Capabilities
-
-### Main workflow (`scalpel`)
-
-- Export from Taskwarrior (`task ... export`) using a filter (default `status:pending`)
-- Normalize tasks into a SCALPEL payload with indices (`by_uuid`, `by_status`, `by_project`, `by_tag`, `by_day`)
-- Render a self-contained interactive HTML calendar (no server required)
-- Open the rendered page automatically (optional `--no-open`)
-
-### Interactive HTML planning UI
-
-The generated page supports a planning-first workflow and exports commands/results for you to apply:
-
-- Drag/resize calendar tasks with snap-to-grid behavior
-- Multi-day calendar view with configurable work hours and vertical scale
-- Selection-driven planning actions and command generation
-- Queue `task` actions for selected tasks (`complete`, `delete`) and local placeholder task adds
-- Copy/export generated Taskwarrior command output (SCALPEL does not run commands automatically)
-- Export/import plan JSON (`scalpel.plan.v1` plan result format)
+- Multi-day calendar with configurable work hours and vertical scale
+- Drag/resize scheduling with snap-to-grid behavior
+- Selection-driven planning actions
+- Queue actions for selected tasks: complete, delete, add placeholders
+- Copy command output for shell execution
+- Export/import plan JSON (`scalpel.plan.v1`)
 - Notes panel and quick command palette (`Ctrl/Cmd+K`)
-- Goal/tag/project color mapping and theme customization
-- Optional AI scheduling modal in the UI (paired with the plan-result workflow)
+- Goal/project/tag color mapping and theme customization
+- Optional AI scheduling modal (works with the plan-result flow)
 
-### Replayable, inspectable pipeline
+### CLI-first, replayable workflow
 
-- Render from live Taskwarrior data (`scalpel`)
-- Render from saved payload JSON (`scalpel-render-payload`)
-- Extract embedded payload JSON from generated HTML (`scalpel-validate-payload --from-html`)
+- Live Taskwarrior export -> payload -> HTML (`scalpel`)
+- HTML -> extract embedded payload JSON (`scalpel-validate-payload --from-html`)
+- Filter payloads with query syntax (`scalpel-filter-payload`)
+- Re-render from payload JSON (`scalpel-render-payload`)
 - Validate and upgrade payloads across schema versions (never downgrades)
-- Filter payloads with query syntax and re-render subsets
 
-### Planner + AI workflows
+### Planning + AI tooling
 
-- Apply deterministic planner ops to selected UUIDs (`scalpel-plan-ops`)
-- Validate AI plan result files (`scalpel-validate-plan-result`)
-- Apply AI plan results to payloads (`scalpel-apply-plan-result`)
-- Generate deterministic stub plans for local testing (`scalpel-ai-plan-stub`)
-- Call LM Studio as a local planner backend (`scalpel-ai-plan-lmstudio`)
-
-### Engineering/tooling support
-
-- Repo hygiene and preflight checks (`scalpel-doctor`, `scalpel-check`)
-- One-command CI gate (`scalpel-ci`)
-- Smoke HTML/payload generation (`scalpel-smoke-build`)
-- Golden fixture generation/checking (`scalpel-gen-fixtures`)
-- Micro-benchmarks (`scalpel-bench`)
-- Delta-debug shrinking for failing payloads (`scalpel-ddmin-shrink`)
+- Deterministic planner ops (`align-starts`, `align-ends`, `stack`, `distribute`, `nudge`) via `scalpel-plan-ops`
+- Stub AI planner for deterministic local testing (`scalpel-ai-plan-stub`)
+- Optional LM Studio local model integration (`scalpel-ai-plan-lmstudio`)
+- Plan validation/apply tools (`scalpel-validate-plan-result`, `scalpel-apply-plan-result`)
 
 ## Installation
 
@@ -84,52 +67,69 @@ Requirements:
 - Python `>=3.11`
 - Taskwarrior installed on `PATH` for the main live-export command (`scalpel`)
 
-Install from PyPI (distribution name):
+Taskwarrior setup (`~/.taskrc`):
+
+SCALPEL expects a `duration` UDA so generated commands like `duration:10min` round-trip cleanly.
+
+```ini
+uda.duration.type=duration
+uda.duration.label=duration
+uda.duration.default=PT10M
+```
+
+Install from PyPI:
 
 ```bash
 python3 -m pip install taskwarrior-scalpel
 ```
 
-Or install from a local checkout:
+Or from a local checkout:
 
 ```bash
 python3 -m pip install .
 ```
 
-Primary CLI entrypoint after install:
+Names:
 
-```bash
-scalpel --help
-```
-
-Additional tool commands are also installed (for example `scalpel-render-payload`, `scalpel-filter-payload`, `scalpel-plan-ops`, `scalpel-ci`).
-
-Notes:
-
-- PyPI distribution name: `taskwarrior-scalpel`
-- Python package/module namespace: `scalpel`
+- PyPI package: `taskwarrior-scalpel`
+- Python module: `scalpel`
 - Main CLI: `scalpel`
 
 ## Quick Start
 
-Generate an interactive planning page from Taskwarrior:
+Generate an interactive planning page from your live Taskwarrior data:
 
 ```bash
 scalpel --no-open --out build/scalpel_schedule.html
 ```
 
-Useful options:
+Common options:
 
 - `--filter "status:pending +work"`: Taskwarrior filter passed to `task export`
-- `--start YYYY-MM-DD`: view start date
-- `--days N`: number of days to render
+- `--start YYYY-MM-DD`: start date of the view
+- `--days N`: number of days to show
 - `--workhours HH:MM-HH:MM`: visible planning window
 - `--tz` / `--display-tz`: bucketing vs display timezone
-- `--plan-overrides FILE.json` or `--plan-result FILE.json`: apply changes before render
+- `--plan-overrides FILE.json` / `--plan-result FILE.json`: apply changes before render
 
-## Reproducible / Offline Workflow (Payload Replay)
+## Common Workflows
 
-Generate HTML, extract payload, validate, filter, and re-render:
+### 1) Daily planning from live Taskwarrior
+
+```bash
+scalpel --filter "status:pending" --days 7 --out build/scalpel.html
+```
+
+Then:
+
+- Adjust the schedule in the browser
+- Copy generated commands
+- Review them
+- Run them manually in your shell
+
+### 2) Reproducible payload + replay workflow
+
+Useful for debugging, sharing, testing, and offline iteration.
 
 ```bash
 scalpel --no-open --out build/scalpel.html
@@ -138,9 +138,36 @@ scalpel-filter-payload --in build/payload.json --q "project:work -blocked" --out
 scalpel-render-payload --in build/work.json --out build/work.html
 ```
 
-This workflow is useful for debugging, reproducibility, testing, and sharing minimal fixtures.
+### 3) AI-assisted planning (local-first)
 
-## Query Language (Payload Filtering)
+Deterministic stub planner flow:
+
+```bash
+scalpel --no-open --out build/scalpel.html
+scalpel-validate-payload --from-html build/scalpel.html --write-json build/payload.json
+
+# build/selected.json contains a JSON array of selected task UUIDs
+scalpel-ai-plan-stub --in build/payload.json --selected build/selected.json --prompt "align starts" --out build/plan.json --plan-schema v2
+scalpel-apply-plan-result --in build/payload.json --plan build/plan.json --out build/payload_planned.json
+scalpel-render-payload --in build/payload_planned.json --out build/scalpel_planned.html
+```
+
+Optional LM Studio backend:
+
+```bash
+scalpel-ai-plan-lmstudio \
+  --in build/payload.json \
+  --selected build/selected.json \
+  --prompt "align starts" \
+  --out build/plan.json \
+  --base-url http://127.0.0.1:1234 \
+  --model your-model-name
+```
+
+<details>
+<summary><strong>Advanced: Query Language (Payload Filtering)</strong></summary>
+
+<br />
 
 `scalpel-filter-payload` uses the SCALPEL query language (`scalpel.query_lang`).
 
@@ -163,49 +190,26 @@ scalpel-filter-payload --in build/payload.json --q "project:work +focus -blocked
 scalpel-filter-payload --in build/payload.json --q "day:2026-02-26 desc~meeting" --out build/meetings.json
 ```
 
-## Planner / AI Flow (CLI)
+</details>
 
-Deterministic local flow (stub planner):
+<details>
+<summary><strong>Advanced: Tooling Commands (Installed)</strong></summary>
 
-```bash
-scalpel --no-open --out build/scalpel.html
-scalpel-validate-payload --from-html build/scalpel.html --write-json build/payload.json
+<br />
 
-# build/selected.json should contain a JSON array of task UUIDs
-scalpel-ai-plan-stub --in build/payload.json --selected build/selected.json --prompt "align starts" --out build/plan.json --plan-schema v2
-scalpel-apply-plan-result --in build/payload.json --plan build/plan.json --out build/payload_planned.json
-scalpel-render-payload --in build/payload_planned.json --out build/scalpel_planned.html
-```
+Core workflow:
 
-Optional LM Studio backend:
+- `scalpel`
+- `scalpel-render-payload`
+- `scalpel-validate-payload`
+- `scalpel-filter-payload`
+- `scalpel-plan-ops`
+- `scalpel-apply-plan-result`
+- `scalpel-validate-plan-result`
+- `scalpel-ai-plan-stub`
+- `scalpel-ai-plan-lmstudio`
 
-```bash
-scalpel-ai-plan-lmstudio \
-  --in build/payload.json \
-  --selected build/selected.json \
-  --prompt "align starts" \
-  --out build/plan.json \
-  --base-url http://127.0.0.1:1234 \
-  --model your-model-name
-```
-
-See `docs/AI_FLOW.md`, `docs/AI_INTERFACE.md`, and `docs/PLANNER_CORE.md` for contracts and formats.
-
-## Tooling Commands (Installed)
-
-Main user-facing commands:
-
-- `scalpel` - live Taskwarrior export -> normalized payload -> rendered HTML
-- `scalpel-render-payload` - render payload JSON to replay HTML
-- `scalpel-validate-payload` - validate payload JSON or extract+validate from HTML
-- `scalpel-filter-payload` - query/filter payload JSON
-- `scalpel-plan-ops` - apply deterministic planner ops to selected tasks
-- `scalpel-apply-plan-result` - apply AI plan result JSON to a payload
-- `scalpel-validate-plan-result` - validate AI plan JSON format
-- `scalpel-ai-plan-stub` - deterministic stub AI planner (good for testing)
-- `scalpel-ai-plan-lmstudio` - LM Studio local model planner integration
-
-Engineering/support commands:
+Engineering/support:
 
 - `scalpel-doctor`
 - `scalpel-check`
@@ -216,7 +220,12 @@ Engineering/support commands:
 - `scalpel-ddmin-shrink`
 - `scalpel-bench`
 
-## Public Python API (Stable Surface)
+</details>
+
+<details>
+<summary><strong>Advanced: Public Python API (Stable Surface)</strong></summary>
+
+<br />
 
 Import from `scalpel.api` (preferred) or `import scalpel` (re-export).
 
@@ -243,7 +252,12 @@ today = tasks_by_day(payload, "2026-02-26")
 print(len(today))
 ```
 
-## Timezones
+</details>
+
+<details>
+<summary><strong>Advanced: Timezones</strong></summary>
+
+<br />
 
 SCALPEL separates two timezone concerns:
 
@@ -255,7 +269,12 @@ Typical usage:
 - Interactive local use: `--tz local --display-tz local` (defaults)
 - Deterministic CI/fixtures: `--tz UTC` and choose display (`local` or `UTC`)
 
-## Nautical Hooks (Optional)
+</details>
+
+<details>
+<summary><strong>Advanced: Nautical Hooks (Optional)</strong></summary>
+
+<br />
 
 Nautical preview task expansion is enabled by default.
 
@@ -264,12 +283,18 @@ Nautical preview task expansion is enabled by default.
 
 When enabled, SCALPEL attempts to load `nautical_core` (including from `~/.task` / `~/.task/hooks` if present) and generate anchor/CP preview tasks.
 
-## Packaging / Release / Docs
+</details>
 
-- Packaging metadata: `pyproject.toml`
-- Release checklist: `docs/PACKAGING_RELEASE_CHECKLIST.md`
-- Schema evolution notes: `docs/SCHEMA_EVOLUTION_PROTOCOL.md`
-- AI contracts/flows: `docs/AI_INTERFACE.md`, `docs/AI_FLOW.md`, `docs/PLANNER_CORE.md`
+<details>
+<summary><strong>Advanced: Docs / References</strong></summary>
+
+<br />
+
+- `docs/AI_FLOW.md`
+- `docs/AI_INTERFACE.md`
+- `docs/PLANNER_CORE.md`
+- `docs/SCHEMA_EVOLUTION_PROTOCOL.md`
+- `docs/PACKAGING_RELEASE_CHECKLIST.md`
 
 Golden fixture maintenance:
 
@@ -277,3 +302,5 @@ Golden fixture maintenance:
 scalpel-gen-fixtures --check
 scalpel-gen-fixtures --write
 ```
+
+</details>
