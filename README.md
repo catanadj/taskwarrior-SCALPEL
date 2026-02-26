@@ -1,5 +1,8 @@
 <img width="1220" height="252" alt="image" src="https://github.com/user-attachments/assets/0c87aec3-ca3c-4a4e-9b94-dce3c9c88689" />
 
+![Screenshot](https://github.com/user-attachments/assets/516dc7fb-ff6e-4754-a996-7805533763db)
+
+
 Mission-grade personal planning with Taskwarrior + calendar.
 
 SCALPEL is a CLI-first planning and rendering toolchain for Taskwarrior users. It exports tasks, normalizes them into a versioned calendar payload, validates the payload/contracts, and renders a self-contained interactive HTML planning view.
