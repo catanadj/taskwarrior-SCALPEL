@@ -6,16 +6,16 @@
 
 Mission-grade personal planning with Taskwarrior + calendar.
 
-SCALPEL is a CLI-first planning and rendering toolchain for Taskwarrior users. It turns `task export` data into a validated, versioned calendar payload and renders a self-contained interactive HTML planning view.
+**When you plan that your plans may be interrupted or disturbed, you gain steadiness. **
 
-It is designed for people who want:
+Using standard calendar tools (Google Calendar and the like) you just set your schedule and then try your best to follow it but in real world as they say "no plan survives contact with the enemy" but surely the act of planning for alternatives/contingencies helps but how exactly can this be put in practice and with what tools?
 
-- A visual planning surface without giving up CLI workflows
-- A reproducible pipeline (payload JSON + replay rendering)
-- A safe way to test schedule changes before applying them in Taskwarrior
-- Optional AI-assisted planning on top of a stable payload/render contract
+I am sure that the commanders in the military have such tools but I could not find anything similar for individual/civilian use.
 
-Important: SCALPEL generates command output and plan JSON. It does not execute Taskwarrior commands automatically.
+This project is my answer to that gap. 
+
+In the current stage of development is not much different than a standard calendar application but in its advance form is going to be much different.
+
 
 ## Status
 
@@ -24,6 +24,13 @@ Stable `1.0.0` release line.
 - Core payload/schema/rendering interfaces are versioned and contract-tested.
 - Replay/validation/filtering is part of the supported workflow.
 - Planner/AI helpers (stub + optional LM Studio integration) are layered on top of the stable payload pipeline.
+
+- A visual planning surface without giving up CLI workflows
+- A reproducible pipeline (payload JSON + replay rendering)
+- A safe way to test schedule changes before applying them in Taskwarrior
+- Optional AI-assisted planning on top of a stable payload/render contract
+
+Important: SCALPEL generates command output and plan JSON. It does not execute Taskwarrior commands automatically.
 
 ## What It Feels Like To Use
 
