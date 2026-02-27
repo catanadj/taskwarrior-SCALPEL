@@ -111,7 +111,7 @@ Names:
 Generate an interactive planning page from your live Taskwarrior data:
 
 ```bash
-scalpel --no-open --out build/scalpel_schedule.html
+scalpel --out build/scalpel_schedule.html
 ```
 
 Common options:
