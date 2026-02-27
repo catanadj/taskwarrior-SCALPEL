@@ -4,17 +4,19 @@
 
 # SCALPEL
 
-Mission-grade personal planning with Taskwarrior + calendar.
+## Mission-grade personal planning with Taskwarrior + calendar.
 
-**When you plan that your plans may be interrupted or disturbed, you gain steadiness. **
+**When you plan that your plans may be interrupted or disturbed, you gain steadiness.**
 
 Using standard calendar tools (Google Calendar and the like) you just set your schedule and then try your best to follow it but in real world as they say "no plan survives contact with the enemy" but surely the act of planning for alternatives/contingencies helps but how exactly can this be put in practice and with what tools?
 
-I am sure that the commanders in the military have such tools but I could not find anything similar for individual/civilian use.
+I am sure that the commanders in the military have such tools but I could not find anything similar for individual/civilian use especially not open source and local.
 
 This project is my answer to that gap. 
 
-In the current stage of development is not much different than a standard calendar application but in its advance form is going to be much different.
+In the current stage of development is not much different than a standard calendar application but in its advance form is going to be much more capable. 
+
+Please support its development.
 
 
 ## Status
