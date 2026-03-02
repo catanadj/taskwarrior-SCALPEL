@@ -418,6 +418,7 @@ JS_PART = r'''// Controls / rerender
   // Help + quick commands (lightweight command palette)
   const elBtnHelp = document.getElementById("btnHelp");
   const elBtnCommand = document.getElementById("btnCommand");
+  const elBtnRefresh = document.getElementById("btnRefresh");
   const elActionOverflow = document.getElementById("actionOverflow");
   const elBtnMoreActions = document.getElementById("btnMoreActions");
   const elOverflowMenu = document.getElementById("overflowMenu");
@@ -491,6 +492,56 @@ JS_PART = r'''// Controls / rerender
     elOverflowMenu.hidden = false;
     if (elActionOverflow) elActionOverflow.classList.add("open");
     if (elBtnMoreActions) elBtnMoreActions.setAttribute("aria-expanded", "true");
+  }
+
+  if (elBtnRefresh){
+    const canRefreshViaHttp = /^https?:$/i.test(String(location.protocol || ""));
+    if (!canRefreshViaHttp) {
+      elBtnRefresh.disabled = true;
+      elBtnRefresh.title = "Refresh is available only in --serve mode.";
+    } else {
+      elBtnRefresh.addEventListener("click", async () => {
+        closeOverflowMenu();
+
+        try{
+          const dirty = (typeof hasPendingActions === "function" && hasPendingActions())
+            || (typeof hasPlanOverrides === "function" && hasPlanOverrides());
+          if (dirty){
+            const ok = confirm(
+              "You have local pending changes.\n\n"
+              + "Refreshing will reload the page from fresh Taskwarrior data. Continue?"
+            );
+            if (!ok) {
+              elStatus.textContent = "Refresh cancelled.";
+              return;
+            }
+          }
+        }catch(_){ }
+
+        elBtnRefresh.disabled = true;
+        elStatus.textContent = "Refreshing data...";
+        try{
+          const res = await fetch("/refresh", {
+            method: "POST",
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+          });
+          let body = null;
+          try { body = await res.json(); } catch (_) {}
+          if (!res.ok || !body || body.ok !== true) {
+            const reason = (body && body.error) ? String(body.error) : `HTTP ${res.status}`;
+            elStatus.textContent = `Refresh failed: ${reason}`;
+            return;
+          }
+          elStatus.textContent = "Data refreshed. Reloading...";
+          setTimeout(() => location.reload(), 40);
+        } catch (e) {
+          elStatus.textContent = `Refresh failed: ${String((e && e.message) || e || "network error")}`;
+        } finally {
+          elBtnRefresh.disabled = false;
+        }
+      });
+    }
   }
 
   function openHelpModal(){

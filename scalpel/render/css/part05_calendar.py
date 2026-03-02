@@ -1117,6 +1117,21 @@ CSS_PART = r'''  .cal-wrap {
     background: rgba(255,255,255,0.05);
     border-color: rgba(154,166,178,0.36);
   }
+  .day-ctx-menu{
+    min-width: 280px;
+    border-color: rgba(var(--accent-rgb), 0.44);
+    box-shadow:
+      0 12px 26px rgba(0,0,0,0.42),
+      0 0 0 1px rgba(var(--accent-rgb), 0.16) inset;
+  }
+  .day-ctx-menu .nautical-ctx-title{
+    color: rgba(var(--accent-rgb), 0.96);
+    border-bottom-color: rgba(var(--accent-rgb), 0.28);
+  }
+  .day-ctx-menu .nautical-ctx-btn:hover{
+    border-color: rgba(var(--accent-rgb), 0.46);
+    background: rgba(var(--accent-rgb), 0.14);
+  }
 
 
   /* Sticky notes */

@@ -1413,6 +1413,103 @@ function _pulseEl(el){
     renderNotesPanel();
   }
 
+  function _isTimewNote(n){
+    return !!(n && String(n.scenario || "").trim().toLowerCase() === "timew");
+  }
+
+  function _timewNoteText(iv){
+    const ann = String(iv && iv.annotation || "").trim();
+    const tags = Array.isArray(iv && iv.tags)
+      ? iv.tags.map(x => String(x || "").trim()).filter(Boolean)
+      : [];
+    const tagLine = tags.length ? tags.map(t => `#${t}`).join(" ") : "";
+    if (ann && tagLine) return `[timew] ${ann} • ${tagLine}`;
+    if (ann) return `[timew] ${ann}`;
+    if (tagLine) return `[timew] ${tagLine}`;
+    return "[timew] Interval";
+  }
+
+  function applyTimewIntervalsAsNotes(dayYmd, intervals){
+    const ymd = String(dayYmd || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return { added: 0, removed: 0 };
+
+    const dayStartMs = msFromYmd(ymd);
+    const dayEndMs = dayStartMs + 86400000;
+    let removed = 0;
+
+    for (const [id, n] of Array.from(notesById.entries())) {
+      if (!_isTimewNote(n)) continue;
+      if (String(n.bucket_day_key || "") !== ymd) continue;
+      notesById.delete(id);
+      removed++;
+    }
+
+    let added = 0;
+    const src = Array.isArray(intervals) ? intervals : [];
+    for (let i = 0; i < src.length; i++) {
+      const iv = src[i] || {};
+      let sMs = Number(iv.start_ms);
+      let eMs = Number(iv.end_ms);
+      if (!Number.isFinite(sMs) || !Number.isFinite(eMs) || eMs <= sMs) continue;
+
+      sMs = Math.max(sMs, dayStartMs);
+      eMs = Math.min(eMs, dayEndMs);
+      if (eMs <= sMs) continue;
+
+      let sMin = clamp(minuteOfDayFromMs(sMs), 0, 24 * 60);
+      let eMin = clamp(minuteOfDayFromMs(eMs), 0, 24 * 60);
+      sMin = Math.max(0, Math.min(24 * 60, Math.round(sMin)));
+      eMin = Math.max(0, Math.min(24 * 60, Math.round(eMin)));
+      if (eMin <= sMin) continue;
+
+      const id = `timew:${ymd}:${i}:${Math.round(sMs)}:${Math.round(eMs)}`;
+      const now = _notesNow();
+      const note = {
+        id,
+        text: _timewNoteText(iv),
+        bucket_day_key: ymd,
+        start_min: sMin,
+        end_min: eMin,
+        repeat_dows: [],
+        pinned: false,
+        archived: false,
+        scenario: "timew",
+        style: { color: "c8" },
+        created_ms: now,
+        modified_ms: now,
+      };
+      upsertNote(note, false);
+      added++;
+    }
+
+    saveNotes();
+    try { setNotesAllVisible(true, true); } catch (_) {}
+    renderNotesPanel();
+    try { rerenderAll({ mode: "full", immediate: true }); } catch (_) {}
+    return { added, removed };
+  }
+
+  function clearTimewIntervalNotesDay(dayYmd){
+    const ymd = String(dayYmd || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return { removed: 0 };
+    let removed = 0;
+    for (const [id, n] of Array.from(notesById.entries())) {
+      if (!_isTimewNote(n)) continue;
+      if (String(n.bucket_day_key || "") !== ymd) continue;
+      notesById.delete(id);
+      removed++;
+    }
+    if (removed > 0) {
+      saveNotes();
+      renderNotesPanel();
+      try { rerenderAll({ mode: "full", immediate: true }); } catch (_) {}
+    }
+    return { removed };
+  }
+
+  globalThis.__scalpel_applyTimewIntervalsAsNotes = applyTimewIntervalsAsNotes;
+  globalThis.__scalpel_clearTimewIntervalNotesDay = clearTimewIntervalNotesDay;
+
   // Expose placement fns used by calendar drop handlers
   // (in-scope functions, referenced directly)
   initNotesUI();

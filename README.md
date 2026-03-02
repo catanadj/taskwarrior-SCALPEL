@@ -122,6 +122,7 @@ Common options:
 - `--workhours HH:MM-HH:MM`: visible planning window
 - `--tz` / `--display-tz`: bucketing vs display timezone
 - `--plan-overrides FILE.json` / `--plan-result FILE.json`: apply changes before render
+- `--serve [--host 127.0.0.1 --port 8765]`: keep a local server running with `POST /refresh`
 
 ## Common Workflows
 
@@ -137,6 +138,15 @@ Then:
 - Copy generated commands
 - Review them
 - Run them manually in your shell
+
+Optional live-refresh mode:
+
+```bash
+scalpel --serve --out build/scalpel.html
+```
+
+Then use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
+In `--serve` mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
 
 ### 2) Reproducible payload + replay workflow
 

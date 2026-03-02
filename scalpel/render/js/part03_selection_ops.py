@@ -578,6 +578,205 @@ JS_PART = r'''// Selection model
     return best;
   }
 
+  let __dayCtxMenu = null;
+  let __dayCtxDayIndex = null;
+
+  function __closeDayContextMenu() {
+    if (!__dayCtxMenu) return;
+    __dayCtxDayIndex = null;
+    __dayCtxMenu.hidden = true;
+  }
+
+  function __positionDayContextMenu(menu, x, y) {
+    if (!menu) return;
+    const gap = 8;
+    const vw = Math.max(320, window.innerWidth || 0);
+    const vh = Math.max(180, window.innerHeight || 0);
+    let left = Math.round(Number.isFinite(Number(x)) ? Number(x) : gap);
+    let top = Math.round(Number.isFinite(Number(y)) ? Number(y) : gap);
+
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    menu.hidden = false;
+
+    const rect = menu.getBoundingClientRect();
+    if (left + rect.width + gap > vw) left = Math.max(gap, vw - rect.width - gap);
+    if (top + rect.height + gap > vh) top = Math.max(gap, vh - rect.height - gap);
+    if (left < gap) left = gap;
+    if (top < gap) top = gap;
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  function __visibleDayIndexFromYmd(dayYmd) {
+    const target = String(dayYmd || "").trim();
+    if (!target) return null;
+    for (let i = 0; i < DAYS; i++) {
+      if (ymdFromMs(dayStarts[i]) === target) return i;
+    }
+    return null;
+  }
+
+  async function __showTimewIntervalsForYmd(dayYmd, dayIndexHint) {
+    const ymd = String(dayYmd || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+      if (elStatus) elStatus.textContent = "Invalid day. Expected YYYY-MM-DD.";
+      return;
+    }
+
+    const canHttp = /^https?:$/i.test(String(location.protocol || ""));
+    if (!canHttp) {
+      if (elStatus) elStatus.textContent = "Timewarrior day fetch requires --serve mode.";
+      return;
+    }
+
+    if (Number.isInteger(dayIndexHint) && dayIndexHint >= 0 && dayIndexHint < DAYS) {
+      try { if (typeof setActiveDay === "function") setActiveDay(dayIndexHint, true); } catch (_) {}
+    }
+
+    if (elStatus) elStatus.textContent = `Loading Timewarrior intervals for ${ymd}...`;
+    let body = null;
+    try{
+      const res = await fetch(`/timew?day=${encodeURIComponent(ymd)}`, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        cache: "no-store",
+      });
+      try { body = await res.json(); } catch (_) {}
+      if (!res.ok || !body || body.ok !== true) {
+        const reason = (body && body.error) ? String(body.error) : `HTTP ${res.status}`;
+        if (elStatus) elStatus.textContent = `Timewarrior fetch failed: ${reason}`;
+        return;
+      }
+    } catch (e) {
+      if (elStatus) elStatus.textContent = `Timewarrior fetch failed: ${String((e && e.message) || e || "network error")}`;
+      return;
+    }
+
+    const applyFn = globalThis.__scalpel_applyTimewIntervalsAsNotes;
+    if (typeof applyFn !== "function") {
+      if (elStatus) elStatus.textContent = "Notes integration unavailable for Timewarrior intervals.";
+      return;
+    }
+
+    const intervals = Array.isArray(body && body.intervals) ? body.intervals : [];
+    const out = applyFn(ymd, intervals);
+
+    let di = __visibleDayIndexFromYmd(ymd);
+    if (di == null && typeof applyViewWin === "function") {
+      try { applyViewWin({ startYmd: ymd }); } catch (_) {}
+      di = __visibleDayIndexFromYmd(ymd);
+    }
+    if (di != null && typeof setActiveDay === "function") {
+      try { setActiveDay(di, true); } catch (_) {}
+    }
+
+    const added = Number(out && out.added) || 0;
+    const removed = Number(out && out.removed) || 0;
+    if (elStatus) elStatus.textContent = `Timewarrior notes updated for ${ymd}: ${added} interval(s) shown, ${removed} replaced.`;
+  }
+
+  function __ensureDayContextMenu() {
+    if (__dayCtxMenu) return __dayCtxMenu;
+
+    const menu = document.createElement("div");
+    menu.className = "nautical-ctx-menu day-ctx-menu";
+    menu.hidden = true;
+    menu.innerHTML = `
+      <div class="nautical-ctx-title" data-role="title"></div>
+      <button type="button" class="nautical-ctx-btn" data-act="show">Show Timewarrior intervals (this day)</button>
+      <button type="button" class="nautical-ctx-btn" data-act="pick">Show Timewarrior intervals (choose day...)</button>
+      <button type="button" class="nautical-ctx-btn subtle" data-act="clear">Clear Timewarrior notes (this day)</button>
+      <button type="button" class="nautical-ctx-btn subtle" data-act="cancel">Cancel</button>
+    `;
+
+    menu.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    menu.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+    });
+    menu.addEventListener("click", (ev) => {
+      const btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act]") : null;
+      const act = btn && btn.dataset ? String(btn.dataset.act || "") : "";
+      if (!act) return;
+      if (act === "cancel") {
+        __closeDayContextMenu();
+        return;
+      }
+
+      const di = Number(__dayCtxDayIndex);
+      const dayYmd = (Number.isInteger(di) && di >= 0 && di < DAYS) ? ymdFromMs(dayStarts[di]) : "";
+      __closeDayContextMenu();
+
+      if (act === "show") {
+        __showTimewIntervalsForYmd(dayYmd, di);
+        return;
+      }
+      if (act === "pick") {
+        const initial = dayYmd || ymdFromMs(Date.now());
+        const picked = prompt("Show Timewarrior intervals for day (YYYY-MM-DD):", initial);
+        if (picked == null) {
+          if (elStatus) elStatus.textContent = "Timewarrior day selection cancelled.";
+          return;
+        }
+        const ymdPick = String(picked || "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymdPick)) {
+          if (elStatus) elStatus.textContent = "Invalid day format. Use YYYY-MM-DD.";
+          return;
+        }
+        __showTimewIntervalsForYmd(ymdPick, __visibleDayIndexFromYmd(ymdPick));
+        return;
+      }
+      if (act === "clear") {
+        const clearFn = globalThis.__scalpel_clearTimewIntervalNotesDay;
+        if (typeof clearFn !== "function") {
+          if (elStatus) elStatus.textContent = "Timewarrior notes clear action unavailable.";
+          return;
+        }
+        const out = clearFn(dayYmd);
+        const removed = Number(out && out.removed) || 0;
+        if (elStatus) elStatus.textContent = removed
+          ? `Removed ${removed} Timewarrior note(s) for ${dayYmd}.`
+          : `No Timewarrior notes found for ${dayYmd}.`;
+      }
+    });
+
+    document.addEventListener("pointerdown", (ev) => {
+      if (!__dayCtxMenu || __dayCtxMenu.hidden) return;
+      if (__dayCtxMenu.contains(ev.target)) return;
+      __closeDayContextMenu();
+    }, true);
+    document.addEventListener("keydown", (ev) => {
+      if (!__dayCtxMenu || __dayCtxMenu.hidden) return;
+      if (String(ev.key || "") !== "Escape") return;
+      __closeDayContextMenu();
+    }, true);
+    window.addEventListener("resize", () => __closeDayContextMenu(), { passive: true });
+    window.addEventListener("scroll", () => __closeDayContextMenu(), true);
+
+    document.body.appendChild(menu);
+    __dayCtxMenu = menu;
+    return menu;
+  }
+
+  function __openDayContextMenu(dayIndex, clientX, clientY) {
+    const di = Number(dayIndex);
+    if (!Number.isInteger(di) || di < 0 || di >= DAYS) {
+      __closeDayContextMenu();
+      return;
+    }
+    const dayYmd = ymdFromMs(dayStarts[di]);
+    const menu = __ensureDayContextMenu();
+    __dayCtxDayIndex = di;
+
+    const titleEl = menu.querySelector('[data-role="title"]');
+    if (titleEl) titleEl.textContent = `Day actions • ${dayYmd}`;
+    __positionDayContextMenu(menu, clientX, clientY);
+  }
+
   function buildCalendarSkeleton() {
     elCal.innerHTML = "";
 
@@ -647,6 +846,12 @@ JS_PART = r'''// Selection model
             renderDayBalance(activeDayIndex, lastDayVis);
           }
         } catch (_) {}
+      });
+      h.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        try { if (typeof setActiveDay === "function") setActiveDay(i, true); } catch (_) {}
+        __openDayContextMenu(i, ev.clientX, ev.clientY);
       });
       header.appendChild(h);
       // Allow dropping notes onto the day header (creates an all-day note)
