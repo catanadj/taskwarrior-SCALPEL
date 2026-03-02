@@ -44,9 +44,10 @@ def _base36(n: int) -> str:
     return sign + "".join(reversed(out))
 
 
-def _slot_id_for_start(start_ms: int) -> str:
-    # Compact, stable, globally unique enough for our horizon.
-    return f"S{_base36(int(start_ms))}"
+def _slot_id_for_interval(start_ms: int, due_ms: int) -> str:
+    # Compact and stable. Must include end boundary so different durations at
+    # the same start do not collide in slot_catalog.
+    return f"S{_base36(int(start_ms))}-{_base36(int(due_ms))}"
 
 
 def _iso_min(ms: int, tz: dt.tzinfo) -> str:
@@ -256,7 +257,7 @@ def build_candidate_slots(
                 s = _ceil_to_snap(a, snap_ms)
                 while s + dur_ms <= b:
                     e = s + dur_ms
-                    sid = _slot_id_for_start(s)
+                    sid = _slot_id_for_interval(s, e)
                     if sid not in slot_catalog:
                         slot_catalog[sid] = {"start_ms": int(s), "due_ms": int(e)}
                     out_slots.append(

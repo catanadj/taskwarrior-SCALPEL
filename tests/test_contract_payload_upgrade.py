@@ -23,5 +23,41 @@ class TestPayloadUpgradeContract(unittest.TestCase):
         self.assertIn("generated_at", out)
         self.assertIn("indices", out)
 
+    def test_upgrade_v1_missing_generated_at_is_repaired(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "cfg": {"tz": "UTC", "display_tz": "UTC"},
+            "tasks": [{"uuid": "u1", "status": "pending", "tags": []}],
+            "indices": {
+                "by_uuid": {"u1": 0},
+                "by_status": {"pending": [0]},
+                "by_project": {},
+                "by_tag": {},
+                "by_day": {},
+            },
+        }
+        out = upgrade_payload(payload, target_version=1)
+        self.assertEqual(out.get("schema_version"), 1)
+        self.assertIsInstance(out.get("generated_at"), str)
+        self.assertTrue(bool(str(out.get("generated_at")).strip()))
+
+    def test_upgrade_to_v2_repairs_missing_generated_at_from_v1_payload(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "cfg": {"tz": "UTC", "display_tz": "UTC"},
+            "tasks": [{"uuid": "u1", "status": "pending", "tags": []}],
+            "indices": {
+                "by_uuid": {"u1": 0},
+                "by_status": {"pending": [0]},
+                "by_project": {},
+                "by_tag": {},
+                "by_day": {},
+            },
+        }
+        out = upgrade_payload(payload, target_version=2)
+        self.assertEqual(out.get("schema_version"), 2)
+        self.assertIsInstance(out.get("generated_at"), str)
+        self.assertTrue(bool(str(out.get("generated_at")).strip()))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

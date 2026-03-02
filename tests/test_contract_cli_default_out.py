@@ -11,6 +11,35 @@ from scalpel import cli
 
 
 class TestCliDefaultOutContract(unittest.TestCase):
+    def test_obs_log_emits_structured_line_when_enabled(self) -> None:
+        with patch.dict(os.environ, {"SCALPEL_OBS_LOG": "1"}, clear=False), patch("scalpel.cli.eprint") as ep:
+            cli._obs_log("serve.auth_denied", path="/payload", method="GET", client="127.0.0.1")
+        self.assertTrue(ep.called)
+        line = str(ep.call_args.args[0]) if ep.call_args and ep.call_args.args else ""
+        self.assertTrue(line.startswith("[scalpel.serve.obs] "))
+        blob = line.split(" ", 1)[1]
+        obj = json.loads(blob)
+        self.assertEqual(obj.get("event"), "serve.auth_denied")
+        self.assertEqual(obj.get("path"), "/payload")
+        self.assertIn("ts", obj)
+
+    def test_obs_log_is_silent_when_disabled(self) -> None:
+        with patch.dict(os.environ, {}, clear=True), patch("scalpel.cli.eprint") as ep:
+            cli._obs_log("serve.auth_denied", path="/payload")
+        self.assertFalse(ep.called)
+
+    def test_counter_helpers_track_total_and_by_path(self) -> None:
+        counters = {}
+        cli._counter_inc(counters, "auth_failures_total", path="/payload")
+        cli._counter_inc(counters, "auth_failures_total", path="/payload")
+        cli._counter_inc(counters, "auth_failures_total", path="/refresh")
+        snap = cli._counter_snapshot(counters)
+        self.assertEqual(snap.get("auth_failures_total"), 3)
+        by_path = snap.get("auth_failures_total_by_path")
+        self.assertIsInstance(by_path, dict)
+        self.assertEqual(by_path.get("/payload"), 2)
+        self.assertEqual(by_path.get("/refresh"), 1)
+
     def test_default_out_is_build_relative_to_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -90,6 +119,73 @@ class TestCliDefaultOutContract(unittest.TestCase):
                 "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
             ), patch("scalpel.cli.ThreadingHTTPServer", FakeServer):
                 cli.main(["--serve", "--no-open", "--start", "2026-01-01", "--port", "0", "--out", str(outp)])
+
+            self.assertTrue(outp.exists())
+            self.assertEqual(events, ["init", "serve_forever", "server_close"])
+
+    def test_serve_remote_host_requires_allow_remote_flag(self) -> None:
+        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
+            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        ):
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(["--serve", "--no-open", "--start", "2026-01-01", "--host", "0.0.0.0"])
+        self.assertIn("without --allow-remote", str(ctx.exception))
+
+    def test_serve_remote_host_requires_token(self) -> None:
+        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
+            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        ):
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(
+                    [
+                        "--serve",
+                        "--no-open",
+                        "--start",
+                        "2026-01-01",
+                        "--host",
+                        "0.0.0.0",
+                        "--allow-remote",
+                    ]
+                )
+        self.assertIn("requires --serve-token", str(ctx.exception))
+
+    def test_serve_remote_with_token_and_allow_remote_starts_server(self) -> None:
+        events: list[str] = []
+
+        class FakeServer:
+            def __init__(self, addr, _handler):  # type: ignore[no-untyped-def]
+                self.server_address = ("0.0.0.0", 8765 if int(addr[1]) == 0 else int(addr[1]))
+                events.append("init")
+
+            def serve_forever(self):  # type: ignore[no-untyped-def]
+                events.append("serve_forever")
+                raise KeyboardInterrupt
+
+            def server_close(self):  # type: ignore[no-untyped-def]
+                events.append("server_close")
+
+        with tempfile.TemporaryDirectory() as td:
+            outp = Path(td) / "serve.html"
+            with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
+                "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+            ), patch("scalpel.cli.ThreadingHTTPServer", FakeServer):
+                cli.main(
+                    [
+                        "--serve",
+                        "--no-open",
+                        "--start",
+                        "2026-01-01",
+                        "--port",
+                        "0",
+                        "--host",
+                        "0.0.0.0",
+                        "--allow-remote",
+                        "--serve-token",
+                        "abc123",
+                        "--out",
+                        str(outp),
+                    ]
+                )
 
             self.assertTrue(outp.exists())
             self.assertEqual(events, ["init", "serve_forever", "server_close"])

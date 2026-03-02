@@ -235,6 +235,18 @@ def _repair_view_start_ms(cfg: dict, *, tz: dt.tzinfo) -> None:
         return
 
 
+def _has_generated_at(payload: dict[str, Any]) -> bool:
+    ga = payload.get("generated_at")
+    if isinstance(ga, str) and ga.strip():
+        return True
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        m = meta.get("generated_at")
+        if isinstance(m, str) and m.strip():
+            return True
+    return False
+
+
 def apply_schema_v1(payload: Any) -> Any:
     """Upgrade payload to schema v1 (additive + idempotent).
 
@@ -262,6 +274,7 @@ def apply_schema_v1(payload: Any) -> Any:
         and _indices_look_like_int_indices(out.get("indices"))
         and isinstance(cfg.get("tz"), str)
         and isinstance(cfg.get("display_tz"), str)
+        and _has_generated_at(out)
     ):
         return out
 

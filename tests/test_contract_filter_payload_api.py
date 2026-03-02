@@ -57,6 +57,14 @@ class TestFilterPayloadApiContract(unittest.TestCase):
         out = filter_payload(payload, "")
         self.assertEqual(len(out.get("tasks") or []), len(payload.get("tasks") or []))
 
+    def test_filter_payload_none_query_is_noop(self) -> None:
+        from scalpel.api import filter_payload
+        from scalpel.api import load_payload_from_json
+
+        payload = load_payload_from_json(REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json")
+        out = filter_payload(payload, None)
+        self.assertEqual(len(out.get("tasks") or []), len(payload.get("tasks") or []))
+
     def test_filter_payload_keep_meta_false_drops_meta(self) -> None:
         from scalpel.api import filter_payload
         from scalpel.api import load_payload_from_json

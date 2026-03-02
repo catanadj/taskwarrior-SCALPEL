@@ -24,3 +24,12 @@ Last updated: 2026-02-18
 
 - [x] Add explicit warnings/log markers for timestamp parse failures.
 - [x] Add explicit warnings/log markers for nautical hook load failures.
+
+## Remediation Sprint (2026-03-02)
+
+- [x] Fix `scalpel.plan.v2` slot ID collisions across different task durations (`scalpel/ai/slots.py`, `scalpel/ai/plan_v2.py`).
+- [x] Fix schema-v1 fast-path skipping `generated_at` normalization (`scalpel/schema_v1.py`).
+- [x] Handle `filter_payload(payload, None)` safely (`scalpel/api.py`).
+- [x] Harden `--serve` remote exposure with explicit opt-in and token auth guard (`scalpel/cli.py`).
+- [x] Load nautical hooks only when needed to reduce code-execution surface (`scalpel/payload.py`).
+- [x] Add regression tests for all fixes above.

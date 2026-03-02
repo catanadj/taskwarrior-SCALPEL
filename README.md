@@ -123,6 +123,7 @@ Common options:
 - `--tz` / `--display-tz`: bucketing vs display timezone
 - `--plan-overrides FILE.json` / `--plan-result FILE.json`: apply changes before render
 - `--serve [--host 127.0.0.1 --port 8765]`: keep a local server running with `POST /refresh`
+- `--allow-remote --serve-token TOKEN`: explicitly allow non-loopback serve mode with endpoint auth
 
 ## Common Workflows
 
@@ -147,6 +148,14 @@ scalpel --serve --out build/scalpel.html
 
 Then use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
 In `--serve` mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
+
+For remote/LAN use, `--allow-remote` is required and must be paired with `--serve-token` (or `SCALPEL_SERVE_TOKEN`). The printed URL includes `?token=...` and the server sets an auth cookie for follow-up UI/API calls.
+
+Serve observability:
+
+- Set `SCALPEL_OBS_LOG=1` to emit structured serve events to stderr (auth denials, refresh/timew success/failure).
+- `GET /metrics` returns lightweight in-memory counters for requests/auth failures/refresh/timew operations (token-protected when auth is enabled).
+- `GET /health?metrics=1` includes `auth_required` and the same counter snapshot.
 
 ### 2) Reproducible payload + replay workflow
 

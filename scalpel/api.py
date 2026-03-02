@@ -306,7 +306,10 @@ def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bo
     if not isinstance(by_uuid, dict):
         by_uuid = {}
 
-    q = Query.parse(query) if isinstance(query, str) else query
+    if query is None:
+        q = Query()
+    else:
+        q = Query.parse(query) if isinstance(query, str) else query
 
     keep_old: set[int] = set()
     if hasattr(q, "run_indices"):

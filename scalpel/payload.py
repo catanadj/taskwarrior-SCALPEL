@@ -189,6 +189,9 @@ def _build_nautical_preview_tasks(
     max_infer_duration_min: int,
     nautical_hooks_enabled: bool,
 ) -> List[Dict[str, Any]]:
+    if not _raw_tasks_may_need_nautical(raw_tasks):
+        return []
+
     nautical = _load_nautical_core(enabled=nautical_hooks_enabled)
     if not nautical:
         return []

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+import datetime as dt
 from pathlib import Path
 from unittest.mock import patch
 
@@ -36,6 +37,23 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
             self.assertIsNone(mod)
             combined = "\n".join(str(c.args[0]) for c in ep.call_args_list if c.args)
             self.assertIn("WARN: failed loading nautical_core", combined)
+
+    def test_preview_builder_skips_loader_when_raw_tasks_have_no_nautical_fields(self) -> None:
+        raw_tasks = [{"uuid": "u1", "description": "Normal task"}]
+        base_tasks = [{"uuid": "u1", "due_ms": 1_700_000_000_000, "scheduled_ms": None, "duration_min": 30}]
+        with patch("scalpel.payload._load_nautical_core") as load_mod:
+            out = payload_mod._build_nautical_preview_tasks(
+                base_tasks=base_tasks,
+                raw_tasks=raw_tasks,
+                start_date=dt.date(2026, 1, 1),
+                days=7,
+                tz_name="UTC",
+                default_duration_min=30,
+                max_infer_duration_min=480,
+                nautical_hooks_enabled=True,
+            )
+        self.assertEqual(out, [])
+        load_mod.assert_not_called()
 
 
 if __name__ == "__main__":
