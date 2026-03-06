@@ -325,7 +325,10 @@ JS_PART = r'''// Rendering (lists)
     let applied = 0;
     for (const move of moves) {
       const cur = plan.get(move.sourceUuid);
-      if (cur && Number(cur.due_ms) === move.dueMs && Number(cur.dur_ms) === move.durMs) applied += 1;
+      if (cur && Number(cur.due_ms) === move.dueMs && Number(cur.dur_ms) === move.durMs) {
+        applied += 1;
+        try { markNauticalPreviewConsumed(move.sourceUuid, move.dueMs); } catch (_) {}
+      }
     }
     if (elStatus) {
       if (applied === moves.length) elStatus.textContent = `${successLabel} ${applied} task(s).`;
@@ -546,6 +549,7 @@ JS_PART = r'''// Rendering (lists)
 
     const applied = plan.get(move.sourceUuid);
     if (applied && Number(applied.due_ms) === move.dueMs && Number(applied.dur_ms) === move.durMs) {
+      try { markNauticalPreviewConsumed(move.sourceUuid, move.dueMs); } catch (_) {}
       if (elStatus) elStatus.textContent = `Moved ${move.sourceUuid.slice(0,8)} to Nautical spawn ${formatLocalNoOffset(move.dueMs)}.`;
       return true;
     }

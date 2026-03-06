@@ -130,6 +130,19 @@ function showFatal(msg, err) {
   const pad2 = (n) => (n < 10 ? "0" + n : "" + n);
   const clamp = (n, lo, hi) => (n < lo ? lo : (n > hi ? hi : n));
   const isNauticalPreviewTask = (t) => !!(t && t.nautical_preview);
+  const __nauticalConsumedPreviewDueBySource = new Map(); // source uuid -> max consumed preview due_ms
+  function markNauticalPreviewConsumed(sourceUuid, previewDueMs) {
+    const u = String(sourceUuid || "").trim();
+    const due = Number(previewDueMs);
+    if (!u || !Number.isFinite(due)) return false;
+    const prev = Number(__nauticalConsumedPreviewDueBySource.get(u));
+    if (Number.isFinite(prev) && prev >= due) return false;
+    __nauticalConsumedPreviewDueBySource.set(u, due);
+    return true;
+  }
+  function clearNauticalPreviewConsumedMarks() {
+    __nauticalConsumedPreviewDueBySource.clear();
+  }
   function getNauticalPreviewSourceUuid(t) {
     const raw = t && (
       t.nautical_source_uuid ??
@@ -156,6 +169,11 @@ function showFatal(msg, err) {
     if (previewIv && Number.isFinite(previewIv.dueMs)) previewDueMs = previewIv.dueMs;
     else previewDueMs = Number(t.due_ms);
     if (!Number.isFinite(previewDueMs)) return true;
+
+    // Once a preview spawn has been consumed via "bring source task here", keep it hidden
+    // even if the source task is later moved manually (e.g. to overlap another interval).
+    const consumedDueMs = Number(__nauticalConsumedPreviewDueBySource.get(sourceUuid));
+    if (Number.isFinite(consumedDueMs) && previewDueMs <= consumedDueMs) return false;
 
     // Only show previews strictly after the current source task placement.
     return previewDueMs > sourceIv.dueMs;
@@ -733,6 +751,7 @@ startYmd: ymdFromMs(cfg.view_start_ms),
 
   function resetPlanToBaseline() {
     plan = new Map();
+    clearNauticalPreviewConsumedMarks();
     for (const t of (DATA.tasks || [])) {
       if (t && t.local) continue;
       const b = baseline.get(t.uuid) || { scheduled_ms: null, due_ms: null };
