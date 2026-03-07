@@ -43,21 +43,50 @@ JS_PART = r'''// Palette colors (projects/tags)
     try { _kvSetRaw(key, JSON.stringify(obj)); } catch (_) {}
     try { localStorage.setItem(String(key), JSON.stringify(obj)); } catch (_) {}
   }
+
+  // Strict CSS color validator for inline style usage.
+  function _normalizeCssColor(v) {
+    const s = String(v || "").trim();
+    if (!s) return "";
+    if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return s;
+    if (/^(?:rgb|hsl)a?\(\s*[-+0-9.%\s,]+\)$/.test(s)) return s;
+    if (/^[a-zA-Z][a-zA-Z0-9-]{0,31}$/.test(s)) return s.toLowerCase();
+    return "";
+  }
+  function _isSafeCssColor(v) { return !!_normalizeCssColor(v); }
+  function _sanitizeColorMapObject(obj) {
+    const out = {};
+    try {
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return out;
+      for (const [k, rawV] of Object.entries(obj)) {
+        if (typeof k !== "string") continue;
+        if (!(k.startsWith("project:") || k.startsWith("tag:"))) continue;
+        const color = _normalizeCssColor(rawV);
+        if (!color) continue;
+        out[k] = color;
+      }
+    } catch (_) {}
+    return out;
+  }
+  try {
+    globalThis.__scalpel_isSafeCssColor = _isSafeCssColor;
+    globalThis.__scalpel_normalizeCssColor = _normalizeCssColor;
+  } catch (_) {}
   // stored as { "project:work.dev": "#aabbcc", "tag:deep": "#112233" }
   // Prefer a global palette color map so colors persist across different view_key builds.
   const colorsGlobalKey = "scalpel:paletteColors:global";
 
-  let colorMap = loadJson(colorsGlobalKey, null);
-  if (!colorMap || typeof colorMap !== "object" || Array.isArray(colorMap)) colorMap = {};
+  let colorMap = _sanitizeColorMapObject(loadJson(colorsGlobalKey, null));
 
   // Back-compat: merge any legacy per-view colors (view overrides global) and migrate.
-  const _viewColorMap = loadJson(colorsKey, null);
-  if (_viewColorMap && typeof _viewColorMap === "object" && !Array.isArray(_viewColorMap)) {
-    colorMap = Object.assign({}, colorMap, _viewColorMap);
+  const _viewColorMap = _sanitizeColorMapObject(loadJson(colorsKey, null));
+  if (_viewColorMap && Object.keys(_viewColorMap).length) {
+    colorMap = _sanitizeColorMapObject(Object.assign({}, colorMap, _viewColorMap));
     try { if (typeof globalThis.__scalpel_kvSet === "function") globalThis.__scalpel_kvSet(colorsGlobalKey, JSON.stringify(colorMap)); } catch (_) {}
   }
 
   function saveColors() {
+    colorMap = _sanitizeColorMapObject(colorMap);
     try { globalThis.__scalpel_kvSet(colorsGlobalKey, JSON.stringify(colorMap)); } catch (_) {}
     try { globalThis.__scalpel_kvSet(colorsKey, JSON.stringify(colorMap)); } catch (_) {}
   }
@@ -66,7 +95,19 @@ JS_PART = r'''// Palette colors (projects/tags)
   // Goals (config-driven highlighting)
   // -----------------------------
   const rawGoalsCfg = (DATA.goals && DATA.goals.goals) ? DATA.goals.goals : [];
-  const goals = Array.isArray(rawGoalsCfg) ? rawGoalsCfg : [];
+  const goals = (() => {
+    const out = [];
+    if (!Array.isArray(rawGoalsCfg)) return out;
+    for (const g of rawGoalsCfg) {
+      if (!g || typeof g !== "object") continue;
+      const gid = String(g.id || "").trim();
+      if (!gid) continue;
+      const color = _normalizeCssColor(g.color);
+      if (!color) continue;
+      out.push({ ...g, id: gid, color });
+    }
+    return out;
+  })();
 
   let goalsState = loadJson(goalsKey, null);
   if (!goalsState || typeof goalsState !== "object") goalsState = {};

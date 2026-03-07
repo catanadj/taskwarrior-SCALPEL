@@ -1979,11 +1979,21 @@ function renderPaletteFromEvents(events) {
     const out = Object.create(null);
     try{
       if (!obj || typeof obj !== "object") return out;
+      const normalizeCssColor = (typeof globalThis.__scalpel_normalizeCssColor === "function")
+        ? globalThis.__scalpel_normalizeCssColor
+        : ((v) => {
+          const s = String(v || "").trim();
+          if (!s) return "";
+          if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return s;
+          if (/^(?:rgb|hsl)a?\(\s*[-+0-9.%\s,]+\)$/.test(s)) return s;
+          if (/^[a-zA-Z][a-zA-Z0-9-]{0,31}$/.test(s)) return s.toLowerCase();
+          return "";
+        });
       for (const [k, v] of Object.entries(obj)){
         if (typeof k !== "string" || typeof v !== "string") continue;
         if (!(k.startsWith("project:") || k.startsWith("tag:"))) continue;
-        const vv = v.trim();
-        if (!vv || vv.length > 128) continue;
+        const vv = normalizeCssColor(v);
+        if (!vv) continue;
         out[k] = vv;
       }
     }catch(_){ }

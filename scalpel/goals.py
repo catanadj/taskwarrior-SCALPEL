@@ -7,6 +7,23 @@ import os
 import re
 from typing import Any, Dict, Optional
 
+_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+_FUNC_COLOR_RE = re.compile(r"^(?:rgb|hsl)a?\(\s*[-+0-9.%\s,]+\)$", re.IGNORECASE)
+_NAMED_COLOR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]{0,31}$")
+
+
+def _normalize_css_color(value: str) -> str:
+    s = str(value or "").strip()
+    if not s:
+        return ""
+    if _HEX_COLOR_RE.fullmatch(s):
+        return s
+    if _FUNC_COLOR_RE.fullmatch(s):
+        return s
+    if _NAMED_COLOR_RE.fullmatch(s):
+        return s.lower()
+    return ""
+
 
 def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
     """Load goals config JSON.
@@ -52,7 +69,7 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
         if not gid:
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
             gid = slug or f"goal-{len(out)+1}"
-        color = str(g.get("color") or "").strip()
+        color = _normalize_css_color(g.get("color") or "")
         if not color:
             continue
 
@@ -88,4 +105,3 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
         )
 
     return {"version": 1, "goals": out}
-
