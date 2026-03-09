@@ -56,6 +56,16 @@ def _have(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
+def _is_truthy_env(name: str) -> bool:
+    raw = os.getenv(name, "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _have_mypy(py_exec: str) -> bool:
+    p = subprocess.run([py_exec, "-m", "mypy", "--version"], capture_output=True, text=True)
+    return p.returncode == 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         prog="scalpel-ci",
@@ -65,7 +75,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     ap.add_argument("--skip-doctor", action="store_true", help="Skip repo hygiene checks.")
     ap.add_argument("--skip-compileall", action="store_true", help="Skip python -m compileall.")
-    ap.add_argument("--skip-lint", action="store_true", help="Skip ruff checks (if installed).")
+    ap.add_argument("--skip-lint", action="store_true", help="Skip ruff checks.")
+    ap.add_argument("--skip-typecheck", action="store_true", help="Skip mypy strict allowlist checks.")
     ap.add_argument("--skip-tests", action="store_true", help="Skip unit/contract tests.")
     ap.add_argument("--skip-fixtures", action="store_true", help="Skip golden fixture check.")
 
@@ -98,6 +109,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception:
         pass
 
+    require_tooling = bool(ns.strict) or _is_truthy_env("CI")
+
     steps: List[Tuple[str, List[str]]] = []
 
     if not ns.skip_doctor:
@@ -122,7 +135,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             if ns.format:
                 steps.append(("ruff format --check", ["ruff", "format", "--check", "."]))
         else:
-            print("[scalpel-ci] WARN: ruff not found; skipping lint")
+            msg = "[scalpel-ci] WARN: ruff not found; skipping lint"
+            if require_tooling:
+                print("[scalpel-ci] FAIL: ruff is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
+                return 2
+            print(msg)
+
+    if not ns.skip_typecheck:
+        if _have_mypy(sys.executable):
+            steps.append(("mypy strict allowlist", [sys.executable, "-m", "mypy", "--config-file", "pyproject.toml"]))
+        else:
+            if require_tooling:
+                print("[scalpel-ci] FAIL: mypy is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
+                return 2
+            print("[scalpel-ci] WARN: mypy not found; skipping typecheck")
 
     if not ns.skip_tests:
         steps.append(("unittest", [sys.executable, "-m", "unittest", "discover", "-s", "tests"]))

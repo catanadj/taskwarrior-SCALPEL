@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # Default behavior:
 #   - deterministic, UTC-run CI gate (doctor + compileall + tests + fixtures)
-#   - optional ruff lint if installed
+#   - lint + strict allowlist typecheck when dev tooling is installed
 #
 # Bypass:
 #   SCALPEL_SKIP_GATE=1 ./scripts/scalpel_gate.sh

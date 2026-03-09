@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      - name: Type Check
+        run: python -m mypy --config-file pyproject.toml
+
       - name: Compile
         run: python -m compileall -q scalpel
 

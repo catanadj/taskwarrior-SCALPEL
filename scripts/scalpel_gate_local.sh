@@ -20,8 +20,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 cd "$ROOT"
 
 if [[ "${SCALPEL_PREPUSH_FAST:-0}" == "1" ]]; then
-  echo "[gate] FAST mode: tests only (skipping doctor, fixtures, lint)"
-  ./scripts/scalpel_ci.sh --skip-doctor --skip-fixtures --skip-lint
+  echo "[gate] FAST mode: tests only (skipping doctor, fixtures, lint, typecheck)"
+  ./scripts/scalpel_ci.sh --skip-doctor --skip-fixtures --skip-lint --skip-typecheck
   exit 0
 fi
 

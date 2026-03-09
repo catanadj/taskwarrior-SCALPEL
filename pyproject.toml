@@ -28,6 +28,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
   "ruff>=0.6",
+  "mypy>=1.11",
 ]
 release = [
   "build>=1.2",
@@ -66,6 +67,7 @@ scalpel = [
   "render/*.html",
   "render/*.patch",
   "render/*.md",
+  "render/js/*.js",
 ]
 
 [tool.ruff]
@@ -77,3 +79,15 @@ target-version = "py311"
 select = ["F", "E9", "W6"]
 # Keep unused-import noise low during pre-release; enforce later if desired.
 ignore = ["F401"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+files = [
+  "scalpel/taskwarrior.py",
+  "scalpel/util/timeparse.py",
+  "scalpel/util/tz.py",
+  "scalpel/util/duration.py",
+  "scalpel/tools/ci.py",
+]
