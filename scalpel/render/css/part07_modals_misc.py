@@ -667,6 +667,104 @@ CSS_PART = r'''  .modal {
 .themesw .sw.c8{ background: var(--note-c8-bg); border-color: var(--note-c8-bd); }
 .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
+  /* Task edit modal */
+  .task-edit-modal{ width: min(860px, 100%); }
+  .task-edit-head,
+  .task-edit-row{
+    display:grid;
+    grid-template-columns: minmax(170px, 240px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+  }
+  .task-edit-head{
+    padding: 0 2px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .task-edit-grid{
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+  }
+  .task-edit-row{
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface4);
+  }
+  .task-edit-row .k{
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 700;
+    opacity: 0.95;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .task-edit-row .v{
+    min-width: 0;
+    display:flex;
+    align-items:center;
+  }
+  .task-edit-row input[type="text"],
+  .task-edit-row textarea{
+    width: 100%;
+    min-width: 0;
+  }
+  .task-edit-row textarea{
+    min-height: 56px;
+    max-height: 180px;
+    resize: vertical;
+    border-radius: 10px;
+    border: 1px solid var(--input-bd);
+    background: var(--input-bg);
+    color: var(--text);
+    padding: 6px 8px;
+    outline: none;
+    font-size: 13px;
+    line-height: 1.35;
+    font-family: inherit;
+  }
+  .task-edit-custom{
+    margin-top: 2px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+  }
+  .task-edit-custom-h{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 8px;
+  }
+  .task-edit-custom-h .k{
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .task-edit-custom-grid{
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+  }
+  .task-edit-custom-row{
+    display:grid;
+    grid-template-columns: minmax(150px, 260px) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items:center;
+  }
+  .task-edit-custom-row .rm{
+    min-width: 30px;
+    padding-inline: 8px;
+  }
+
   /* Theme editor */
   #themeEditModal .modal { width: min(760px, 100%); }
   .themedit-sec{ margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }

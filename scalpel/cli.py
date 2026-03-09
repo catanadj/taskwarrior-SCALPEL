@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 from .ai import apply_plan_result, load_plan_overrides, load_plan_result
 from .payload import build_payload
 from .render.inline import build_html
-from .taskwarrior import parse_tw_utc_to_epoch_ms
+from .taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
 from .util.console import eprint
 from .util.timeparse import parse_date_yyyy_mm_dd, parse_workhours
 from .util.tz import resolve_tz, today_date, normalize_tz_name
@@ -267,6 +267,7 @@ def _counter_snapshot(counters: dict[str, Any]) -> dict[str, Any]:
 
 
 _YMD_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_UUID_QUERY_RE = re.compile(r"^[0-9A-Fa-f][0-9A-Fa-f-]{7,35}$")
 
 
 def _timew_timeout_s() -> float:
@@ -366,6 +367,24 @@ def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> dict[str, Any]:
 
     out.sort(key=lambda x: (int(x.get("start_ms") or 0), int(x.get("end_ms") or 0)))
     return {"day": day_ymd, "intervals": out}
+
+
+def _run_task_export_for_uuid(uuid_query: str) -> dict[str, Any]:
+    uq = str(uuid_query or "").strip()
+    if not _UUID_QUERY_RE.match(uq):
+        raise ValueError("Query param 'uuid' must be 8-36 hex/hyphen characters.")
+
+    tasks = run_task_export(f"uuid:{uq}")
+    if not tasks:
+        return {"task": None, "matched": 0, "exact": False}
+
+    uq_l = uq.lower()
+    exact = [t for t in tasks if isinstance(t, dict) and str(t.get("uuid") or "").lower() == uq_l]
+    if exact:
+        return {"task": exact[0], "matched": len(tasks), "exact": True}
+    if len(tasks) == 1 and isinstance(tasks[0], dict):
+        return {"task": tasks[0], "matched": 1, "exact": False}
+    raise SystemExit(f"Task query '{uq}' matched {len(tasks)} tasks; provide full UUID.")
 
 
 def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, Any]) -> None:
@@ -496,6 +515,52 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, A
                     return
                 _obs_inc("payload_reads_total")
                 self._send_json(200, payload)
+                return
+
+            if path == "/task":
+                if not self._is_authorized():
+                    self._deny_unauthorized(path)
+                    return
+                qs = parse_qs(urlsplit(self.path).query or "", keep_blank_values=False)
+                uuid_q = str((qs.get("uuid") or [""])[0]).strip()
+                if not uuid_q:
+                    self._send_json(400, {"ok": False, "error": "Query param 'uuid' is required."})
+                    return
+                try:
+                    res = _run_task_export_for_uuid(uuid_q)
+                    task_obj = res.get("task")
+                    if not isinstance(task_obj, dict):
+                        _obs_inc("task_export_not_found_total")
+                        self._send_json(404, {"ok": False, "error": f"Task not found for uuid:{uuid_q}"})
+                        return
+                    _obs_inc("task_export_success_total")
+                    _obs_log(
+                        "serve.task_export_ok",
+                        uuid_query=uuid_q,
+                        matched=int(res.get("matched") or 0),
+                        exact=bool(res.get("exact")),
+                    )
+                    self._send_json(
+                        200,
+                        {
+                            "ok": True,
+                            "task": task_obj,
+                            "uuid_query": uuid_q,
+                            "matched": int(res.get("matched") or 0),
+                            "exact": bool(res.get("exact")),
+                        },
+                    )
+                except ValueError as e:
+                    _obs_inc("task_export_error_total")
+                    self._send_json(400, {"ok": False, "error": str(e)})
+                except SystemExit as e:
+                    _obs_inc("task_export_error_total")
+                    _obs_log("serve.task_export_error", uuid_query=uuid_q, error=str(e))
+                    self._send_json(409, {"ok": False, "error": str(e)})
+                except Exception as e:
+                    _obs_inc("task_export_error_total")
+                    _obs_log("serve.task_export_error", uuid_query=uuid_q, error=f"{type(e).__name__}: {e}")
+                    self._send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
                 return
 
             if path == "/timew":

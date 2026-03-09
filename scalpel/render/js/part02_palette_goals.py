@@ -1417,6 +1417,15 @@ function buildAddCommandForLocal(uuid, desc) {
   const elAddLines = document.getElementById("addLines");
   const elAddClose = document.getElementById("addClose");
   const elAddQueue = document.getElementById("addQueue");
+  const elTaskEditModal = document.getElementById("taskEditModal");
+  const elTaskEditTitle = document.getElementById("taskEditTitle");
+  const elTaskEditMeta = document.getElementById("taskEditMeta");
+  const elTaskEditGrid = document.getElementById("taskEditGrid");
+  const elTaskEditCustomRows = document.getElementById("taskEditCustomRows");
+  const elTaskEditAddCustom = document.getElementById("taskEditAddCustom");
+  const elTaskEditClose = document.getElementById("taskEditClose");
+  const elTaskEditReset = document.getElementById("taskEditReset");
+  const elTaskEditSave = document.getElementById("taskEditSave");
 
   // -----------------------------
   // Calendar constants

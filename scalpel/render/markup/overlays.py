@@ -93,6 +93,37 @@ Review PR #142"></textarea>
   </div>
 </div>
 
+<div class="modal-backdrop" id="taskEditModal">
+  <div class="modal task-edit-modal">
+    <div class="mh">
+      <div class="t" id="taskEditTitle">Edit task</div>
+      <button class="small btn-soft" id="taskEditClose">Close</button>
+    </div>
+    <div class="mb">
+      <div class="hint" id="taskEditMeta"></div>
+      <div class="task-edit-head">
+        <div class="k">Field</div>
+        <div class="v">Value</div>
+      </div>
+      <div class="task-edit-grid" id="taskEditGrid"></div>
+      <div class="task-edit-custom">
+        <div class="task-edit-custom-h">
+          <div class="k">Custom UDA</div>
+          <button type="button" class="small btn-soft" id="taskEditAddCustom">+ Add</button>
+        </div>
+        <div class="task-edit-custom-grid" id="taskEditCustomRows"></div>
+        <div class="hint">Add UDA fields not listed above. Rows with an empty Field are ignored.</div>
+      </div>
+      <div class="hint">Only changed values are emitted into the queued <code>task ... modify</code> command.</div>
+    </div>
+    <div class="mf">
+      <button class="small btn-soft" id="taskEditReset">Reset</button>
+      <div class="grow" aria-hidden="true"></div>
+      <button class="small btn-primary" id="taskEditSave">Queue modify</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="noteModal">
   <div class="modal">
     <div class="mh">

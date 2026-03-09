@@ -138,6 +138,452 @@ JS_PART = r'''// Rendering (lists)
     node.style.removeProperty("filter");
   }
 
+  function __taskIdentifierForCommand(task) {
+    if (!task) return "";
+    return String((task.uuid || "").slice(0, 8));
+  }
+
+  function __taskFieldValue(value) {
+    if (value == null) return "";
+    let raw = "";
+    if (typeof value === "string") raw = value;
+    else if (typeof value === "number" || typeof value === "boolean") raw = String(value);
+    else if (Array.isArray(value)) raw = value.map(v => String(v == null ? "" : v)).join(",");
+    else {
+      try { raw = JSON.stringify(value); } catch (_) { raw = String(value); }
+    }
+    return String(raw || "").replace(/\s+/g, " ").trim();
+  }
+
+  function __taskFieldPreview(value) {
+    const s = __taskFieldValue(value);
+    if (!s) return "";
+    return (s.length > 84) ? (s.slice(0, 81) + "...") : s;
+  }
+
+  function __taskUdaEntries(task) {
+    if (!task || typeof task !== "object") return [];
+    const builtin = new Set([
+      "id", "uuid", "description", "status", "project", "tags", "priority",
+      "entry", "modified", "start", "end", "scheduled", "due", "wait", "until",
+      "recur", "mask", "imask", "parent", "depends", "annotations", "urgency",
+      "scheduled_ms", "due_ms", "duration_min", "local",
+      "nautical_preview", "nautical_source_uuid", "nauticalSourceUuid",
+      "nautical_source", "nauticalSource",
+    ]);
+    const out = [];
+    for (const [k, v] of Object.entries(task)) {
+      const key = String(k || "").trim();
+      if (!key || builtin.has(key) || key.startsWith("_")) continue;
+      const val = __taskFieldValue(v);
+      if (!val) continue;
+      out.push({ key, val });
+    }
+    out.sort((a, b) => String(a.key || "").localeCompare(String(b.key || "")));
+    return out;
+  }
+
+  function __twQuotedAtom(value) {
+    const s = String(value == null ? "" : value).trim();
+    if (!s) return "";
+    if (!/[\s"'\\]/.test(s)) return s;
+    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+
+  function __taskParseTagList(raw) {
+    const seen = new Set();
+    const out = [];
+    const parts = String(raw || "").split(/[,\s]+/);
+    for (const p of parts) {
+      const tag = String(p || "").trim().replace(/^[+-]+/, "");
+      if (!tag || seen.has(tag)) continue;
+      seen.add(tag);
+      out.push(tag);
+    }
+    return out;
+  }
+
+  function __isTaskEditModalOpen() {
+    return !!(elTaskEditModal && elTaskEditModal.style.display === "flex");
+  }
+
+  let __taskEditState = null; // { uuid, ident, fields, custom_rows }
+
+  function __newTaskEditCustomRow(key, val) {
+    return { key: String(key || "").trim(), val: String(val || "").trim() };
+  }
+
+  function __ensureTaskEditCustomRows() {
+    if (!__taskEditState) return [];
+    if (!Array.isArray(__taskEditState.custom_rows)) __taskEditState.custom_rows = [];
+    return __taskEditState.custom_rows;
+  }
+
+  function __syncTaskEditCustomRowsFromDom() {
+    if (!__taskEditState || !elTaskEditCustomRows) return;
+    const keyNodes = elTaskEditCustomRows.querySelectorAll('[data-custom-kind="key"]');
+    const rows = [];
+    keyNodes.forEach((node) => {
+      const idx = String((node && node.getAttribute && node.getAttribute("data-custom-idx")) || "");
+      const valNode = elTaskEditCustomRows.querySelector(`[data-custom-idx="${idx}"][data-custom-kind="val"]`);
+      const key = String((node && node.value) || "").trim();
+      const val = String((valNode && valNode.value) || "").trim();
+      rows.push(__newTaskEditCustomRow(key, val));
+    });
+    __taskEditState.custom_rows = rows;
+  }
+
+  function __addTaskEditCustomRow(key, val, focusKey) {
+    if (!__taskEditState) return;
+    __syncTaskEditCustomRowsFromDom();
+    const rows = __ensureTaskEditCustomRows();
+    rows.push(__newTaskEditCustomRow(key, val));
+    __renderTaskEditCustomRows();
+    if (!focusKey) return;
+    setTimeout(() => {
+      try {
+        const idx = rows.length - 1;
+        const sel = focusKey ? `[data-custom-idx="${idx}"][data-custom-kind="key"]` : `[data-custom-idx="${idx}"][data-custom-kind="val"]`;
+        const el = elTaskEditCustomRows && elTaskEditCustomRows.querySelector(sel);
+        if (el) el.focus();
+      } catch (_) {}
+    }, 0);
+  }
+
+  function __taskEditFieldDefs(detailsTask, fallbackTask) {
+    const rows = [];
+    const desc = String(detailsTask.description ?? fallbackTask.description ?? "").trim();
+    const proj = String(detailsTask.project ?? fallbackTask.project ?? "").trim();
+    const pri = String(detailsTask.priority ?? fallbackTask.priority ?? "").trim();
+    const tagsArr = Array.isArray(detailsTask.tags) ? detailsTask.tags : (Array.isArray(fallbackTask.tags) ? fallbackTask.tags : []);
+    const tags = tagsArr.map(v => String(v || "").trim()).filter(Boolean).join(", ");
+
+    rows.push({ key: "description", kind: "description", label: "description", value: desc });
+    rows.push({ key: "project", kind: "scalar", label: "project", value: proj });
+    rows.push({ key: "priority", kind: "scalar", label: "priority", value: pri });
+    rows.push({ key: "tags", kind: "tags", label: "tags", value: tags });
+
+    const udaEntries = __taskUdaEntries(detailsTask);
+    for (const it of udaEntries) rows.push({ key: it.key, kind: "scalar", label: it.key, value: String(it.val || "") });
+    return rows;
+  }
+
+  function __renderTaskEditGrid() {
+    if (!elTaskEditGrid) return;
+    const fields = (__taskEditState && Array.isArray(__taskEditState.fields)) ? __taskEditState.fields : [];
+    const frag = document.createDocumentFragment();
+
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i] || {};
+      const row = document.createElement("div");
+      row.className = "task-edit-row";
+
+      const k = document.createElement("div");
+      k.className = "k mono";
+      k.textContent = String(f.label || f.key || "");
+
+      const v = document.createElement("div");
+      v.className = "v";
+
+      let inp = null;
+      if (f.kind === "description") {
+        inp = document.createElement("textarea");
+        inp.rows = 2;
+      } else {
+        inp = document.createElement("input");
+        inp.type = "text";
+      }
+      inp.value = String(f.value || "");
+      inp.setAttribute("data-field-idx", String(i));
+      inp.setAttribute("data-field-key", String(f.key || ""));
+      inp.setAttribute("data-field-kind", String(f.kind || ""));
+      v.appendChild(inp);
+
+      row.appendChild(k);
+      row.appendChild(v);
+      frag.appendChild(row);
+    }
+
+    elTaskEditGrid.textContent = "";
+    elTaskEditGrid.appendChild(frag);
+    __renderTaskEditCustomRows();
+  }
+
+  function __renderTaskEditCustomRows() {
+    if (!elTaskEditCustomRows) return;
+    const rows = __ensureTaskEditCustomRows();
+    const frag = document.createDocumentFragment();
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || {};
+      const row = document.createElement("div");
+      row.className = "task-edit-custom-row";
+
+      const inpKey = document.createElement("input");
+      inpKey.type = "text";
+      inpKey.placeholder = "uda_field";
+      inpKey.value = String(r.key || "");
+      inpKey.setAttribute("data-custom-idx", String(i));
+      inpKey.setAttribute("data-custom-kind", "key");
+
+      const inpVal = document.createElement("input");
+      inpVal.type = "text";
+      inpVal.placeholder = "value";
+      inpVal.value = String(r.val || "");
+      inpVal.setAttribute("data-custom-idx", String(i));
+      inpVal.setAttribute("data-custom-kind", "val");
+
+      const bRm = document.createElement("button");
+      bRm.type = "button";
+      bRm.className = "small danger rm";
+      bRm.textContent = "−";
+      bRm.title = "Remove row";
+      bRm.addEventListener("click", () => {
+        __syncTaskEditCustomRowsFromDom();
+        const cur = __ensureTaskEditCustomRows();
+        if (i < 0 || i >= cur.length) return;
+        cur.splice(i, 1);
+        if (!cur.length) cur.push(__newTaskEditCustomRow("", ""));
+        __renderTaskEditCustomRows();
+      });
+
+      row.appendChild(inpKey);
+      row.appendChild(inpVal);
+      row.appendChild(bRm);
+      frag.appendChild(row);
+    }
+
+    elTaskEditCustomRows.textContent = "";
+    elTaskEditCustomRows.appendChild(frag);
+  }
+
+  function __closeTaskEditModal() {
+    if (!elTaskEditModal) return;
+    elTaskEditModal.style.display = "none";
+    __taskEditState = null;
+  }
+
+  function __resetTaskEditModal() {
+    const st = __taskEditState;
+    if (!st || !Array.isArray(st.fields) || !elTaskEditGrid) return;
+    for (let i = 0; i < st.fields.length; i++) {
+      const f = st.fields[i] || {};
+      const inp = elTaskEditGrid.querySelector(`[data-field-idx="${i}"]`);
+      if (!inp) continue;
+      inp.value = String(f.value || "");
+    }
+    st.custom_rows = [__newTaskEditCustomRow("", "")];
+    __renderTaskEditCustomRows();
+    if (elStatus && st.ident) elStatus.textContent = `Reset edits for ${st.ident}.`;
+  }
+
+  function __collectTaskEditArgs() {
+    const st = __taskEditState;
+    if (!st || !Array.isArray(st.fields) || !elTaskEditGrid) return { args: [], error: "Task editor is not ready." };
+    const args = [];
+
+    for (let i = 0; i < st.fields.length; i++) {
+      const f = st.fields[i] || {};
+      const key = String(f.key || "").trim();
+      if (!key) continue;
+
+      const inp = elTaskEditGrid.querySelector(`[data-field-idx="${i}"]`);
+      const cur = String((inp && inp.value) || "").trim();
+      const old = String(f.value || "").trim();
+
+      if (String(f.kind || "") === "description") {
+        if (cur === old) continue;
+        if (!cur) return { args: [], error: "Description cannot be empty." };
+        args.push(`description:${__twQuotedAtom(cur)}`);
+        continue;
+      }
+
+      if (String(f.kind || "") === "tags") {
+        const oldTags = __taskParseTagList(old);
+        const newTags = __taskParseTagList(cur);
+        const oldSet = new Set(oldTags);
+        const newSet = new Set(newTags);
+        for (const tag of oldTags) if (!newSet.has(tag)) args.push(`-${tag}`);
+        for (const tag of newTags) if (!oldSet.has(tag)) args.push(`+${tag}`);
+        continue;
+      }
+
+      if (cur === old) continue;
+      if (!cur) args.push(`${key}:`);
+      else args.push(`${key}:${__twQuotedAtom(cur)}`);
+    }
+
+    const existingKeys = new Set(st.fields.map(f => String((f && f.key) || "").trim().toLowerCase()).filter(Boolean));
+    const seenCustom = new Set();
+    const customRows = __ensureTaskEditCustomRows();
+    for (let i = 0; i < customRows.length; i++) {
+      const inpKey = elTaskEditCustomRows && elTaskEditCustomRows.querySelector(`[data-custom-idx="${i}"][data-custom-kind="key"]`);
+      const inpVal = elTaskEditCustomRows && elTaskEditCustomRows.querySelector(`[data-custom-idx="${i}"][data-custom-kind="val"]`);
+      const key = String((inpKey && inpKey.value) || "").trim();
+      const val = String((inpVal && inpVal.value) || "").trim();
+      if (!key && !val) continue;
+      if (!key) return { args: [], error: "Custom UDA row has a value but no field name." };
+
+      const keyLc = key.toLowerCase();
+      if (existingKeys.has(keyLc)) return { args: [], error: `Custom UDA '${key}' is already shown above.` };
+      if (seenCustom.has(keyLc)) return { args: [], error: `Custom UDA '${key}' is repeated.` };
+      seenCustom.add(keyLc);
+
+      if (!val) args.push(`${key}:`);
+      else args.push(`${key}:${__twQuotedAtom(val)}`);
+    }
+
+    return { args, error: "" };
+  }
+
+  function __queueTaskEditSave() {
+    const st = __taskEditState;
+    if (!st || !st.ident) return false;
+
+    const out = __collectTaskEditArgs();
+    if (out.error) {
+      if (elStatus) elStatus.textContent = out.error;
+      return false;
+    }
+    const args = Array.isArray(out.args) ? out.args : [];
+    if (!args.length) {
+      if (elStatus) elStatus.textContent = `No field changes detected for ${st.ident}.`;
+      return false;
+    }
+
+    const line = `task ${st.ident} modify ${args.join(" ")}`;
+    if (typeof queueAction === "function") queueAction(line);
+    else {
+      actionQueue.push(line);
+      try { saveActions(); } catch (_) {}
+      try { renderCommands(); } catch (_) {}
+    }
+
+    if (elStatus) elStatus.textContent = `Queued modify for ${st.ident} (${args.length} change${args.length === 1 ? "" : "s"}).`;
+    __closeTaskEditModal();
+    return true;
+  }
+
+  async function __fetchFreshTaskForEdit(uuid) {
+    const u = String(uuid || "").trim();
+    if (!u) return null;
+    const canHttp = /^https?:$/i.test(String(location.protocol || ""));
+    if (!canHttp) return null;
+    const res = await fetch(`/task?uuid=${encodeURIComponent(u)}`, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store",
+    });
+    let body = null;
+    try { body = await res.json(); } catch (_) {}
+    if (!res.ok || !body || body.ok !== true || !body.task || typeof body.task !== "object") return null;
+    return body.task;
+  }
+
+  async function __openTaskEditModal(uuid) {
+    const u = String(uuid || "").trim();
+    if (!u) return false;
+    const t = tasksByUuid.get(u);
+    if (!t) return false;
+    if (t.nautical_preview) return false;
+    if (t.local) {
+      if (elStatus) elStatus.textContent = "Local placeholder tasks cannot be edited via `task modify` yet.";
+      return false;
+    }
+    if (queuedActionKind(u)) {
+      if (elStatus) elStatus.textContent = "Task already has queued done/delete action. Clear final actions first.";
+      return false;
+    }
+
+    const ident = __taskIdentifierForCommand(t);
+    if (!ident) {
+      if (elStatus) elStatus.textContent = "Cannot edit task: missing task identifier.";
+      return false;
+    }
+    if (!elTaskEditModal || !elTaskEditGrid) {
+      if (elStatus) elStatus.textContent = "Task editor modal is unavailable in this build.";
+      return false;
+    }
+
+    let detailsTask = t;
+    let usedFreshTask = false;
+    try {
+      if (elStatus) elStatus.textContent = `Loading task attributes for ${ident}...`;
+      const fresh = await __fetchFreshTaskForEdit(u);
+      if (fresh && typeof fresh === "object") {
+        detailsTask = fresh;
+        usedFreshTask = true;
+      }
+    } catch (_) {}
+
+    const iv = effectiveInterval(u);
+    const sch = (iv && Number.isFinite(iv.startMs)) ? formatLocalNoOffset(iv.startMs) : "-";
+    const due = (iv && Number.isFinite(iv.dueMs)) ? formatLocalNoOffset(iv.dueMs) : "-";
+    const dur = (iv && Number.isFinite(iv.durMs)) ? fmtDuration(iv.durMs / 60000) : "-";
+    const rows = __taskEditFieldDefs(detailsTask, t);
+    const udaCount = rows.filter(r => String(r && r.key || "").toLowerCase() !== "description"
+      && String(r && r.key || "").toLowerCase() !== "project"
+      && String(r && r.key || "").toLowerCase() !== "priority"
+      && String(r && r.key || "").toLowerCase() !== "tags").length;
+
+    __taskEditState = { uuid: u, ident, fields: rows, custom_rows: [__newTaskEditCustomRow("", "")] };
+    if (elTaskEditTitle) elTaskEditTitle.textContent = `Edit task ${ident}`;
+    if (elTaskEditMeta) {
+      elTaskEditMeta.textContent =
+        `Source: ${usedFreshTask ? "fresh task export" : "cached payload"} • `
+        + `Scheduled: ${sch} • Due: ${due} • Duration: ${dur} • `
+        + `UDAs: ${udaCount}`;
+    }
+
+    __renderTaskEditGrid();
+    elTaskEditModal.style.display = "flex";
+    setTimeout(() => {
+      try {
+        const first = elTaskEditGrid.querySelector("[data-field-idx='0']");
+        if (first) first.focus();
+      } catch (_) {}
+    }, 0);
+    return true;
+  }
+
+  (function __bindTaskEditModal(){
+    if (!elTaskEditModal) return;
+    if (elTaskEditClose) elTaskEditClose.addEventListener("click", __closeTaskEditModal);
+    if (elTaskEditReset) elTaskEditReset.addEventListener("click", __resetTaskEditModal);
+    if (elTaskEditSave) elTaskEditSave.addEventListener("click", __queueTaskEditSave);
+    if (elTaskEditAddCustom) {
+      elTaskEditAddCustom.addEventListener("click", () => {
+        __addTaskEditCustomRow("", "", true);
+      });
+    }
+    elTaskEditModal.addEventListener("click", (ev) => {
+      if (ev.target === elTaskEditModal) __closeTaskEditModal();
+    });
+    if (elTaskEditGrid) {
+      elTaskEditGrid.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
+          __queueTaskEditSave();
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      });
+    }
+    document.addEventListener("keydown", (ev) => {
+      if (!__isTaskEditModalOpen()) return;
+      if (ev.key === "Escape") {
+        __closeTaskEditModal();
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
+      if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
+        __queueTaskEditSave();
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    }, true);
+  })();
+
   function __createBacklogRow() {
     const row = document.createElement("div");
     const sel = document.createElement("div");
@@ -187,6 +633,18 @@ JS_PART = r'''// Rendering (lists)
       rerenderAll({ mode: "full", immediate: true });
       ev.preventDefault();
       ev.stopPropagation();
+    });
+
+    row.addEventListener("dblclick", async (ev) => {
+      const uuid = row.dataset ? row.dataset.uuid : null;
+      if (!uuid || row.dataset.preview === "1") return;
+      if (ev.target && ev.target.closest && ev.target.closest(".selbox2")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { setActiveDayFromUuid(uuid); } catch (_) {}
+      try { setSelectionOnly(uuid); } catch (_) {}
+      rerenderAll({ mode: "selection", immediate: true });
+      try { await __openTaskEditModal(uuid); } catch (_) {}
     });
     return row;
   }
@@ -837,6 +1295,17 @@ JS_PART = r'''// Rendering (lists)
       rerenderAll({ mode: "selection", immediate: true });
       ev2.preventDefault();
       ev2.stopPropagation();
+    });
+    el.addEventListener("dblclick", async (ev2) => {
+      if (drag) return;
+      const u = el.dataset.uuid;
+      if (!u || el.dataset.preview === "1") return;
+      ev2.preventDefault();
+      ev2.stopPropagation();
+      setActiveDayFromUuid(u);
+      setSelectionOnly(u);
+      rerenderAll({ mode: "selection", immediate: true });
+      try { await __openTaskEditModal(u); } catch (_) {}
     });
     el.addEventListener("pointerdown", onPointerDownEvent);
     return el;
