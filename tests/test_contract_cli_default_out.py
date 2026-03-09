@@ -230,6 +230,31 @@ class TestCliDefaultOutContract(unittest.TestCase):
         self.assertEqual(third["start_ms"], 1767311400000)
         self.assertEqual(third["end_ms"], 1767312000000)  # 2026-01-02T00:00:00Z (clamped)
 
+    def test_task_export_uuid_query_rejects_invalid_input(self) -> None:
+        with self.assertRaises(ValueError):
+            cli._run_task_export_for_uuid("not-a-valid-uuid query")
+
+    def test_task_export_uuid_query_not_found(self) -> None:
+        with patch("scalpel.cli.run_task_export", return_value=[]):
+            out = cli._run_task_export_for_uuid("1234abcd")
+        self.assertEqual(out, {"task": None, "matched": 0, "exact": False})
+
+    def test_task_export_uuid_query_prefers_exact_match(self) -> None:
+        t1 = {"uuid": "aaaaaaaa-1111-1111-1111-111111111111", "description": "A"}
+        t2 = {"uuid": "aaaaaaaa-2222-2222-2222-222222222222", "description": "B"}
+        with patch("scalpel.cli.run_task_export", return_value=[t1, t2]):
+            out = cli._run_task_export_for_uuid("aaaaaaaa-2222-2222-2222-222222222222")
+        self.assertIs(out["task"], t2)
+        self.assertEqual(out["matched"], 2)
+        self.assertTrue(out["exact"])
+
+    def test_task_export_uuid_query_ambiguous_prefix_fails(self) -> None:
+        t1 = {"uuid": "aaaaaaaa-1111-1111-1111-111111111111", "description": "A"}
+        t2 = {"uuid": "aaaaaaaa-2222-2222-2222-222222222222", "description": "B"}
+        with patch("scalpel.cli.run_task_export", return_value=[t1, t2]):
+            with self.assertRaises(SystemExit):
+                cli._run_task_export_for_uuid("aaaaaaaa")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
