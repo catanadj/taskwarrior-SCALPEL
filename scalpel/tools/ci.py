@@ -105,7 +105,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Force tzset where available (POSIX).
     try:
-        time.tzset()  # type: ignore[attr-defined]
+        if hasattr(time, "tzset"):
+            time.tzset()
     except Exception:
         pass
 

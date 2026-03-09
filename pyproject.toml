@@ -84,7 +84,12 @@ ignore = ["F401"]
 python_version = "3.11"
 strict = true
 warn_unused_configs = true
+explicit_package_bases = true
+follow_imports = "skip"
 files = [
+  "scalpel/model.py",
+  "scalpel/payload.py",
+  "scalpel/planner.py",
   "scalpel/taskwarrior.py",
   "scalpel/util/timeparse.py",
   "scalpel/util/tz.py",

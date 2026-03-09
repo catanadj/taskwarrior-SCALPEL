@@ -74,7 +74,7 @@ def resolve_tz(name: Optional[str]) -> dt.tzinfo:
 
     if ZoneInfo is not None:
         try:
-            return ZoneInfo(tz_name)  # type: ignore[misc]
+            return ZoneInfo(tz_name)
         except Exception as ex:
             raise ValueError(f"Invalid timezone identifier: {tz_name!r}") from ex
 

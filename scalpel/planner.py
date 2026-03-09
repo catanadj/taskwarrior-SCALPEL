@@ -4,10 +4,17 @@ from __future__ import annotations
 import datetime as dt
 import shlex
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
+from .ai.interface import PlanOverride
 from .interval import infer_interval_ms
-from .model import Task, CalendarConfig, PlanOverride, ConflictSegment, SelectionMetrics
+from .model import (
+    CalendarConfig,
+    ConflictSegment,
+    EventMap,
+    Payload,
+    SelectionMetrics,
+    Task,
+)
 from .util.tz import day_key_from_ms, midnight_epoch_ms, normalize_tz_name, resolve_tz
 
 
@@ -15,11 +22,11 @@ def apply_overrides(
     tasks: list[Task],
     overrides: dict[str, PlanOverride],
     cfg: CalendarConfig,
-) -> dict[str, tuple[int, int, int]]:
+) -> EventMap:
     """
     Returns per-uuid (start_ms, due_ms, duration_min) AFTER applying overrides/inference.
     """
-    events: Dict[str, Tuple[int, int, int]] = {}
+    events: EventMap = {}
 
     default_duration_min = int(cfg.get("default_duration_min", 10) or 10)
     max_infer_duration_min = int(cfg.get("max_infer_duration_min", 480) or 480)
@@ -54,13 +61,13 @@ def apply_overrides(
             events[uuid] = (int(start_calc), int(end_calc), int(dur_min))
             continue
 
-        due_ms = t.get("due_ms")
-        scheduled_ms = t.get("scheduled_ms")
+        due_ms_raw = t.get("due_ms")
+        scheduled_ms_raw = t.get("scheduled_ms")
         duration_min = t.get("duration_min")
-        if isinstance(due_ms, int) and due_ms > 0:
+        if isinstance(due_ms_raw, int) and due_ms_raw > 0:
             iv = infer_interval_ms(
-                due_ms=due_ms,
-                scheduled_ms=scheduled_ms if isinstance(scheduled_ms, int) else None,
+                due_ms=due_ms_raw,
+                scheduled_ms=scheduled_ms_raw if isinstance(scheduled_ms_raw, int) else None,
                 duration_min=duration_min if isinstance(duration_min, int) else None,
                 default_duration_min=default_duration_min,
                 max_infer_duration_min=max_infer_duration_min,
@@ -71,19 +78,19 @@ def apply_overrides(
     return events
 
 
-def detect_conflicts(events: dict[str, tuple[int, int, int]], cfg: CalendarConfig) -> list[ConflictSegment]:
+def detect_conflicts(events: EventMap, cfg: CalendarConfig) -> list[ConflictSegment]:
     """Overlap detection and out-of-workhours segments."""
-    segments: List[ConflictSegment] = []
+    segments: list[ConflictSegment] = []
 
     # Overlaps (sweep line, similar to JS computeConflictSegments).
-    pts: List[Tuple[int, int, str]] = []
+    pts: list[tuple[int, int, str]] = []
     for uuid, (start_ms, due_ms, _dur) in events.items():
         pts.append((start_ms, +1, uuid))
         pts.append((due_ms, -1, uuid))
     pts.sort(key=lambda x: (x[0], -x[1]))
 
     active: set[str] = set()
-    prev_t: Optional[int] = None
+    prev_t: int | None = None
 
     for t_ms, kind, uuid in pts:
         if prev_t is not None and t_ms > prev_t and len(active) >= 2:
@@ -174,9 +181,9 @@ def detect_conflicts(events: dict[str, tuple[int, int, int]], cfg: CalendarConfi
     return segments
 
 
-def selection_metrics(selected_uuids: list[str], events: dict[str, tuple[int, int, int]]) -> SelectionMetrics:
+def selection_metrics(selected_uuids: list[str], events: EventMap) -> SelectionMetrics:
     """sum duration, span, total gaps (between sorted intervals)."""
-    ints: List[Tuple[int, int]] = []
+    ints: list[tuple[int, int]] = []
     total_min = 0
 
     for u in selected_uuids:
@@ -210,7 +217,7 @@ def selection_metrics(selected_uuids: list[str], events: dict[str, tuple[int, in
     )
 
 
-def generate_modify_commands(selected: list[str], events: dict[str, tuple[int, int, int]]) -> list[str]:
+def generate_modify_commands(selected: list[str], events: EventMap) -> list[str]:
     """
     Emit:
       task <uuid> modify scheduled:... due:... duration:...
@@ -220,7 +227,7 @@ def generate_modify_commands(selected: list[str], events: dict[str, tuple[int, i
     def _fmt_local(ms: int) -> str:
         return dt.datetime.fromtimestamp(int(ms) / 1000.0).strftime("%Y-%m-%dT%H:%M")
 
-    out: List[Tuple[int, str]] = []
+    out: list[tuple[int, str]] = []
     for uuid in selected:
         ev = events.get(uuid)
         if not ev:
@@ -241,23 +248,23 @@ def generate_modify_commands(selected: list[str], events: dict[str, tuple[int, i
 
 @dataclass(frozen=True)
 class PlanSummary:
-    events: Dict[str, Tuple[int, int, int]]
-    conflicts: List[ConflictSegment]
-    commands: List[str]
+    events: EventMap
+    conflicts: list[ConflictSegment]
+    commands: list[str]
     metrics: SelectionMetrics
 
 
 def build_plan_summary(
-    payload: dict,
+    payload: Payload,
     *,
-    overrides: Optional[Dict[str, PlanOverride]] = None,
-    selected_uuids: Optional[List[str]] = None,
+    overrides: dict[str, PlanOverride] | None = None,
+    selected_uuids: list[str] | None = None,
 ) -> PlanSummary:
     """Compute a deterministic plan summary for payload+overrides."""
-    tasks = payload.get("tasks") if isinstance(payload, dict) else None
-    cfg = payload.get("cfg") if isinstance(payload, dict) else None
-    tasks_list: list[Task] = tasks if isinstance(tasks, list) else []
-    cfg_dict: CalendarConfig = cfg if isinstance(cfg, dict) else {}
+    tasks_list = payload.get("tasks")
+    cfg_dict = payload.get("cfg")
+    tasks_list = tasks_list if isinstance(tasks_list, list) else []
+    cfg_dict = cfg_dict if isinstance(cfg_dict, dict) else {}
 
     overrides = overrides or {}
     events = apply_overrides(tasks_list, overrides, cfg_dict)
@@ -280,7 +287,7 @@ def _snap_ms(ms: int, snap_min: int) -> int:
 
 def _group_by_day(
     uuids: list[str],
-    events: dict[str, tuple[int, int, int]],
+    events: EventMap,
     *,
     tz_name: str | None = "UTC",
 ) -> dict[str, list[str]]:
@@ -304,7 +311,7 @@ def _group_by_day(
 
 def op_align_starts(
     uuids: list[str],
-    events: dict[str, tuple[int, int, int]],
+    events: EventMap,
     snap_min: int,
     tz_name: str | None = "UTC",
 ) -> dict[str, PlanOverride]:
@@ -326,7 +333,7 @@ def op_align_starts(
 
 def op_align_ends(
     uuids: list[str],
-    events: dict[str, tuple[int, int, int]],
+    events: EventMap,
     snap_min: int,
     tz_name: str | None = "UTC",
 ) -> dict[str, PlanOverride]:
@@ -348,7 +355,7 @@ def op_align_ends(
 
 def op_stack(
     uuids: list[str],
-    events: dict[str, tuple[int, int, int]],
+    events: EventMap,
     snap_min: int,
     tz_name: str | None = "UTC",
 ) -> dict[str, PlanOverride]:
@@ -371,7 +378,7 @@ def op_stack(
 
 def op_distribute(
     uuids: list[str],
-    events: dict[str, tuple[int, int, int]],
+    events: EventMap,
     snap_min: int,
     tz_name: str | None = "UTC",
 ) -> dict[str, PlanOverride]:
@@ -401,7 +408,7 @@ def op_distribute(
     return out
 
 
-def op_nudge(uuids: list[str], events: dict[str, tuple[int, int, int]], delta_min: int) -> dict[str, PlanOverride]:
+def op_nudge(uuids: list[str], events: EventMap, delta_min: int) -> dict[str, PlanOverride]:
     out: dict[str, PlanOverride] = {}
     if not delta_min:
         return out

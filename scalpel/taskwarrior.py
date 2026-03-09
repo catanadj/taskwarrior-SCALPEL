@@ -8,8 +8,9 @@ import re
 import shlex
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
+from .model import RawTask
 from .util.console import eprint
 
 TW_UTC_RE = re.compile(r"^(\d{8})T(\d{6})Z$")  # e.g. 20251217T083000Z
@@ -58,7 +59,7 @@ def parse_tw_utc_to_epoch_ms(s: str) -> Optional[int]:
     except Exception:
         return None
 
-def run_task_export(filter_str: str) -> List[Dict[str, Any]]:
+def run_task_export(filter_str: str) -> list[RawTask]:
     cmd = ["task"]
     if filter_str.strip():
         try:

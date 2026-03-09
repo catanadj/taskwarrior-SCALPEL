@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import datetime as dt
+import importlib
 import importlib.util
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, cast
 
 from .goals import load_goals_config
+from .model import CalendarConfig, Payload, RawTask, Task
 from .taskwarrior import run_task_export, parse_tw_utc_to_epoch_ms
 from .util.timeparse import midnight_epoch_ms
 from .util.tz import normalize_tz_name, resolve_tz
@@ -19,7 +21,7 @@ from .ai import PlanOverride, apply_plan_overrides
 from .util.console import eprint
 
 
-def _nautical_hooks_enabled(enabled: Optional[bool] = None) -> bool:
+def _nautical_hooks_enabled(enabled: bool | None = None) -> bool:
     if enabled is not None:
         return bool(enabled)
     raw = os.getenv("SCALPEL_ENABLE_NAUTICAL_HOOKS")
@@ -33,7 +35,7 @@ def _nautical_hooks_enabled(enabled: Optional[bool] = None) -> bool:
     return True
 
 
-def _raw_tasks_may_need_nautical(raw_tasks: Sequence[Dict[str, Any]]) -> bool:
+def _raw_tasks_may_need_nautical(raw_tasks: Sequence[RawTask]) -> bool:
     for raw in raw_tasks:
         if not isinstance(raw, dict):
             continue
@@ -44,7 +46,7 @@ def _raw_tasks_may_need_nautical(raw_tasks: Sequence[Dict[str, Any]]) -> bool:
     return False
 
 
-def _warn_nautical_disabled_if_needed(raw_tasks: Sequence[Dict[str, Any]], *, enabled: bool) -> None:
+def _warn_nautical_disabled_if_needed(raw_tasks: Sequence[RawTask], *, enabled: bool) -> None:
     if enabled:
         return
     if not _raw_tasks_may_need_nautical(raw_tasks):
@@ -55,13 +57,12 @@ def _warn_nautical_disabled_if_needed(raw_tasks: Sequence[Dict[str, Any]], *, en
     )
 
 
-def _load_nautical_core(*, enabled: bool):
+def _load_nautical_core(*, enabled: bool) -> Any | None:
     if not enabled:
         return None
 
     try:
-        import nautical_core as mod
-        return mod
+        return importlib.import_module("nautical_core")
     except Exception:
         pass
 
@@ -100,7 +101,7 @@ def _load_nautical_core(*, enabled: bool):
     return None
 
 
-def _parse_hhmm_str(s: str) -> Optional[Tuple[int, int]]:
+def _parse_hhmm_str(s: str) -> tuple[int, int] | None:
     try:
         hh_s, mm_s = s.split(":", 1)
         hh = int(hh_s)
@@ -112,7 +113,7 @@ def _parse_hhmm_str(s: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def _local_hhmm_from_ms(ms: Optional[int], tzinfo: dt.tzinfo) -> Optional[Tuple[int, int]]:
+def _local_hhmm_from_ms(ms: int | None, tzinfo: dt.tzinfo) -> tuple[int, int] | None:
     if not isinstance(ms, int):
         return None
     try:
@@ -128,7 +129,7 @@ def _cp_next_due_ms(
     base_due_ms: Optional[int],
     td: dt.timedelta,
     tzinfo: dt.tzinfo,
-) -> Optional[int]:
+) -> int | None:
     base_ms = base_end_ms if isinstance(base_end_ms, int) else base_due_ms
     if not isinstance(base_ms, int):
         return None
@@ -146,8 +147,8 @@ def _cp_next_due_ms(
     return int(due_local.astimezone(dt.timezone.utc).timestamp() * 1000)
 
 
-def _anchor_times_for_date(nautical, dnf, target: dt.date, seed_date: dt.date) -> List[str]:
-    times: List[str] = []
+def _anchor_times_for_date(nautical: Any, dnf: Any, target: dt.date, seed_date: dt.date) -> list[str]:
+    times: list[str] = []
     seen = set()
     for term in dnf:
         try:
@@ -160,7 +161,7 @@ def _anchor_times_for_date(nautical, dnf, target: dt.date, seed_date: dt.date) -
             tval = mods.get("t")
             if not tval:
                 continue
-            vals: List[str] = []
+            vals: list[str] = []
             if isinstance(tval, tuple) and len(tval) == 2:
                 vals = [f"{int(tval[0]):02d}:{int(tval[1]):02d}"]
             elif isinstance(tval, list):
@@ -178,17 +179,45 @@ def _anchor_times_for_date(nautical, dnf, target: dt.date, seed_date: dt.date) -
     return times
 
 
+def _apply_interval_fields(
+    task_out: Task,
+    *,
+    default_duration_min: int,
+    max_infer_duration_min: int,
+) -> None:
+    iv = infer_interval_ms(
+        due_ms=task_out.get("due_ms"),
+        scheduled_ms=task_out.get("scheduled_ms"),
+        duration_min=task_out.get("duration_min"),
+        default_duration_min=int(default_duration_min),
+        max_infer_duration_min=int(max_infer_duration_min),
+    )
+    if iv is None:
+        return
+    task_out.update(
+        {
+            "start_calc_ms": iv.start_ms,
+            "end_calc_ms": iv.end_ms,
+            "dur_calc_min": iv.duration_min,
+            "dur_src": iv.duration_src,
+            "place_src": iv.placement_src,
+            "interval_ok": iv.ok,
+            "interval_warn": iv.warning,
+        }
+    )
+
+
 def _build_nautical_preview_tasks(
     *,
-    base_tasks: Sequence[Dict[str, Any]],
-    raw_tasks: Sequence[Dict[str, Any]],
+    base_tasks: Sequence[Task],
+    raw_tasks: Sequence[RawTask],
     start_date: dt.date,
     days: int,
     tz_name: str,
     default_duration_min: int,
     max_infer_duration_min: int,
     nautical_hooks_enabled: bool,
-) -> List[Dict[str, Any]]:
+) -> list[Task]:
     if not _raw_tasks_may_need_nautical(raw_tasks):
         return []
 
@@ -199,7 +228,7 @@ def _build_nautical_preview_tasks(
     tzinfo = resolve_tz(tz_name)
     start_excl = start_date - dt.timedelta(days=1)
     end_excl = start_date + dt.timedelta(days=max(1, int(days)))
-    out: List[Dict[str, Any]] = []
+    out: list[Task] = []
 
     for task_out, raw in zip(base_tasks, raw_tasks):
         anchor_expr = str(raw.get("anchor") or "").strip()
@@ -235,6 +264,9 @@ def _build_nautical_preview_tasks(
                 )
 
                 for d in dates:
+                    source_uuid = str(task_out.get("uuid") or "").strip()
+                    if not source_uuid:
+                        continue
                     times = _anchor_times_for_date(nautical, dnf, d, seed_date)
                     if not times:
                         hhmm = nautical.pick_hhmm_from_dnf_for_date(dnf, d, seed_date)
@@ -258,16 +290,16 @@ def _build_nautical_preview_tasks(
                         if isinstance(seed_ms, int) and due_ms == seed_ms:
                             continue
 
-                        preview_uuid = f"nautical-{task_out.get('uuid')}-{d.isoformat()}-t{hm[0]:02d}{hm[1]:02d}"
+                        preview_uuid = f"nautical-{source_uuid}-{d.isoformat()}-t{hm[0]:02d}{hm[1]:02d}"
 
-                        preview = dict(task_out)
+                        preview = cast(Task, dict(task_out))
                         preview.update(
                             {
                                 "uuid": preview_uuid,
                                 "id": None,
                                 "nautical_preview": True,
                                 "nautical_kind": "anchor",
-                                "nautical_source_uuid": task_out.get("uuid"),
+                                "nautical_source_uuid": source_uuid,
                                 "nautical_anchor": anchor_expr,
                                 "nautical_anchor_mode": anchor_mode or None,
                                 "scheduled_ms": None,
@@ -275,30 +307,19 @@ def _build_nautical_preview_tasks(
                             }
                         )
 
-                        iv = infer_interval_ms(
-                            due_ms=preview.get("due_ms"),
-                            scheduled_ms=preview.get("scheduled_ms"),
-                            duration_min=preview.get("duration_min"),
-                            default_duration_min=int(default_duration_min),
-                            max_infer_duration_min=int(max_infer_duration_min),
+                        _apply_interval_fields(
+                            preview,
+                            default_duration_min=default_duration_min,
+                            max_infer_duration_min=max_infer_duration_min,
                         )
-                        if iv is not None:
-                            preview.update(
-                                {
-                                    "start_calc_ms": iv.start_ms,
-                                    "end_calc_ms": iv.end_ms,
-                                    "dur_calc_min": iv.duration_min,
-                                    "dur_src": iv.duration_src,
-                                    "place_src": iv.placement_src,
-                                    "interval_ok": iv.ok,
-                                    "interval_warn": iv.warning,
-                                }
-                            )
 
                         out.append(preview)
 
         cp_str = str(raw.get("cp") or "").strip()
         if cp_str:
+            source_uuid = str(task_out.get("uuid") or "").strip()
+            if not source_uuid:
+                continue
             chain_val = str(raw.get("chain") or "").strip().lower()
             if chain_val in {"off", "0", "false", "no"}:
                 continue
@@ -314,13 +335,13 @@ def _build_nautical_preview_tasks(
 
             until_dt = nautical.parse_dt_any(str(raw.get("chainUntil") or "").strip())
 
-            due_ms = task_out.get("due_ms") if isinstance(task_out.get("due_ms"), int) else None
-            if due_ms is None:
-                due_ms = task_out.get("scheduled_ms") if isinstance(task_out.get("scheduled_ms"), int) else None
+            due_ms_val = task_out.get("due_ms") if isinstance(task_out.get("due_ms"), int) else None
+            if due_ms_val is None:
+                due_ms_val = task_out.get("scheduled_ms") if isinstance(task_out.get("scheduled_ms"), int) else None
 
             end_ms = parse_tw_utc_to_epoch_ms(str(raw.get("end") or ""))
-            base_end_ms = end_ms if isinstance(end_ms, int) else due_ms
-            base_due_ms = due_ms
+            base_end_ms = end_ms if isinstance(end_ms, int) else due_ms_val
+            base_due_ms = due_ms_val
             if not isinstance(base_end_ms, int):
                 continue
 
@@ -349,16 +370,16 @@ def _build_nautical_preview_tasks(
                     break
 
                 if due_local_date >= start_date:
-                    preview_uuid = f"nautical-cp-{task_out.get('uuid')}-{due_local_date.isoformat()}"
+                    preview_uuid = f"nautical-cp-{source_uuid}-{due_local_date.isoformat()}"
 
-                    preview = dict(task_out)
+                    preview = cast(Task, dict(task_out))
                     preview.update(
                         {
                             "uuid": preview_uuid,
                             "id": None,
                             "nautical_preview": True,
                             "nautical_kind": "cp",
-                            "nautical_source_uuid": task_out.get("uuid"),
+                            "nautical_source_uuid": source_uuid,
                             "nautical_cp": cp_str,
                             "nautical_link": next_link,
                             "scheduled_ms": None,
@@ -366,25 +387,11 @@ def _build_nautical_preview_tasks(
                         }
                     )
 
-                    iv = infer_interval_ms(
-                        due_ms=preview.get("due_ms"),
-                        scheduled_ms=preview.get("scheduled_ms"),
-                        duration_min=preview.get("duration_min"),
-                        default_duration_min=int(default_duration_min),
-                        max_infer_duration_min=int(max_infer_duration_min),
+                    _apply_interval_fields(
+                        preview,
+                        default_duration_min=default_duration_min,
+                        max_infer_duration_min=max_infer_duration_min,
                     )
-                    if iv is not None:
-                        preview.update(
-                            {
-                                "start_calc_ms": iv.start_ms,
-                                "end_calc_ms": iv.end_ms,
-                                "dur_calc_min": iv.duration_min,
-                                "dur_src": iv.duration_src,
-                                "place_src": iv.placement_src,
-                                "interval_ok": iv.ok,
-                                "interval_warn": iv.warning,
-                            }
-                        )
 
                     out.append(preview)
 
@@ -409,9 +416,9 @@ def build_payload(
     goals_path: str,
     tz: Optional[str] = None,
     display_tz: Optional[str] = None,
-    plan_overrides: Optional[Dict[str, PlanOverride]] = None,
+    plan_overrides: Optional[dict[str, PlanOverride]] = None,
     nautical_hooks_enabled: Optional[bool] = None,
-) -> Dict[str, Any]:
+) -> Payload:
     """Build a SCALPEL payload from Taskwarrior export.
 
     Timezone contract:
@@ -432,14 +439,14 @@ def build_payload(
     nautical_enabled = _nautical_hooks_enabled(nautical_hooks_enabled)
     _warn_nautical_disabled_if_needed(raw_tasks, enabled=nautical_enabled)
 
-    tasks: List[Dict[str, Any]] = []
-    preview_pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+    tasks: list[Task] = []
+    preview_pairs: list[tuple[Task, RawTask]] = []
     for t in raw_tasks:
         nt = normalize_task(t)
         if not nt:
             continue
 
-        task_out: Dict[str, Any] = {
+        task_out: Task = {
             "uuid": nt.uuid,
             "id": nt.id,
             "description": nt.description,
@@ -453,25 +460,11 @@ def build_payload(
             "duration_min": nt.duration_min,
         }
 
-        iv = infer_interval_ms(
-            due_ms=nt.due_ms,
-            scheduled_ms=nt.scheduled_ms,
-            duration_min=nt.duration_min,
-            default_duration_min=int(default_duration_min),
-            max_infer_duration_min=int(max_infer_duration_min),
+        _apply_interval_fields(
+            task_out,
+            default_duration_min=default_duration_min,
+            max_infer_duration_min=max_infer_duration_min,
         )
-        if iv is not None:
-            task_out.update(
-                {
-                    "start_calc_ms": iv.start_ms,
-                    "end_calc_ms": iv.end_ms,
-                    "dur_calc_min": iv.duration_min,
-                    "dur_src": iv.duration_src,
-                    "place_src": iv.placement_src,
-                    "interval_ok": iv.ok,
-                    "interval_warn": iv.warning,
-                }
-            )
 
         tasks.append(task_out)
         preview_pairs.append((task_out, t))
@@ -491,7 +484,7 @@ def build_payload(
 
     view_start_ms = midnight_epoch_ms(start_date, tz=tz_name)
 
-    cfg = {
+    cfg: CalendarConfig = {
         "tz": tz_name,
         "display_tz": display_tz_name,
         "days": int(days),
@@ -516,9 +509,12 @@ def build_payload(
 
     goals_cfg = load_goals_config(goals_path)
 
-    payload = {"cfg": cfg, "tasks": tasks, "goals": goals_cfg}
+    payload: Payload = {"cfg": cfg, "tasks": tasks, "goals": goals_cfg}
     if plan_overrides:
-        payload = apply_plan_overrides(payload, plan_overrides, normalize=False)
+        payload = cast(
+            Payload,
+            apply_plan_overrides(cast(dict[str, Any], payload), plan_overrides, normalize=False),
+        )
 
     # v2 is applied by callers/tools via scalpel.schema.upgrade_payload.
-    return apply_schema_v1(payload)
+    return cast(Payload, apply_schema_v1(payload))
