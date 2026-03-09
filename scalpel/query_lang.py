@@ -5,21 +5,23 @@ import re
 import shlex
 from functools import lru_cache
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Pattern
+
+from scalpel.model import Payload, Task
 
 
 class QueryError(ValueError):
     """Raised for invalid query expressions (parse or execution)."""
 
 
-def _tasks_list(payload: Dict[str, Any]) -> List[Any]:
+def _tasks_list(payload: Payload) -> list[Task]:
     tasks = payload.get("tasks") or []
     if not isinstance(tasks, list):
         return []
     return tasks
 
 
-def _idx_map(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
+def _idx_map(payload: Payload, key: str) -> dict[str, Any]:
     idx = payload.get("indices") or {}
     if not isinstance(idx, dict):
         return {}
@@ -27,49 +29,49 @@ def _idx_map(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
     return m if isinstance(m, dict) else {}
 
 
-def _as_int_set(v: Any) -> Set[int]:
+def _as_int_set(v: Any) -> set[int]:
     if not isinstance(v, list):
         return set()
     try:
         # Hot path: indices are produced by schema normalization as list[int].
         return set(v)
     except TypeError:
-        s: Set[int] = set()
+        out: set[int] = set()
         for x in v:
             if isinstance(x, int):
-                s.add(x)
-        return s
+                out.add(x)
+        return out
 
 
-def _intersect(cur: Optional[Set[int]], nxt: Set[int]) -> Set[int]:
+def _intersect(cur: set[int] | None, nxt: set[int]) -> set[int]:
     return nxt if cur is None else (cur & nxt)
 
 
-def _task_desc(t: Dict[str, Any]) -> str:
+def _task_desc(t: Task) -> str:
     d = t.get("description")
     return d if isinstance(d, str) else ""
 
 
-def _task_tags(t: Dict[str, Any]) -> Set[str]:
+def _task_tags(t: Task) -> set[str]:
     tags = t.get("tags")
     if not isinstance(tags, list):
         return set()
-    out: Set[str] = set()
+    out: set[str] = set()
     for x in tags:
         if isinstance(x, str) and x:
             out.add(x)
     return out
 
 
-def _compile_regex_pat(pat: str) -> re.Pattern:
+def _compile_regex_pat(pat: str) -> Pattern[str]:
     try:
         return re.compile(pat)
     except re.error as e:
         raise QueryError(f"Invalid regex in query: {e}") from e
 
 
-def _split_csv(s: str) -> List[str]:
-    parts: List[str] = []
+def _split_csv(s: str) -> list[str]:
+    parts: list[str] = []
     for p in (s or "").split(","):
         p = p.strip()
         if p:
@@ -79,24 +81,24 @@ def _split_csv(s: str) -> List[str]:
 
 @dataclass(frozen=True)
 class Query:
-    projects: Tuple[str, ...] = ()
-    statuses: Tuple[str, ...] = ()
-    uuids: Tuple[str, ...] = ()
-    days: Tuple[str, ...] = ()  # YYYY-MM-DD (optional; uses indices.by_day if present)
+    projects: tuple[str, ...] = ()
+    statuses: tuple[str, ...] = ()
+    uuids: tuple[str, ...] = ()
+    days: tuple[str, ...] = ()  # YYYY-MM-DD (optional; uses indices.by_day if present)
 
-    tags_all: Tuple[str, ...] = ()
-    tags_not: Tuple[str, ...] = ()
+    tags_all: tuple[str, ...] = ()
+    tags_not: tuple[str, ...] = ()
 
     # Regex filters on description (compiled at run-time)
-    desc_re_all: Tuple[str, ...] = ()
-    desc_re_not: Tuple[str, ...] = ()
+    desc_re_all: tuple[str, ...] = ()
+    desc_re_not: tuple[str, ...] = ()
 
     # Simple substring filters on description (case-insensitive)
-    desc_sub_all: Tuple[str, ...] = ()
+    desc_sub_all: tuple[str, ...] = ()
 
     @staticmethod
     @lru_cache(maxsize=256)
-    def _cached_regex(pat: str) -> re.Pattern:
+    def _cached_regex(pat: str) -> Pattern[str]:
         return _compile_regex_pat(pat)
 
     @staticmethod
@@ -119,19 +121,19 @@ class Query:
         except ValueError as e:
             raise QueryError(f"Could not parse query (quoting/escaping error): {e}") from e
 
-        projects: List[str] = []
-        statuses: List[str] = []
-        uuids: List[str] = []
-        days: List[str] = []
+        projects: list[str] = []
+        statuses: list[str] = []
+        uuids: list[str] = []
+        days: list[str] = []
 
-        tags_all: List[str] = []
-        tags_not: List[str] = []
+        tags_all: list[str] = []
+        tags_not: list[str] = []
 
-        desc_re_all: List[str] = []
-        desc_re_not: List[str] = []
-        desc_sub_all: List[str] = []
+        desc_re_all: list[str] = []
+        desc_re_not: list[str] = []
+        desc_sub_all: list[str] = []
 
-        def add_csv(dst: List[str], raw: str) -> None:
+        def add_csv(dst: list[str], raw: str) -> None:
             dst.extend(_split_csv(raw))
 
         for tok in toks:
@@ -221,7 +223,7 @@ class Query:
             desc_sub_all=tuple(desc_sub_all),
         )
 
-    def run_indices(self, payload: Dict[str, Any]) -> Set[int]:
+    def run_indices(self, payload: Payload) -> set[int]:
         tasks = _tasks_list(payload)
         n_tasks = len(tasks)
 
@@ -231,44 +233,44 @@ class Query:
         by_tag = _idx_map(payload, "by_tag")
         by_day = _idx_map(payload, "by_day")
 
-        cur: Optional[Set[int]] = None
+        cur: set[int] | None = None
 
         # uuids (OR over uuids, then AND with others)
         if self.uuids:
-            s: Set[int] = set()
+            uuid_hits: set[int] = set()
             for u in self.uuids:
                 if not isinstance(u, str) or not u:
                     continue
                 idx = by_uuid.get(u)
                 if isinstance(idx, int):
-                    s.add(idx)
-            cur = _intersect(cur, s)
+                    uuid_hits.add(idx)
+            cur = _intersect(cur, uuid_hits)
 
         # statuses (OR within group)
         if self.statuses:
-            s: Set[int] = set()
+            status_hits: set[int] = set()
             for st in self.statuses:
-                s |= _as_int_set(by_status.get(st))
-            cur = _intersect(cur, s)
+                status_hits |= _as_int_set(by_status.get(st))
+            cur = _intersect(cur, status_hits)
 
         # projects (OR within group)
         if self.projects:
-            s: Set[int] = set()
+            project_hits: set[int] = set()
             for pr in self.projects:
-                s |= _as_int_set(by_project.get(pr))
-            cur = _intersect(cur, s)
+                project_hits |= _as_int_set(by_project.get(pr))
+            cur = _intersect(cur, project_hits)
 
         # days (OR within group)
         if self.days:
-            s: Set[int] = set()
+            day_hits: set[int] = set()
             for d in self.days:
-                s |= _as_int_set(by_day.get(d))
-            cur = _intersect(cur, s)
+                day_hits |= _as_int_set(by_day.get(d))
+            cur = _intersect(cur, day_hits)
 
         # tags_all => AND across required tags
         for tag in self.tags_all:
-            s = _as_int_set(by_tag.get(tag))
-            cur = _intersect(cur, s)
+            tag_hits = _as_int_set(by_tag.get(tag))
+            cur = _intersect(cur, tag_hits)
 
         # If no indexed constraints were provided, start with all tasks
         if cur is None:
@@ -276,7 +278,7 @@ class Query:
 
         # tags_not => subtract
         if self.tags_not:
-            deny: Set[int] = set()
+            deny: set[int] = set()
             for tag in self.tags_not:
                 deny |= _as_int_set(by_tag.get(tag))
             cur -= deny
@@ -285,7 +287,7 @@ class Query:
         if self.desc_sub_all:
             needles = [x.lower() for x in self.desc_sub_all if isinstance(x, str) and x]
             if needles:
-                kept: Set[int] = set()
+                kept_sub: set[int] = set()
                 for i in cur:
                     if i < 0 or i >= n_tasks:
                         continue
@@ -298,15 +300,15 @@ class Query:
                             ok = False
                             break
                     if ok:
-                        kept.add(i)
-                cur = kept
+                        kept_sub.add(i)
+                cur = kept_sub
 
         # Regex filters on description
         if self.desc_re_all or self.desc_re_not:
             re_all = [self._cached_regex(p) for p in self.desc_re_all]
             re_not = [self._cached_regex(p) for p in self.desc_re_not]
 
-            kept: Set[int] = set()
+            kept_regex: set[int] = set()
             for i in cur:
                 if i < 0 or i >= n_tasks:
                     continue
@@ -324,19 +326,19 @@ class Query:
                         ok = False
                         break
                 if ok:
-                    kept.add(i)
-            cur = kept
+                    kept_regex.add(i)
+            cur = kept_regex
 
         return cur
 
-    def run(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def run(self, payload: Payload) -> list[Task]:
         tasks = _tasks_list(payload)
         n_tasks = len(tasks)
         idxs = self.run_indices(payload)
         if not idxs:
             return []
 
-        out: List[Dict[str, Any]] = []
+        out: list[Task] = []
         # Preserve original task order without scanning all tasks for sparse hits.
         ordered = sorted(i for i in idxs if 0 <= i < n_tasks)
         for i in ordered:

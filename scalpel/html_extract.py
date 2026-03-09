@@ -5,7 +5,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 @dataclass
@@ -33,7 +33,7 @@ def _attr_type(attrs: str) -> str | None:
     return (m.group("dq") or m.group("sq") or m.group("bare") or "").strip()
 
 
-def _extract_payload_json_from_data_assignment(html_text: str):
+def _extract_payload_json_from_data_assignment(html_text: str) -> dict[str, Any]:
     """
     Fallback extractor for payload embedded as:
       const DATA = {...};
@@ -88,10 +88,13 @@ def _extract_payload_json_from_data_assignment(html_text: str):
 
     blob = html_text[start:i].strip()
     blob = _html.unescape(blob)
-    return json.loads(blob)
+    payload = json.loads(blob)
+    if not isinstance(payload, dict):
+        raise ValueError("DATA assignment did not evaluate to a JSON object.")
+    return cast(dict[str, Any], payload)
 
 
-def extract_payload_json_from_html_text(html_text: str):
+def extract_payload_json_from_html_text(html_text: str) -> dict[str, Any]:
     """
     Extract SCALPEL payload JSON from HTML.
 
@@ -113,7 +116,8 @@ def extract_payload_json_from_html_text(html_text: str):
             payload = json.loads(_html.unescape(body))
         except Exception:
             continue
-        return payload
+        if isinstance(payload, dict):
+            return cast(dict[str, Any], payload)
 
     # 2) any <script type="application/json..."> (allow params like charset)
     pat_type = r'<script\b[^>]*\btype=["\']application/json(?:\s*;[^"\']*)?["\'][^>]*>(?P<body>.*?)</script>'
@@ -125,7 +129,8 @@ def extract_payload_json_from_html_text(html_text: str):
             payload = json.loads(_html.unescape(body))
         except Exception:
             continue
-        return payload
+        if isinstance(payload, dict):
+            return cast(dict[str, Any], payload)
 
     # 3) fallback DATA assignment
     try:

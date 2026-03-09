@@ -274,10 +274,9 @@ def select_tasks(payload: ScalpelPayload, q: str | Query | None = None, *, inclu
     for t in got:
         if not isinstance(t, dict):
             continue
-        task = cast(Task, t)
-        if (not include_smoke) and _is_smoke_synthetic(task):
+        if (not include_smoke) and _is_smoke_synthetic(t):
             continue
-        out.append(task)
+        out.append(t)
     return out
 
 
