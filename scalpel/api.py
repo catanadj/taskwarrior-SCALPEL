@@ -11,15 +11,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, cast
 
 from scalpel.html_extract import extract_payload_json_from_html_file
+from scalpel.model import Payload as ScalpelPayload
+from scalpel.model import Task
 from scalpel.query_lang import Query
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import assert_valid_payload
 
-JsonPath = Union[str, Path]
-Payload = Dict[str, Any]
+JsonPath = str | Path
 
 
 # --- Public API: smoke-synthetic filtering ------------------------------------
@@ -32,7 +33,7 @@ _SMOKE_SYNTHETIC_UUIDS = [
 ]
 
 
-def _is_smoke_synthetic(task: dict) -> bool:
+def _is_smoke_synthetic(task: Task) -> bool:
     """Return True only for reserved smoke scaffolding tasks (and explicit synthetic flags).
 
     Important: do NOT use heuristics like description prefixes here, because golden fixtures
@@ -55,21 +56,21 @@ def _is_smoke_synthetic(task: dict) -> bool:
     return False
 
 
-def _tasks_list(payload: dict) -> list:
-    t = payload.get("tasks") or []
-    return t if isinstance(t, list) else []
+def _tasks_list(payload: ScalpelPayload) -> list[Task]:
+    tasks = payload.get("tasks")
+    return tasks if isinstance(tasks, list) else []
 
 
-def _indices(payload: dict) -> dict:
+def _indices(payload: ScalpelPayload) -> dict[str, Any]:
     idx = payload.get("indices") or {}
     return idx if isinstance(idx, dict) else {}
 
 
-def _pluck_by_indices(payload: dict, idxs: object, *, include_smoke: bool) -> list[dict]:
+def _pluck_by_indices(payload: ScalpelPayload, idxs: object, *, include_smoke: bool) -> list[Task]:
     tasks = _tasks_list(payload)
     if not isinstance(idxs, list):
         return []
-    out: list[dict] = []
+    out: list[Task] = []
     for i in idxs:
         if not isinstance(i, int):
             continue
@@ -87,7 +88,7 @@ def _pluck_by_indices(payload: dict, idxs: object, *, include_smoke: bool) -> li
 # --- /Public API: smoke-synthetic filtering -----------------------------------
 
 
-def _coerce_target_version(payload: Dict[str, Any], target_version: Optional[int]) -> int:
+def _coerce_target_version(payload: ScalpelPayload, target_version: int | None) -> int:
     """Choose target schema version.
 
     Default: LATEST_SCHEMA_VERSION.
@@ -116,7 +117,7 @@ def load_payload_from_json(
     upgrade: bool = True,
     validate: bool = True,
     target_version: int | None = None,
-) -> Dict[str, Any]:
+) -> ScalpelPayload:
     """Load a payload from a JSON file.
 
     Defaults:
@@ -127,13 +128,17 @@ def load_payload_from_json(
       - Never downgrades: if input is already newer than target_version, keep the newer version.
     """
     p = Path(path)
-    payload = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+    payload_obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+    payload = cast(ScalpelPayload, payload_obj)
     if not isinstance(payload, dict):
         raise ValueError(f"JSON payload must be an object/dict; got {type(payload).__name__}")
 
     if upgrade:
         tv = _coerce_target_version(payload, target_version)
-        payload = upgrade_payload(payload, target_version=tv)  # type: ignore[arg-type]
+        upgraded = upgrade_payload(payload, target_version=tv)
+        if not isinstance(upgraded, dict):
+            raise TypeError("upgrade_payload returned non-dict")
+        payload = cast(ScalpelPayload, upgraded)
 
     if validate:
         assert_valid_payload(payload)
@@ -142,17 +147,20 @@ def load_payload_from_json(
 
 
 def normalize_payload(
-    payload: Dict[str, Any],
+    payload: ScalpelPayload,
     *,
     validate: bool = True,
     target_version: int | None = None,
-) -> Dict[str, Any]:
+) -> ScalpelPayload:
     """Normalize an in-memory payload to the latest schema by default."""
     if not isinstance(payload, dict):
         raise TypeError(f"payload must be a dict/object; got {type(payload).__name__}")
 
     tv = _coerce_target_version(payload, target_version)
-    out = upgrade_payload(payload, target_version=tv)  # type: ignore[arg-type]
+    out_raw = upgrade_payload(payload, target_version=tv)
+    if not isinstance(out_raw, dict):
+        raise TypeError("upgrade_payload returned non-dict")
+    out = cast(ScalpelPayload, out_raw)
 
     if validate:
         assert_valid_payload(out)
@@ -160,16 +168,16 @@ def normalize_payload(
     return out
 
 
-def load_payload_from_html(path: JsonPath, *, validate: bool = True, target_version: int | None = None) -> Payload:
+def load_payload_from_html(path: JsonPath, *, validate: bool = True, target_version: int | None = None) -> ScalpelPayload:
     """Extract payload JSON from HTML file and normalize."""
     p = Path(path)
     obj = extract_payload_json_from_html_file(p)
     if not isinstance(obj, dict):
         raise ValueError(f"HTML payload must be an object/dict; got {type(obj).__name__}")
-    return normalize_payload(obj, validate=validate, target_version=target_version)
+    return normalize_payload(cast(ScalpelPayload, obj), validate=validate, target_version=target_version)
 
 
-def task_by_uuid(payload: dict, uuid: str) -> dict | None:
+def task_by_uuid(payload: ScalpelPayload, uuid: str) -> Task | None:
     """Return the task dict for `uuid` if present.
 
     Note: this is a *direct* lookup and must not apply synthetic filtering.
@@ -202,7 +210,7 @@ def task_by_uuid(payload: dict, uuid: str) -> dict | None:
     return None
 
 
-def tasks_by_status(payload: dict, status: str, *, include_smoke: bool = False) -> list[dict]:
+def tasks_by_status(payload: ScalpelPayload, status: str, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks by status using indices. Default excludes smoke-synthetic tasks."""
     by_status = _indices(payload).get("by_status") or {}
     if not isinstance(by_status, dict):
@@ -210,7 +218,7 @@ def tasks_by_status(payload: dict, status: str, *, include_smoke: bool = False) 
     return _pluck_by_indices(payload, by_status.get(status) or [], include_smoke=include_smoke)
 
 
-def tasks_by_project(payload: dict, project: str, *, include_smoke: bool = False) -> list[dict]:
+def tasks_by_project(payload: ScalpelPayload, project: str, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks by project using indices. Default excludes smoke-synthetic tasks."""
     by_project = _indices(payload).get("by_project") or {}
     if not isinstance(by_project, dict):
@@ -218,7 +226,7 @@ def tasks_by_project(payload: dict, project: str, *, include_smoke: bool = False
     return _pluck_by_indices(payload, by_project.get(project) or [], include_smoke=include_smoke)
 
 
-def tasks_by_tag(payload: dict, tag: str, *, include_smoke: bool = False) -> list[dict]:
+def tasks_by_tag(payload: ScalpelPayload, tag: str, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks by tag using indices. Default excludes smoke-synthetic tasks."""
     by_tag = _indices(payload).get("by_tag") or {}
     if not isinstance(by_tag, dict):
@@ -226,7 +234,7 @@ def tasks_by_tag(payload: dict, tag: str, *, include_smoke: bool = False) -> lis
     return _pluck_by_indices(payload, by_tag.get(tag) or [], include_smoke=include_smoke)
 
 
-def tasks_by_day(payload: dict, ymd: str, *, include_smoke: bool = False) -> list[dict]:
+def tasks_by_day(payload: ScalpelPayload, ymd: str, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks by day (YYYY-MM-DD) using indices. Default excludes smoke-synthetic tasks."""
     by_day = _indices(payload).get("by_day") or {}
     if not isinstance(by_day, dict):
@@ -234,13 +242,13 @@ def tasks_by_day(payload: dict, ymd: str, *, include_smoke: bool = False) -> lis
     return _pluck_by_indices(payload, by_day.get(ymd) or [], include_smoke=include_smoke)
 
 
-def iter_tasks(payload: dict, *, include_smoke: bool = False) -> list[dict]:
+def iter_tasks(payload: ScalpelPayload, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks as a list of dicts.
 
     By default, excludes strict-smoke synthetic tasks. Use include_smoke=True to include them.
     """
     tasks = _tasks_list(payload)
-    out: list[dict] = []
+    out: list[Task] = []
     for t in tasks:
         if not isinstance(t, dict):
             continue
@@ -250,7 +258,7 @@ def iter_tasks(payload: dict, *, include_smoke: bool = False) -> list[dict]:
     return out
 
 
-def select_tasks(payload: dict, q: Optional[Union[str, Query]] = None, *, include_smoke: bool = False) -> list[dict]:
+def select_tasks(payload: ScalpelPayload, q: str | Query | None = None, *, include_smoke: bool = False) -> list[Task]:
     """Return tasks optionally filtered by query.
 
     Notes:
@@ -262,17 +270,24 @@ def select_tasks(payload: dict, q: Optional[Union[str, Query]] = None, *, includ
 
     qq = Query.parse(q) if isinstance(q, str) else q
     got = qq.run(payload)
-    out: list[dict] = []
+    out: list[Task] = []
     for t in got:
         if not isinstance(t, dict):
             continue
-        if (not include_smoke) and _is_smoke_synthetic(t):
+        task = cast(Task, t)
+        if (not include_smoke) and _is_smoke_synthetic(task):
             continue
-        out.append(t)
+        out.append(task)
     return out
 
 
-def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bool = True) -> dict:
+def filter_payload(
+    payload: ScalpelPayload,
+    query: str | Query | None,
+    *,
+    keep_cfg: bool = True,
+    keep_meta: bool = True,
+) -> ScalpelPayload:
     """Filter a payload to only tasks matching `query` and rebuild indices.
 
     Design goals:
@@ -313,9 +328,9 @@ def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bo
 
     keep_old: set[int] = set()
     if hasattr(q, "run_indices"):
-        keep_old = set(q.run_indices(p))  # type: ignore[attr-defined]
+        keep_old = set(q.run_indices(p))
     else:
-        kept_tasks = q.run(p)  # type: ignore[call-arg]
+        kept_tasks = q.run(p)
         kept_uuids: list[str] = []
         for t in kept_tasks:
             if isinstance(t, dict):
@@ -332,30 +347,37 @@ def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bo
 
     new_tasks = [tasks[i] for i in keep_sorted]
 
-    def _remap_list(v):
+    def _remap_list(v: object) -> list[int]:
         if not isinstance(v, list):
             return []
-        out = []
+        out: list[int] = []
         for x in v:
             if isinstance(x, int) and x in old_to_new:
                 out.append(old_to_new[x])
         return out
 
-    def _remap_map(m):
+    def _remap_uuid_map(m: object) -> dict[str, int]:
         if not isinstance(m, dict):
             return {}
-        out = {}
+        out: dict[str, int] = {}
         for k, v in m.items():
             if isinstance(v, int):
                 if v in old_to_new:
-                    out[k] = old_to_new[v]
-            else:
-                out[k] = _remap_list(v)
+                    out[str(k)] = old_to_new[v]
         return out
 
-    new_indices = {}
-    for k in ("by_uuid", "by_status", "by_project", "by_tag", "by_day"):
-        new_indices[k] = _remap_map(idx.get(k))
+    def _remap_multi_map(m: object) -> dict[str, list[int]]:
+        if not isinstance(m, dict):
+            return {}
+        out: dict[str, list[int]] = {}
+        for k, v in m.items():
+            out[str(k)] = _remap_list(v)
+        return out
+
+    new_indices: dict[str, object] = {}
+    new_indices["by_uuid"] = _remap_uuid_map(idx.get("by_uuid"))
+    for k in ("by_status", "by_project", "by_tag", "by_day"):
+        new_indices[k] = _remap_multi_map(idx.get(k))
 
     out: dict[str, Any] = {}
     if keep_cfg and "cfg" in p:
@@ -364,9 +386,10 @@ def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bo
         out["meta"] = p["meta"]
 
     # Preserve other top-level keys that are part of the payload surface
-    for k in ("schema_version", "generated_at"):
-        if k in p and k not in out:
-            out[k] = p[k]
+    if "schema_version" in p and "schema_version" not in out:
+        out["schema_version"] = p["schema_version"]
+    if "generated_at" in p and "generated_at" not in out:
+        out["generated_at"] = p["generated_at"]
 
     out["tasks"] = new_tasks
     out["indices"] = new_indices
@@ -380,7 +403,7 @@ def filter_payload(payload: dict, query, *, keep_cfg: bool = True, keep_meta: bo
     else:
         out.pop("meta", None)
 
-    return out
+    return cast(ScalpelPayload, out)
 
 
 # --- Public API exports (locked by contract tests) ------------------------

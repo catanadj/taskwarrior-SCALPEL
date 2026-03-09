@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, cast
 
+from scalpel.model import Payload, Task
 from scalpel.schema_v1 import apply_schema_v1
 from scalpel.util.tz import day_key_from_ms, normalize_tz_name, resolve_tz
 
 from .interface import AiPlanResult, PlanOverride, validate_plan_overrides
-
-JsonDict = Dict[str, Any]
 
 
 def _infer_duration_min(start_ms: int, due_ms: int) -> int:
@@ -18,11 +17,11 @@ def _infer_duration_min(start_ms: int, due_ms: int) -> int:
 
 
 def apply_plan_overrides(
-    payload: JsonDict,
-    overrides: Dict[str, PlanOverride],
+    payload: Payload,
+    overrides: dict[str, PlanOverride],
     *,
     normalize: bool = True,
-) -> JsonDict:
+) -> Payload:
     """Return a payload with plan overrides applied to task calc fields.
 
     - Updates per-task: start_calc_ms, end_calc_ms, dur_calc_min, day_key.
@@ -37,9 +36,9 @@ def apply_plan_overrides(
     if errs:
         raise ValueError("Invalid plan overrides:\n" + "\n".join(f"  - {e}" for e in errs))
 
-    out: JsonDict = dict(payload)
+    out: dict[str, Any] = dict(payload)
     tasks_in = out.get("tasks")
-    tasks: List[Dict[str, Any]] = []
+    tasks: list[Task] = []
 
     cfg = out.get("cfg")
     tz_name = None
@@ -53,17 +52,16 @@ def apply_plan_overrides(
     if isinstance(tasks_in, list):
         for t in tasks_in:
             if not isinstance(t, dict):
-                tasks.append(t)
                 continue
             u = t.get("uuid")
             if not isinstance(u, str) or u not in overrides:
-                tasks.append(t)
+                tasks.append(cast(Task, dict(t)))
                 continue
 
             ov = overrides[u]
             dur_min = ov.duration_min if ov.duration_min is not None else _infer_duration_min(ov.start_ms, ov.due_ms)
 
-            t2 = dict(t)
+            t2 = cast(Task, dict(t))
             t2["start_calc_ms"] = int(ov.start_ms)
             t2["end_calc_ms"] = int(ov.due_ms)
             t2["dur_calc_min"] = int(dur_min)
@@ -74,21 +72,21 @@ def apply_plan_overrides(
 
             tasks.append(t2)
     else:
-        tasks = tasks_in if isinstance(tasks_in, list) else []
+        tasks = []
 
     out["tasks"] = tasks
     if normalize:
         out.pop("indices", None)
-        return apply_schema_v1(out)
-    return out
+        return cast(Payload, apply_schema_v1(out))
+    return cast(Payload, out)
 
 
-def _ensure_task_uuid(t: Dict[str, Any]) -> None:
+def _ensure_task_uuid(t: dict[str, Any]) -> None:
     if not isinstance(t.get("uuid"), str) or not t["uuid"].strip():
         raise ValueError("added task must include non-empty uuid")
 
 
-def _ensure_added_task_fields(t: Dict[str, Any]) -> None:
+def _ensure_added_task_fields(t: dict[str, Any]) -> None:
     if not isinstance(t.get("description"), str) or not t["description"].strip():
         raise ValueError("added task must include non-empty description")
     if not isinstance(t.get("status"), str) or not t["status"].strip():
@@ -100,36 +98,36 @@ def _ensure_added_task_fields(t: Dict[str, Any]) -> None:
         raise ValueError("added task tags must be a list when provided")
 
 
-def _merge_task_update(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
-    out = dict(base)
+def _merge_task_update(base: Task, patch: dict[str, Any]) -> Task:
+    out: dict[str, Any] = dict(base)
     for k, v in patch.items():
         if k == "uuid":
             continue
         out[k] = v
-    return out
+    return cast(Task, out)
 
 
 def apply_plan_result(
-    payload: JsonDict,
+    payload: Payload,
     result: AiPlanResult,
     *,
     normalize: bool = True,
-) -> JsonDict:
+) -> Payload:
     """Apply an AiPlanResult: add tasks, update fields, then apply overrides."""
     if not isinstance(payload, dict):
         raise TypeError(f"payload must be dict, got {type(payload).__name__}")
     if not isinstance(result, AiPlanResult):
         raise TypeError("result must be AiPlanResult")
 
-    out: JsonDict = dict(payload)
+    out: dict[str, Any] = dict(payload)
     tasks_in = out.get("tasks")
-    tasks_list: List[Dict[str, Any]] = []
+    tasks_list: list[Task] = []
     if isinstance(tasks_in, list):
         for t in tasks_in:
             if isinstance(t, dict):
-                tasks_list.append(dict(t))
+                tasks_list.append(cast(Task, dict(t)))
 
-    by_uuid = {t.get("uuid"): t for t in tasks_list if isinstance(t.get("uuid"), str)}
+    by_uuid: dict[str, Task] = {u: t for t in tasks_list if isinstance((u := t.get("uuid")), str)}
 
     # Apply updates to existing tasks.
     for uuid, patch in (result.task_updates or {}).items():
@@ -144,21 +142,21 @@ def apply_plan_result(
         by_uuid[uuid] = merged
 
     # Add new tasks.
-    added = []
+    added: list[Task] = []
     for t in result.added_tasks or ():
         if not isinstance(t, dict):
             raise ValueError("added_tasks entries must be objects")
         _ensure_task_uuid(t)
         _ensure_added_task_fields(t)
-        u = t.get("uuid")
+        u = cast(str, t["uuid"])
         if u in by_uuid:
             raise ValueError(f"added_tasks uuid already exists: {u}")
-        added.append(dict(t))
+        added.append(cast(Task, dict(t)))
         by_uuid[u] = added[-1]
 
     # Preserve task order: existing tasks first, then added.
-    ordered = []
-    seen = set()
+    ordered: list[Task] = []
+    seen: set[str] = set()
     for t in tasks_list:
         u = t.get("uuid")
         if u in by_uuid and u not in seen:
@@ -166,17 +164,19 @@ def apply_plan_result(
             seen.add(u)
     for t in added:
         u = t.get("uuid")
-        if u not in seen:
+        if isinstance(u, str) and u not in seen:
             ordered.append(t)
             seen.add(u)
 
     out["tasks"] = ordered
+    payload_out = cast(Payload, out)
 
     # Apply overrides on top of updated/added tasks.
     if result.overrides:
-        out = apply_plan_overrides(out, result.overrides, normalize=False)
+        payload_out = apply_plan_overrides(payload_out, result.overrides, normalize=False)
 
     if normalize:
-        out.pop("indices", None)
-        return apply_schema_v1(out)
-    return out
+        out_norm = dict(payload_out)
+        out_norm.pop("indices", None)
+        return cast(Payload, apply_schema_v1(out_norm))
+    return payload_out

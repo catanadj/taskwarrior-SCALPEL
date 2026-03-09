@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, cast
+
+from scalpel.model import CalendarConfig, Payload, Task
 
 from scalpel.util.tz import (
     day_key_from_ms,
@@ -33,7 +35,7 @@ def _normalize_tags(v: Any) -> list[str]:
     return [str(v)]
 
 
-def _parse_duration_to_minutes(raw: Any) -> Optional[int]:
+def _parse_duration_to_minutes(raw: Any) -> int | None:
     # Prefer existing normalized minutes if already present
     try:
         if raw is None:
@@ -47,12 +49,13 @@ def _parse_duration_to_minutes(raw: Any) -> Optional[int]:
     try:
         from .util.duration import parse_duration_to_minutes
 
-        return parse_duration_to_minutes(s)
+        parsed = parse_duration_to_minutes(s)
+        return int(parsed) if parsed is not None else None
     except Exception:
         return None
 
 
-def normalize_task_v1(t: Any, *, tz: dt.tzinfo) -> Dict[str, Any]:
+def normalize_task_v1(t: Any, *, tz: dt.tzinfo) -> Task:
     """Normalize a single task dict for schema v1 indices/query semantics.
 
     Timezone contract:
@@ -61,7 +64,7 @@ def normalize_task_v1(t: Any, *, tz: dt.tzinfo) -> Dict[str, Any]:
     if not isinstance(t, dict):
         t = {"description": "" if t is None else str(t)}
 
-    out: Dict[str, Any] = dict(t)
+    out: dict[str, Any] = dict(t)
 
     def _as_str(v: Any, default: str = "") -> str:
         if v is None:
@@ -133,15 +136,15 @@ def normalize_task_v1(t: Any, *, tz: dt.tzinfo) -> Dict[str, Any]:
             or day_key_from_ms(out.get("end_calc_ms"), tz)
         )
 
-    return out
+    return cast(Task, out)
 
 
-def build_indices_v1(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
-    by_uuid: Dict[str, int] = {}
-    by_status: Dict[str, List[int]] = {}
-    by_project: Dict[str, List[int]] = {}
-    by_tag: Dict[str, List[int]] = {}
-    by_day: Dict[str, List[int]] = {}
+def build_indices_v1(tasks: list[Task]) -> dict[str, Any]:
+    by_uuid: dict[str, int] = {}
+    by_status: dict[str, list[int]] = {}
+    by_project: dict[str, list[int]] = {}
+    by_tag: dict[str, list[int]] = {}
+    by_day: dict[str, list[int]] = {}
 
     for i, t in enumerate(tasks):
         u = str(t.get("uuid") or "")
@@ -191,7 +194,7 @@ def _indices_look_like_int_indices(indices: Any) -> bool:
     return True
 
 
-def _ensure_cfg_tz(cfg: dict) -> tuple[str, str, dt.tzinfo]:
+def _ensure_cfg_tz(cfg: dict[str, Any]) -> tuple[str, str, dt.tzinfo]:
     """Ensure cfg has tz fields and return (tz_name, display_tz, tzinfo).
 
     Policy:
@@ -219,7 +222,7 @@ def _ensure_cfg_tz(cfg: dict) -> tuple[str, str, dt.tzinfo]:
     return tz_name, display_tz, tzinfo
 
 
-def _repair_view_start_ms(cfg: dict, *, tz: dt.tzinfo) -> None:
+def _repair_view_start_ms(cfg: dict[str, Any], *, tz: dt.tzinfo) -> None:
     vs = cfg.get("view_start_ms")
     if not isinstance(vs, int):
         return
@@ -260,13 +263,13 @@ def apply_schema_v1(payload: Any) -> Any:
     if not isinstance(payload, dict):
         return payload
 
-    out = dict(payload)
+    out: dict[str, Any] = dict(payload)
 
     cfg_in = out.get("cfg")
-    cfg = dict(cfg_in) if isinstance(cfg_in, dict) else {}
+    cfg: dict[str, Any] = dict(cfg_in) if isinstance(cfg_in, dict) else {}
     _, _, tzinfo = _ensure_cfg_tz(cfg)
     _repair_view_start_ms(cfg, tz=tzinfo)
-    out["cfg"] = cfg
+    out["cfg"] = cast(CalendarConfig, cfg)
 
     # Fast-path: only if schema is v1, indices look correct, and tz contract is present.
     if (
@@ -288,8 +291,8 @@ def apply_schema_v1(payload: Any) -> Any:
     if not isinstance(tasks_raw, list):
         tasks_raw = []
 
-    tasks = [normalize_task_v1(t, tz=tzinfo) for t in tasks_raw]
+    tasks: list[Task] = [normalize_task_v1(t, tz=tzinfo) for t in tasks_raw]
     out["tasks"] = tasks
     out["indices"] = build_indices_v1(tasks)
 
-    return out
+    return cast(Payload, out)
