@@ -34,6 +34,13 @@ class TestScalpelDevEntrypointContract(unittest.TestCase):
         self.assertEqual(p.returncode, 0, combined)
         self.assertTrue(("scalpel_test_contract.sh" in combined) or ("unittest discover" in combined))
 
+    def test_dry_run_setup_installs_dev_dependencies(self):
+        p = self._run(["--dry-run", "setup"])
+        combined = (p.stdout or "") + "\n" + (p.stderr or "")
+        self.assertEqual(p.returncode, 0, combined)
+        self.assertIn("pip install --upgrade pip", combined)
+        self.assertIn("pip install -e .\\[dev\\]", combined)
+
     def test_dry_run_smoke_includes_validate(self):
         p = self._run(["--dry-run", "smoke", "--out", "build/s.html", "--json", "build/p.json", "--", "--days", "3"])
         combined = (p.stdout or "") + "\n" + (p.stderr or "")

@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  contract-tests:
+  ci:
     runs-on: ubuntu-latest
     env:
       TZ: UTC
@@ -22,19 +22,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install
+      - name: Install Dev Dependencies
+        if: github.event_name == 'pull_request'
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Lint
-        run: ruff check .
+      - name: PR Strict Gate
+        if: github.event_name == 'pull_request'
+        run: ./scripts/scalpel_ci.sh --strict
 
-      - name: Type Check
-        run: python -m mypy --config-file pyproject.toml
-
-      - name: Compile
-        run: python -m compileall -q scalpel
-
-      - name: Run Contract Suite
-        run: python -m unittest discover -s tests -p 'test_contract_*.py'
+      - name: Push Fast Gate
+        if: github.event_name != 'pull_request'
+        run: ./scripts/scalpel_ci.sh --skip-lint --skip-typecheck

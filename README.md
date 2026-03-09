@@ -100,6 +100,12 @@ Or from a local checkout:
 python3 -m pip install .
 ```
 
+Developer setup (editable install + lint/typecheck tooling):
+
+```bash
+./scripts/scalpel_dev.sh setup
+```
+
 Names:
 
 - PyPI package: `taskwarrior-scalpel`

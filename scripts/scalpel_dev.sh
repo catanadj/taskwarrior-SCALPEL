@@ -27,6 +27,7 @@ usage() {
 scalpel_dev.sh - developer entrypoint for SCALPEL
 
 Commands:
+  setup                Install local dev dependencies (editable + tooling)
   test                 Run contract suite (fast, deterministic)
   ci                   Run CI-lite runner (clean -> doctor -> smoke(strict) -> validate(payload) -> check)
   smoke                Run smoke(strict) and validate(payload) (writes HTML + JSON)
@@ -50,6 +51,7 @@ Pass-through:
 Notes:
   - `ci` delegates to ./scripts/scalpel_ci_lite.sh (preferred).
   - `smoke` uses SCALPEL_SMOKE_OUT_JSON to request JSON sidecar output.
+  - `setup` installs `-e ".[dev]"` so local lint/typecheck tooling is available.
 EOF
 }
 
@@ -138,6 +140,12 @@ parse_out_json_and_passthru() {
 }
 
 case "$cmd" in
+  setup)
+    PY="${PYTHON:-python3}"
+    _run "upgrade pip" "$PY" -m pip install --upgrade pip
+    _run "install dev deps" "$PY" -m pip install -e ".[dev]"
+    ;;
+
   test)
     if [[ -x "./scripts/scalpel_test_contract.sh" ]]; then
       _run "contracts" ./scripts/scalpel_test_contract.sh
