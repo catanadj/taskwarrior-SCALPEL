@@ -11,16 +11,35 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, quote, urlsplit
 
-from .ai import apply_plan_result, load_plan_overrides, load_plan_result
+from .ai import AiPlanResult, PlanOverride, apply_plan_result, load_plan_overrides, load_plan_result
+from .model import Payload, RawTask
 from .payload import build_payload
 from .render.inline import build_html
 from .taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
 from .util.console import eprint
 from .util.timeparse import parse_date_yyyy_mm_dd, parse_workhours
 from .util.tz import resolve_tz, today_date, normalize_tz_name
+
+
+class TimewInterval(TypedDict):
+    start_ms: int
+    end_ms: int
+    tags: list[str]
+    annotation: str
+
+
+class TimewExportResult(TypedDict):
+    day: str
+    intervals: list[TimewInterval]
+
+
+class TaskExportLookupResult(TypedDict):
+    task: RawTask | None
+    matched: int
+    exact: bool
 
 
 def _build_parser(default_out: str) -> argparse.ArgumentParser:
@@ -126,9 +145,9 @@ def _resolve_start_date(start_arg: str | None, tz_name: str) -> dt.date:
         raise SystemExit(f"Invalid --tz value: {e}")
 
 
-def _load_plan_inputs(args: argparse.Namespace) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    plan_overrides = None
-    plan_result = None
+def _load_plan_inputs(args: argparse.Namespace) -> tuple[dict[str, PlanOverride] | None, AiPlanResult | None]:
+    plan_overrides: dict[str, PlanOverride] | None = None
+    plan_result: AiPlanResult | None = None
     if args.plan_overrides:
         try:
             plan_overrides = load_plan_overrides(Path(args.plan_overrides))
@@ -142,7 +161,7 @@ def _load_plan_inputs(args: argparse.Namespace) -> tuple[dict[str, Any] | None, 
     return plan_overrides, plan_result
 
 
-def _build_data(args: argparse.Namespace) -> dict[str, Any]:
+def _build_data(args: argparse.Namespace) -> Payload:
     tz_name = normalize_tz_name(args.tz)
     display_tz = normalize_tz_name(args.display_tz)
     start_date = _resolve_start_date(args.start, tz_name)
@@ -171,7 +190,7 @@ def _build_data(args: argparse.Namespace) -> dict[str, Any]:
     return data
 
 
-def _render_once(args: argparse.Namespace, out_path: str) -> dict[str, Any]:
+def _render_once(args: argparse.Namespace, out_path: str) -> Payload:
     data = _build_data(args)
     html = build_html(data)
     with open(out_path, "w", encoding="utf-8") as f:
@@ -189,7 +208,7 @@ def _format_http_url(host: str, port: int, path: str = "/") -> str:
     return f"http://{safe_host}:{port}{suffix}"
 
 
-def _payload_generated_at(payload: dict[str, Any]) -> str | None:
+def _payload_generated_at(payload: Payload) -> str | None:
     ga = payload.get("generated_at")
     if isinstance(ga, str) and ga:
         return ga
@@ -293,7 +312,7 @@ def _day_window_utc_ms(day_ymd: str, tz_name: str) -> tuple[int, int]:
     return start_ms, end_ms
 
 
-def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> dict[str, Any]:
+def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> TimewExportResult:
     start_ms, end_ms = _day_window_utc_ms(day_ymd, tz_name)
     cmd = ["timew", day_ymd, "export"]
 
@@ -328,7 +347,7 @@ def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> dict[str, Any]:
     if not isinstance(raw, list):
         raise SystemExit("`timew export` did not return a JSON list.")
 
-    out: list[dict[str, Any]] = []
+    out: list[TimewInterval] = []
     now_ms = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
     for it in raw:
         if not isinstance(it, dict):
@@ -369,7 +388,7 @@ def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> dict[str, Any]:
     return {"day": day_ymd, "intervals": out}
 
 
-def _run_task_export_for_uuid(uuid_query: str) -> dict[str, Any]:
+def _run_task_export_for_uuid(uuid_query: str) -> TaskExportLookupResult:
     uq = str(uuid_query or "").strip()
     if not _UUID_QUERY_RE.match(uq):
         raise ValueError("Query param 'uuid' must be 8-36 hex/hyphen characters.")
@@ -387,7 +406,7 @@ def _run_task_export_for_uuid(uuid_query: str) -> dict[str, Any]:
     raise SystemExit(f"Task query '{uq}' matched {len(tasks)} tasks; provide full UUID.")
 
 
-def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, Any]) -> None:
+def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) -> None:
     host = str(args.host or "127.0.0.1").strip() or "127.0.0.1"
     port = int(args.port)
     if port < 0 or port > 65535:
@@ -527,8 +546,8 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, A
                     self._send_json(400, {"ok": False, "error": "Query param 'uuid' is required."})
                     return
                 try:
-                    res = _run_task_export_for_uuid(uuid_q)
-                    task_obj = res.get("task")
+                    task_res = _run_task_export_for_uuid(uuid_q)
+                    task_obj = task_res.get("task")
                     if not isinstance(task_obj, dict):
                         _obs_inc("task_export_not_found_total")
                         self._send_json(404, {"ok": False, "error": f"Task not found for uuid:{uuid_q}"})
@@ -537,8 +556,8 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, A
                     _obs_log(
                         "serve.task_export_ok",
                         uuid_query=uuid_q,
-                        matched=int(res.get("matched") or 0),
-                        exact=bool(res.get("exact")),
+                        matched=int(task_res.get("matched") or 0),
+                        exact=bool(task_res.get("exact")),
                     )
                     self._send_json(
                         200,
@@ -546,8 +565,8 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, A
                             "ok": True,
                             "task": task_obj,
                             "uuid_query": uuid_q,
-                            "matched": int(res.get("matched") or 0),
-                            "exact": bool(res.get("exact")),
+                            "matched": int(task_res.get("matched") or 0),
+                            "exact": bool(task_res.get("exact")),
                         },
                     )
                 except ValueError as e:
@@ -573,10 +592,10 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: dict[str, A
                     self._send_json(400, {"ok": False, "error": "Query param 'day' must be YYYY-MM-DD."})
                     return
                 try:
-                    res = _run_timew_export_for_day(day_ymd=day, tz_name=str(args.tz or "local"))
+                    timew_res = _run_timew_export_for_day(day_ymd=day, tz_name=str(args.tz or "local"))
                     _obs_inc("timew_export_success_total")
-                    _obs_log("serve.timew_export_ok", day=day, intervals=len(res["intervals"]))
-                    self._send_json(200, {"ok": True, "day": res["day"], "intervals": res["intervals"]})
+                    _obs_log("serve.timew_export_ok", day=day, intervals=len(timew_res["intervals"]))
+                    self._send_json(200, {"ok": True, "day": timew_res["day"], "intervals": timew_res["intervals"]})
                 except SystemExit as e:
                     _obs_inc("timew_export_error_total")
                     _obs_log("serve.timew_export_error", day=day, error=str(e))

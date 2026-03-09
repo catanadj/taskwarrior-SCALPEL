@@ -89,6 +89,7 @@ follow_imports = "skip"
 files = [
   "scalpel/ai/apply.py",
   "scalpel/api.py",
+  "scalpel/cli.py",
   "scalpel/model.py",
   "scalpel/payload.py",
   "scalpel/planner.py",
