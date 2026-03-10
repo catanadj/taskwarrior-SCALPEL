@@ -1,0 +1,412 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import socket
+import subprocess
+import tempfile
+import threading
+import time
+import unittest
+from dataclasses import dataclass, field
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.request import Request, urlopen
+
+from scalpel import serve
+from scalpel.render.inline import build_html
+
+
+def _free_port() -> int:
+    try:
+        sock = socket.socket()
+    except PermissionError as ex:
+        raise unittest.SkipTest("local socket bind not permitted in this environment") from ex
+    with sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _json_request(url: str, *, method: str = "GET", body: object | None = None) -> dict[str, Any]:
+    payload = None
+    headers = {"Accept": "application/json"}
+    if body is not None:
+        payload = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = Request(url, data=payload, method=method, headers=headers)
+    with urlopen(req, timeout=5) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _wait_until(pred: Any, *, timeout: float = 5.0, interval: float = 0.05) -> Any:
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        try:
+            last = pred()
+        except Exception as ex:  # pragma: no cover - retry loop
+            last = ex
+            time.sleep(interval)
+            continue
+        if last:
+            return last
+        time.sleep(interval)
+    raise AssertionError(f"condition not met before timeout; last={last!r}")
+
+
+def _make_payload(generated_at: str) -> dict[str, Any]:
+    return {
+        "cfg": {
+            "view_key": "serve-browser-e2e",
+            "view_start_ms": 1767225600000,
+            "days": 7,
+            "px_per_min": 2,
+            "work_start_min": 360,
+            "work_end_min": 1380,
+            "snap_min": 10,
+            "default_duration_min": 10,
+            "max_infer_duration_min": 480,
+            "tz": "UTC",
+            "display_tz": "UTC",
+        },
+        "tasks": [],
+        "meta": {"generated_at": generated_at},
+    }
+
+
+@dataclass
+class _BrowserServeHarness:
+    root: Path
+    token: str = "abc123"
+    out_file: Path = field(init=False)
+    payload_count: int = field(default=0, init=False)
+    holder: dict[str, ThreadingHTTPServer] = field(default_factory=dict, init=False)
+    thread: threading.Thread | None = field(default=None, init=False)
+    server_error: BaseException | None = field(default=None, init=False)
+
+    def __post_init__(self) -> None:
+        self.out_file = self.root / "serve.html"
+        self.out_file.write_text(build_html(_make_payload("gen-0")), encoding="utf-8")
+
+    def _args(self) -> argparse.Namespace:
+        return argparse.Namespace(
+            host="127.0.0.1",
+            port=0,
+            serve_token=self.token,
+            allow_remote=False,
+            no_open=True,
+        )
+
+    def _render_once(self, _args: argparse.Namespace, out_path: str) -> dict[str, Any]:
+        self.payload_count += 1
+        payload = _make_payload(f"gen-{self.payload_count}")
+        Path(out_path).write_text(build_html(payload), encoding="utf-8")
+        return payload
+
+    @staticmethod
+    def _task_lookup(uuid_query: str) -> dict[str, Any]:
+        return {
+            "task": {"uuid": "12345678-1111-2222-3333-abcdefabcdef", "description": f"Task {uuid_query}"},
+            "matched": 1,
+            "exact": True,
+        }
+
+    @staticmethod
+    def _timew_export(day: str) -> dict[str, Any]:
+        return {
+            "day": day,
+            "intervals": [
+                {
+                    "start_ms": 1767225600000,
+                    "end_ms": 1767229200000,
+                    "tags": ["focus"],
+                    "annotation": "Deep work",
+                }
+            ],
+        }
+
+    def _server_factory(self, addr: tuple[str, int], handler: type) -> ThreadingHTTPServer:
+        server_obj = ThreadingHTTPServer(addr, handler)
+        self.holder["server"] = server_obj
+        return server_obj
+
+    def start(self) -> "_BrowserServeHarness":
+        initial_payload = _make_payload("gen-0")
+
+        def runner() -> None:
+            try:
+                serve.serve(
+                    self._args(),
+                    str(self.out_file),
+                    initial_payload,
+                    render_once=self._render_once,
+                    task_lookup=self._task_lookup,
+                    timew_export=self._timew_export,
+                    server_factory=self._server_factory,
+                    browser_open=None,
+                )
+            except BaseException as ex:  # pragma: no cover - surfaced through polling
+                self.server_error = ex
+
+        self.thread = threading.Thread(target=runner, daemon=True)
+        self.thread.start()
+        deadline = time.time() + 5.0
+        while "server" not in self.holder:
+            if self.server_error is not None:
+                if isinstance(self.server_error, PermissionError):
+                    raise unittest.SkipTest("local HTTP bind not permitted in this environment")
+                raise RuntimeError(f"serve thread failed to start: {self.server_error}")
+            if time.time() >= deadline:
+                raise RuntimeError("serve thread did not start in time")
+            time.sleep(0.01)
+        return self
+
+    def stop(self) -> None:
+        server_obj = self.holder.get("server")
+        if server_obj is not None:
+            server_obj.shutdown()
+        if self.thread is not None:
+            self.thread.join(timeout=5)
+
+    @property
+    def base_url(self) -> str:
+        host, port = self.holder["server"].server_address[:2]
+        return f"http://{host}:{int(port)}"
+
+
+class _HeadlessChromium:
+    def __init__(self, chromium_bin: str) -> None:
+        self.chromium_bin = chromium_bin
+        self.port = _free_port()
+        self.proc: subprocess.Popen[str] | None = None
+        self.base = f"http://127.0.0.1:{self.port}"
+
+    def __enter__(self) -> "_HeadlessChromium":
+        self.proc = subprocess.Popen(
+            [
+                self.chromium_bin,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-sandbox",
+                f"--remote-debugging-port={self.port}",
+                "about:blank",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        try:
+            _wait_until(lambda: _json_request(self.base + "/json/version").get("webSocketDebuggerUrl"), timeout=5.0)
+            return self
+        except Exception:
+            self.__exit__(None, None, None)
+            raise
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        if self.proc is not None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+            self.proc = None
+
+
+def _run_cdp_browser_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("initial UI", () =>
+    evaluate("document.readyState === 'complete' && !!document.getElementById('btnRefresh')")
+  );
+
+  await evaluate(`
+    (() => {
+      const more = document.getElementById('btnMoreActions');
+      if (more) more.click();
+      const btn = document.getElementById('btnNotes');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("notes open", () =>
+    evaluate(`
+      (() => {
+        const wrap = document.getElementById('notesWrap');
+        const root = document.querySelector('.rsec[data-rsec="actions"]');
+        const hdr = root ? root.querySelector('[data-rsec-toggle="actions"]') : null;
+        return !!(
+          wrap && wrap.style.display === 'block' &&
+          root && root.classList.contains('open') &&
+          hdr && hdr.getAttribute('aria-expanded') === 'true'
+        );
+      })()
+    `)
+  );
+
+  const before = await evaluate(`
+    (() => JSON.parse(document.getElementById('tw-data').textContent).meta.generated_at)()
+  `);
+  if (before !== "gen-0") throw new Error(`expected gen-0 before refresh, got ${before}`);
+
+  await new Promise((r) => setTimeout(r, 180));
+
+  await evaluate(`
+    (() => {
+      const more = document.getElementById('btnMoreActions');
+      if (more) more.click();
+      const btn = document.getElementById('btnRefresh');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("refreshed payload", () =>
+    evaluate(`
+      (() => {
+        try {
+          return JSON.parse(document.getElementById('tw-data').textContent).meta.generated_at === 'gen-1';
+        } catch (_) {
+          return false;
+        }
+      })()
+    `)
+  );
+
+  await waitFor("notes persisted", () =>
+    evaluate(`
+      (() => {
+        const wrap = document.getElementById('notesWrap');
+        const btn = document.getElementById('btnNotes');
+        const root = document.querySelector('.rsec[data-rsec="actions"]');
+        return !!(
+          wrap && wrap.style.display === 'block' &&
+          btn && btn.classList.contains('on') &&
+          root && root.classList.contains('open')
+        );
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+
+    env = dict(os.environ)
+    env["SCALPEL_CDP_PORT"] = str(devtools_port)
+    env["SCALPEL_PAGE_URL"] = page_url
+    proc = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise AssertionError(f"browser contract failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
+
+
+class TestServeBrowserLiveContract(unittest.TestCase):
+    def test_live_browser_refresh_preserves_notes_visibility(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _BrowserServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_browser_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+                self.assertGreaterEqual(harness.payload_count, 1)
+            finally:
+                harness.stop()
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
