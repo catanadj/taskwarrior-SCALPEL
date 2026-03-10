@@ -6,6 +6,25 @@ on:
   pull_request:
 
 jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    env:
+      TZ: UTC
+      SCALPEL_TZ: UTC
+      SCALPEL_DISPLAY_TZ: local
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup Python
+        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # v5.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Snapshot Hygiene Gate
+        run: ./scripts/scalpel_ci_hygiene.sh
+
   ci:
     runs-on: ubuntu-latest
     env:
