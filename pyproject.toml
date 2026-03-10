@@ -103,4 +103,5 @@ files = [
   "scalpel/util/tz.py",
   "scalpel/util/duration.py",
   "scalpel/tools/ci.py",
+  "scalpel/tools/ci_lite.py",
 ]

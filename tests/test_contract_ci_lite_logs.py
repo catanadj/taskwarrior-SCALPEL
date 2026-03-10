@@ -10,21 +10,21 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CI_LITE = REPO_ROOT / "scripts" / "scalpel_ci_lite.sh"
+CI_LITE_TOOL = REPO_ROOT / "scalpel" / "tools" / "ci_lite.py"
 LOG_DIR = REPO_ROOT / "build" / "ci-lite"
 
 
 class TestCILiteLogContract(unittest.TestCase):
     def test_ci_lite_has_logging_instrumentation(self) -> None:
-        s = CI_LITE.read_text(encoding="utf-8", errors="replace")
+        wrapper = CI_LITE.read_text(encoding="utf-8", errors="replace")
+        impl = CI_LITE_TOOL.read_text(encoding="utf-8", errors="replace")
 
-        # Static contract: do not allow “silent” CI-lite (visibility on failure).
-        self.assertIn('LOG_DIR="build/ci-lite"', s)
-        self.assertIn('tee -a "$logfile"', s)
-        self.assertIn('PIPESTATUS[0]', s)
-        self.assertIn('[ci-lite] log: $logfile', s)
-        self.assertIn("--clean-logs", s)
-        self.assertIn("--print-logs", s)
-        self.assertIn("print_logs()", s)
+        self.assertIn("-m scalpel.tools.ci_lite", wrapper)
+        self.assertIn('print(f"[ci-lite] log: {logfile}")', impl)
+        self.assertIn('print("[ci-lite] === logs ===")', impl)
+        self.assertIn('PERF WARN', impl)
+        self.assertIn('PERF STRICT', impl)
+        self.assertIn("summary.tsv", impl)
 
     def test_clean_logs_flag_clears_log_dir(self) -> None:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,4 +99,3 @@ class TestCILiteLogContract(unittest.TestCase):
         self.assertRegex(combined, r"\[ci-lite\] log: .*_clean\.log")
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
