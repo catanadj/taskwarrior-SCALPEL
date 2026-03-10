@@ -2,11 +2,16 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .cache/
 build/
+dist/
+*.egg-info/
+.ship-safe/
+ship-safe-report.html
 scalpel/scalpel_schedule.html
 tw_today.html
 *.bak

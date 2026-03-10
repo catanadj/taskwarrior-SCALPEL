@@ -31,7 +31,7 @@ def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str
     errors: List[str] = []
 
     bad_name = re.compile(r"^Copy \(\d+\) ")
-    skip_dirs = {".git", "build", "dist", ".venv", ".mypy_cache", ".pytest_cache"}
+    skip_dirs = {".git", "build", "dist", ".venv", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".ship-safe"}
     pycache_count = 0
     pyc_count = 0
     bak_count = 0
@@ -83,7 +83,7 @@ def _smoke_inline_build(repo_root: Path) -> Tuple[List[str], List[str]]:
     errors: List[str] = []
 
     try:
-        from scalpel.render.inline import build_html  # type: ignore
+        from scalpel.render.inline import build_html
     except Exception as e:
         errors.append(f"Import failed: scalpel.render.inline.build_html ({e})")
         return warnings, errors
