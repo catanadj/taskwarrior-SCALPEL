@@ -9,9 +9,10 @@ import subprocess
 import sys
 import threading
 import webbrowser
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, Callable, TypedDict, cast
 from urllib.parse import parse_qs, quote, urlsplit
 
 from .ai import AiPlanResult, PlanOverride, apply_plan_result, load_plan_overrides, load_plan_result
@@ -40,6 +41,20 @@ class TaskExportLookupResult(TypedDict):
     task: RawTask | None
     matched: int
     exact: bool
+
+
+@dataclass(frozen=True)
+class ServeConfig:
+    host: str
+    port: int
+    required_token: str | None
+    out_file: Path
+    route_file: str
+
+
+JsonSendFn = Callable[[int, dict[str, Any]], None]
+CounterIncFn = Callable[[str], None]
+ObsLogFn = Callable[..., None]
 
 
 def _build_parser(default_out: str) -> argparse.ArgumentParser:
@@ -406,7 +421,7 @@ def _run_task_export_for_uuid(uuid_query: str) -> TaskExportLookupResult:
     raise SystemExit(f"Task query '{uq}' matched {len(tasks)} tasks; provide full UUID.")
 
 
-def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) -> None:
+def _build_serve_config(args: argparse.Namespace, out_path: str) -> ServeConfig:
     host = str(args.host or "127.0.0.1").strip() or "127.0.0.1"
     port = int(args.port)
     if port < 0 or port > 65535:
@@ -420,8 +435,137 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
         raise SystemExit("Remote --serve requires --serve-token (or SCALPEL_SERVE_TOKEN).")
 
     out_file = Path(out_path)
-    route_file = "/" + out_file.name
-    state: dict[str, Any] = {"payload": initial_payload}
+    return ServeConfig(
+        host=host,
+        port=port,
+        required_token=required_token,
+        out_file=out_file,
+        route_file="/" + out_file.name,
+    )
+
+
+def _first_query_value(raw_path: str, name: str) -> str:
+    qs = parse_qs(urlsplit(raw_path).query or "", keep_blank_values=False)
+    return str((qs.get(name) or [""])[0]).strip()
+
+
+def _handle_task_endpoint(
+    uuid_q: str,
+    *,
+    send_json: JsonSendFn,
+    obs_inc: CounterIncFn,
+    obs_log: ObsLogFn,
+) -> None:
+    if not uuid_q:
+        send_json(400, {"ok": False, "error": "Query param 'uuid' is required."})
+        return
+    try:
+        task_res = _run_task_export_for_uuid(uuid_q)
+        task_obj = task_res.get("task")
+        if not isinstance(task_obj, dict):
+            obs_inc("task_export_not_found_total")
+            send_json(404, {"ok": False, "error": f"Task not found for uuid:{uuid_q}"})
+            return
+        obs_inc("task_export_success_total")
+        obs_log(
+            "serve.task_export_ok",
+            uuid_query=uuid_q,
+            matched=int(task_res.get("matched") or 0),
+            exact=bool(task_res.get("exact")),
+        )
+        send_json(
+            200,
+            {
+                "ok": True,
+                "task": task_obj,
+                "uuid_query": uuid_q,
+                "matched": int(task_res.get("matched") or 0),
+                "exact": bool(task_res.get("exact")),
+            },
+        )
+    except ValueError as e:
+        obs_inc("task_export_error_total")
+        send_json(400, {"ok": False, "error": str(e)})
+    except SystemExit as e:
+        obs_inc("task_export_error_total")
+        obs_log("serve.task_export_error", uuid_query=uuid_q, error=str(e))
+        send_json(409, {"ok": False, "error": str(e)})
+    except Exception as e:
+        obs_inc("task_export_error_total")
+        obs_log("serve.task_export_error", uuid_query=uuid_q, error=f"{type(e).__name__}: {e}")
+        send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+
+
+def _handle_timew_endpoint(
+    day: str,
+    *,
+    tz_name: str,
+    send_json: JsonSendFn,
+    obs_inc: CounterIncFn,
+    obs_log: ObsLogFn,
+) -> None:
+    if not _YMD_RE.match(day):
+        send_json(400, {"ok": False, "error": "Query param 'day' must be YYYY-MM-DD."})
+        return
+    try:
+        timew_res = _run_timew_export_for_day(day_ymd=day, tz_name=tz_name)
+        obs_inc("timew_export_success_total")
+        obs_log("serve.timew_export_ok", day=day, intervals=len(timew_res["intervals"]))
+        send_json(200, {"ok": True, "day": timew_res["day"], "intervals": timew_res["intervals"]})
+    except SystemExit as e:
+        obs_inc("timew_export_error_total")
+        obs_log("serve.timew_export_error", day=day, error=str(e))
+        send_json(500, {"ok": False, "error": str(e)})
+    except Exception as e:
+        obs_inc("timew_export_error_total")
+        obs_log("serve.timew_export_error", day=day, error=f"{type(e).__name__}: {e}")
+        send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+
+
+def _handle_refresh_endpoint(
+    *,
+    args: argparse.Namespace,
+    out_path: str,
+    route_file: str,
+    state: dict[str, Payload],
+    state_lock: Any,
+    send_json: JsonSendFn,
+    obs_inc: CounterIncFn,
+    obs_log: ObsLogFn,
+) -> None:
+    t0 = dt.datetime.now(dt.timezone.utc)
+    try:
+        with state_lock:
+            payload = _render_once(args, out_path)
+            state["payload"] = payload
+        elapsed_ms = int((dt.datetime.now(dt.timezone.utc) - t0).total_seconds() * 1000)
+        obs_inc("refresh_success_total")
+        obs_log(
+            "serve.refresh_ok",
+            ms=elapsed_ms,
+            generated_at=_payload_generated_at(payload),
+        )
+        send_json(
+            200,
+            {
+                "ok": True,
+                "generated_at": _payload_generated_at(payload),
+                "path": route_file,
+            },
+        )
+    except SystemExit as e:
+        obs_inc("refresh_error_total")
+        obs_log("serve.refresh_error", error=str(e))
+        send_json(500, {"ok": False, "error": str(e)})
+    except Exception as e:
+        obs_inc("refresh_error_total")
+        obs_log("serve.refresh_error", error=f"{type(e).__name__}: {e}")
+        send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+
+
+def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) -> None:
+    cfg = _build_serve_config(args, out_path)
+    state: dict[str, Payload] = {"payload": initial_payload}
     state_lock = threading.Lock()
     obs_lock = threading.Lock()
     obs_counters: dict[str, Any] = {}
@@ -434,12 +578,11 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
         with obs_lock:
             return _counter_snapshot(obs_counters)
 
-    _obs_log("serve.started", host=host, port=port, auth_required=required_token is not None)
+    _obs_log("serve.started", host=cfg.host, port=cfg.port, auth_required=cfg.required_token is not None)
 
     class Handler(BaseHTTPRequestHandler):
         def _query_token(self) -> str:
-            qs = parse_qs(urlsplit(self.path).query or "", keep_blank_values=False)
-            return str((qs.get("token") or [""])[0]).strip()
+            return _first_query_value(self.path, "token")
 
         def _header_token(self) -> str:
             x_token = str(self.headers.get("X-Scalpel-Token") or "").strip()
@@ -461,10 +604,10 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
             return ""
 
         def _is_authorized(self) -> bool:
-            if required_token is None:
+            if cfg.required_token is None:
                 return True
             for tok in (self._query_token(), self._header_token(), self._cookie_token()):
-                if tok and tok == required_token:
+                if tok and tok == cfg.required_token:
                     return True
             return False
 
@@ -483,8 +626,8 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
-            if set_auth_cookie and required_token is not None:
-                self.send_header("Set-Cookie", f"scalpel_token={required_token}; Path=/; HttpOnly; SameSite=Lax")
+            if set_auth_cookie and cfg.required_token is not None:
+                self.send_header("Set-Cookie", f"scalpel_token={cfg.required_token}; Path=/; HttpOnly; SameSite=Lax")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -494,8 +637,8 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
             self.send_response(code)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
-            if set_auth_cookie and required_token is not None:
-                self.send_header("Set-Cookie", f"scalpel_token={required_token}; Path=/; HttpOnly; SameSite=Lax")
+            if set_auth_cookie and cfg.required_token is not None:
+                self.send_header("Set-Cookie", f"scalpel_token={cfg.required_token}; Path=/; HttpOnly; SameSite=Lax")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -509,17 +652,17 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
             path = urlsplit(self.path).path
             _obs_inc("requests_total", path=path)
             _obs_inc("requests_get_total")
-            if path in {"/", route_file}:
+            if path in {"/", cfg.route_file}:
                 if not self._is_authorized():
                     self._deny_unauthorized(path)
                     return
                 try:
                     with state_lock:
-                        html = out_file.read_text(encoding="utf-8")
+                        html = cfg.out_file.read_text(encoding="utf-8")
                 except Exception as e:
                     self._send_json(500, {"ok": False, "error": f"Failed reading HTML: {e}"})
                     return
-                set_cookie = required_token is not None and self._query_token() == required_token
+                set_cookie = cfg.required_token is not None and self._query_token() == cfg.required_token
                 self._send_html(200, html, set_auth_cookie=set_cookie)
                 return
 
@@ -529,85 +672,40 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
                     return
                 with state_lock:
                     payload = state.get("payload")
-                if not isinstance(payload, dict):
+                if payload is None:
                     self._send_json(404, {"ok": False, "error": "No payload loaded"})
                     return
                 _obs_inc("payload_reads_total")
-                self._send_json(200, payload)
+                self._send_json(200, cast(dict[str, Any], payload))
                 return
 
             if path == "/task":
                 if not self._is_authorized():
                     self._deny_unauthorized(path)
                     return
-                qs = parse_qs(urlsplit(self.path).query or "", keep_blank_values=False)
-                uuid_q = str((qs.get("uuid") or [""])[0]).strip()
-                if not uuid_q:
-                    self._send_json(400, {"ok": False, "error": "Query param 'uuid' is required."})
-                    return
-                try:
-                    task_res = _run_task_export_for_uuid(uuid_q)
-                    task_obj = task_res.get("task")
-                    if not isinstance(task_obj, dict):
-                        _obs_inc("task_export_not_found_total")
-                        self._send_json(404, {"ok": False, "error": f"Task not found for uuid:{uuid_q}"})
-                        return
-                    _obs_inc("task_export_success_total")
-                    _obs_log(
-                        "serve.task_export_ok",
-                        uuid_query=uuid_q,
-                        matched=int(task_res.get("matched") or 0),
-                        exact=bool(task_res.get("exact")),
-                    )
-                    self._send_json(
-                        200,
-                        {
-                            "ok": True,
-                            "task": task_obj,
-                            "uuid_query": uuid_q,
-                            "matched": int(task_res.get("matched") or 0),
-                            "exact": bool(task_res.get("exact")),
-                        },
-                    )
-                except ValueError as e:
-                    _obs_inc("task_export_error_total")
-                    self._send_json(400, {"ok": False, "error": str(e)})
-                except SystemExit as e:
-                    _obs_inc("task_export_error_total")
-                    _obs_log("serve.task_export_error", uuid_query=uuid_q, error=str(e))
-                    self._send_json(409, {"ok": False, "error": str(e)})
-                except Exception as e:
-                    _obs_inc("task_export_error_total")
-                    _obs_log("serve.task_export_error", uuid_query=uuid_q, error=f"{type(e).__name__}: {e}")
-                    self._send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+                _handle_task_endpoint(
+                    _first_query_value(self.path, "uuid"),
+                    send_json=self._send_json,
+                    obs_inc=_obs_inc,
+                    obs_log=_obs_log,
+                )
                 return
 
             if path == "/timew":
                 if not self._is_authorized():
                     self._deny_unauthorized(path)
                     return
-                qs = parse_qs(urlsplit(self.path).query or "", keep_blank_values=False)
-                day = str((qs.get("day") or [""])[0]).strip()
-                if not _YMD_RE.match(day):
-                    self._send_json(400, {"ok": False, "error": "Query param 'day' must be YYYY-MM-DD."})
-                    return
-                try:
-                    timew_res = _run_timew_export_for_day(day_ymd=day, tz_name=str(args.tz or "local"))
-                    _obs_inc("timew_export_success_total")
-                    _obs_log("serve.timew_export_ok", day=day, intervals=len(timew_res["intervals"]))
-                    self._send_json(200, {"ok": True, "day": timew_res["day"], "intervals": timew_res["intervals"]})
-                except SystemExit as e:
-                    _obs_inc("timew_export_error_total")
-                    _obs_log("serve.timew_export_error", day=day, error=str(e))
-                    self._send_json(500, {"ok": False, "error": str(e)})
-                except Exception as e:
-                    _obs_inc("timew_export_error_total")
-                    _obs_log("serve.timew_export_error", day=day, error=f"{type(e).__name__}: {e}")
-                    self._send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+                _handle_timew_endpoint(
+                    _first_query_value(self.path, "day"),
+                    tz_name=str(args.tz or "local"),
+                    send_json=self._send_json,
+                    obs_inc=_obs_inc,
+                    obs_log=_obs_log,
+                )
                 return
 
             if path == "/metrics":
-                if required_token is not None and (not self._is_authorized()):
+                if cfg.required_token is not None and (not self._is_authorized()):
                     self._deny_unauthorized(path)
                     return
                 self._send_json(200, {"ok": True, "metrics": _obs_metrics()})
@@ -617,7 +715,7 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
                 qs = parse_qs(urlsplit(self.path).query or "", keep_blank_values=False)
                 include_metrics = str((qs.get("metrics") or [""])[0]).strip().lower() in {"1", "true", "yes", "on"}
                 if include_metrics:
-                    self._send_json(200, {"ok": True, "auth_required": required_token is not None, "metrics": _obs_metrics()})
+                    self._send_json(200, {"ok": True, "auth_required": cfg.required_token is not None, "metrics": _obs_metrics()})
                 else:
                     self._send_json(200, {"ok": True})
                 return
@@ -634,41 +732,23 @@ def _serve(args: argparse.Namespace, out_path: str, initial_payload: Payload) ->
             if not self._is_authorized():
                 self._deny_unauthorized(path)
                 return
-            t0 = dt.datetime.now(dt.timezone.utc)
-            try:
-                with state_lock:
-                    payload = _render_once(args, out_path)
-                    state["payload"] = payload
-                elapsed_ms = int((dt.datetime.now(dt.timezone.utc) - t0).total_seconds() * 1000)
-                _obs_inc("refresh_success_total")
-                _obs_log(
-                    "serve.refresh_ok",
-                    ms=elapsed_ms,
-                    generated_at=_payload_generated_at(payload),
-                )
-                self._send_json(
-                    200,
-                    {
-                        "ok": True,
-                        "generated_at": _payload_generated_at(payload),
-                        "path": route_file,
-                    },
-                )
-            except SystemExit as e:
-                _obs_inc("refresh_error_total")
-                _obs_log("serve.refresh_error", error=str(e))
-                self._send_json(500, {"ok": False, "error": str(e)})
-            except Exception as e:
-                _obs_inc("refresh_error_total")
-                _obs_log("serve.refresh_error", error=f"{type(e).__name__}: {e}")
-                self._send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+            _handle_refresh_endpoint(
+                args=args,
+                out_path=out_path,
+                route_file=cfg.route_file,
+                state=state,
+                state_lock=state_lock,
+                send_json=self._send_json,
+                obs_inc=_obs_inc,
+                obs_log=_obs_log,
+            )
 
-    server = ThreadingHTTPServer((host, port), Handler)
+    server = ThreadingHTTPServer((cfg.host, cfg.port), Handler)
     actual_host, actual_port = server.server_address[:2]
-    if required_token is None:
+    if cfg.required_token is None:
         serve_url = _format_http_url(str(actual_host), int(actual_port), "/")
     else:
-        serve_url = _format_http_url(str(actual_host), int(actual_port), f"/?token={quote(required_token, safe='')}")
+        serve_url = _format_http_url(str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}")
     print(serve_url)
 
     if not getattr(args, "no_open", False):
