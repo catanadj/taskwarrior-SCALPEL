@@ -23,6 +23,11 @@ class TestRepoHygieneContract(unittest.TestCase):
             ".mypy_cache/",
             ".pytest_cache/",
             ".ruff_cache/",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "SECURITY.md",
+            "__init__.py",
+            "scripts/scalpel_pytest.sh",
         ):
             self.assertIn(needle, text)
 

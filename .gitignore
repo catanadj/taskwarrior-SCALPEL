@@ -14,5 +14,10 @@ dist/
 ship-safe-report.html
 scalpel/scalpel_schedule.html
 tw_today.html
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+__init__.py
+scripts/scalpel_pytest.sh
 *.bak
 *.rej
