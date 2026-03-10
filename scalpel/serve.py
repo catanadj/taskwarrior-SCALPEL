@@ -44,6 +44,12 @@ class ServeConfig:
     route_file: str
 
 
+@dataclass
+class ServeState:
+    payload: Payload
+    client_state: dict[str, Any]
+
+
 RenderOnceFn = Callable[[argparse.Namespace, str], Payload]
 TaskLookupFn = Callable[[str], TaskExportLookupResult]
 TimewExportFn = Callable[[str], TimewExportResult]
@@ -73,6 +79,126 @@ def _payload_generated_at(payload: Payload) -> str | None:
         if isinstance(m, str) and m:
             return m
     return None
+
+
+def _client_state_file(out_file: Path) -> Path:
+    return out_file.with_suffix(out_file.suffix + ".state.json")
+
+
+def _read_client_state(path: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): v for k, v in raw.items()}
+
+
+def _write_client_state(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    text = json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _client_state_snapshot(state: ServeState) -> dict[str, Any]:
+    return {str(k): v for k, v in state.client_state.items()}
+
+
+def _escape_script_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace("</", r"<\/")
+
+
+def _serve_bootstrap_script(client_state: dict[str, Any]) -> str:
+    boot_json = _escape_script_json(client_state)
+    return (
+        "<script>\n"
+        "(() => {\n"
+        '  "use strict";\n'
+        "  const g = (typeof globalThis !== 'undefined') ? globalThis : window;\n"
+        "  if (!g) return;\n"
+        f"  const boot = {boot_json};\n"
+        "  const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);\n"
+        "  const store = (g.__scalpel_serverKvStore && typeof g.__scalpel_serverKvStore === 'object') ? g.__scalpel_serverKvStore : Object.assign({}, boot);\n"
+        "  g.__scalpel_serverKvStore = store;\n"
+        "  let pendingValues = {};\n"
+        "  let pendingDelete = new Set();\n"
+        "  let flushTimer = 0;\n"
+        "  function scheduleFlush(){\n"
+        "    if (flushTimer) return;\n"
+        "    flushTimer = setTimeout(flushNow, 60);\n"
+        "  }\n"
+        "  async function flushNow(){\n"
+        "    if (flushTimer){ clearTimeout(flushTimer); flushTimer = 0; }\n"
+        "    const values = pendingValues;\n"
+        "    const del = Array.from(pendingDelete);\n"
+        "    pendingValues = {};\n"
+        "    pendingDelete = new Set();\n"
+        "    if (!Object.keys(values).length && !del.length) return;\n"
+        "    try {\n"
+        "      await fetch('/client-state', {\n"
+        "        method: 'POST',\n"
+        "        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },\n"
+        "        credentials: 'same-origin',\n"
+        "        cache: 'no-store',\n"
+        "        body: JSON.stringify({ values, delete: del }),\n"
+        "      });\n"
+        "    } catch (_) {}\n"
+        "  }\n"
+        "  function safeLsSet(key, value){ try { localStorage.setItem(String(key), String(value)); } catch (_) {} }\n"
+        "  function safeLsDel(key){ try { localStorage.removeItem(String(key)); } catch (_) {} }\n"
+        "  g.__scalpel_kvGet = function(key, fb){\n"
+        "    const k = String(key);\n"
+        "    return hasOwn(store, k) ? store[k] : fb;\n"
+        "  };\n"
+        "  g.__scalpel_kvSet = function(key, value){\n"
+        "    const k = String(key);\n"
+        "    const v = String(value);\n"
+        "    store[k] = v;\n"
+        "    pendingValues[k] = v;\n"
+        "    pendingDelete.delete(k);\n"
+        "    safeLsSet(k, v);\n"
+        "    scheduleFlush();\n"
+        "  };\n"
+        "  g.__scalpel_kvDel = function(key){\n"
+        "    const k = String(key);\n"
+        "    delete store[k];\n"
+        "    delete pendingValues[k];\n"
+        "    pendingDelete.add(k);\n"
+        "    safeLsDel(k);\n"
+        "    scheduleFlush();\n"
+        "  };\n"
+        "  g.__scalpel_kvGetJSON = function(key, fb){\n"
+        "    const v = g.__scalpel_kvGet(String(key), null);\n"
+        "    if (v == null) return fb;\n"
+        "    if (typeof v === 'object') return v;\n"
+        "    try { return JSON.parse(String(v)); } catch (_) { return fb; }\n"
+        "  };\n"
+        "  g.__scalpel_kvSetJSON = function(key, obj){\n"
+        "    const k = String(key);\n"
+        "    store[k] = obj;\n"
+        "    pendingValues[k] = obj;\n"
+        "    pendingDelete.delete(k);\n"
+        "    try { safeLsSet(k, JSON.stringify(obj)); } catch (_) {}\n"
+        "    scheduleFlush();\n"
+        "  };\n"
+        "})();\n"
+        "</script>\n"
+    )
+
+
+def _inject_serve_bootstrap(html_text: str, client_state: dict[str, Any]) -> str:
+    bootstrap = _serve_bootstrap_script(client_state)
+    marker = '<script id="tw-data" type="application/json">'
+    if marker in html_text:
+        return html_text.replace(marker, bootstrap + marker, 1)
+    if "</body>" in html_text:
+        return html_text.replace("</body>", bootstrap + "</body>", 1)
+    return bootstrap + html_text
 
 
 def _is_loopback_host(host: str) -> bool:
@@ -245,7 +371,7 @@ def _handle_refresh_endpoint(
     args: argparse.Namespace,
     out_path: str,
     route_file: str,
-    state: dict[str, Payload],
+    state: ServeState,
     state_lock: threading.Lock,
     render_once: RenderOnceFn,
     send_json: Callable[[int, dict[str, Any]], None],
@@ -255,7 +381,7 @@ def _handle_refresh_endpoint(
     try:
         with state_lock:
             payload = render_once(args, out_path)
-            state["payload"] = payload
+            state.payload = payload
         elapsed_ms = int((dt.datetime.now(dt.timezone.utc) - t0).total_seconds() * 1000)
         obs_inc("refresh_success_total")
         _obs_log(
@@ -281,6 +407,53 @@ def _handle_refresh_endpoint(
         send_json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
 
 
+def _handle_client_state_get(
+    *,
+    state: ServeState,
+    state_lock: threading.Lock,
+    send_json: Callable[[int, dict[str, Any]], None],
+) -> None:
+    with state_lock:
+        snapshot = _client_state_snapshot(state)
+    send_json(200, {"ok": True, "state": snapshot})
+
+
+def _handle_client_state_post(
+    *,
+    body: object,
+    state: ServeState,
+    state_lock: threading.Lock,
+    state_file: Path,
+    send_json: Callable[[int, dict[str, Any]], None],
+) -> None:
+    if not isinstance(body, dict):
+        send_json(400, {"ok": False, "error": "JSON body must be an object."})
+        return
+    values = body.get("values")
+    delete_raw = body.get("delete")
+    if values is None:
+        values = {}
+    if not isinstance(values, dict):
+        send_json(400, {"ok": False, "error": "Field 'values' must be an object."})
+        return
+    delete_keys: list[str] = []
+    if delete_raw is None:
+        delete_raw = []
+    if not isinstance(delete_raw, list):
+        send_json(400, {"ok": False, "error": "Field 'delete' must be an array."})
+        return
+    for item in delete_raw:
+        delete_keys.append(str(item))
+    with state_lock:
+        for key, value in values.items():
+            state.client_state[str(key)] = value
+        for key in delete_keys:
+            state.client_state.pop(str(key), None)
+        snapshot = _client_state_snapshot(state)
+        _write_client_state(state_file, snapshot)
+    send_json(200, {"ok": True, "state": snapshot})
+
+
 def serve(
     args: argparse.Namespace,
     out_path: str,
@@ -293,10 +466,14 @@ def serve(
     browser_open: BrowserOpenFn | None = None,
 ) -> None:
     cfg = _build_serve_config(args, out_path)
-    state: dict[str, Payload] = {"payload": initial_payload}
+    state = ServeState(
+        payload=initial_payload,
+        client_state=_read_client_state(_client_state_file(cfg.out_file)),
+    )
     state_lock = threading.Lock()
     obs_lock = threading.Lock()
     obs_counters: dict[str, Any] = {}
+    state_file = _client_state_file(cfg.out_file)
 
     def _obs_inc(key: str, *, path: str | None = None) -> None:
         with obs_lock:
@@ -387,9 +564,11 @@ def serve(
                 try:
                     with state_lock:
                         html = cfg.out_file.read_text(encoding="utf-8")
+                        client_state = _client_state_snapshot(state)
                 except Exception as e:
                     self._send_json(500, {"ok": False, "error": f"Failed reading HTML: {e}"})
                     return
+                html = _inject_serve_bootstrap(html, client_state)
                 set_cookie = cfg.required_token is not None and self._query_token() == cfg.required_token
                 self._send_html(200, html, set_auth_cookie=set_cookie)
                 return
@@ -399,12 +578,20 @@ def serve(
                     self._deny_unauthorized(path)
                     return
                 with state_lock:
-                    payload = state.get("payload")
-                if payload is None:
-                    self._send_json(404, {"ok": False, "error": "No payload loaded"})
-                    return
+                    payload = state.payload
                 _obs_inc("payload_reads_total")
                 self._send_json(200, cast(dict[str, Any], payload))
+                return
+
+            if path == "/client-state":
+                if not self._is_authorized():
+                    self._deny_unauthorized(path)
+                    return
+                _handle_client_state_get(
+                    state=state,
+                    state_lock=state_lock,
+                    send_json=self._send_json,
+                )
                 return
 
             if path == "/task":
@@ -455,21 +642,40 @@ def serve(
             path = urlsplit(self.path).path
             _obs_inc("requests_total", path=path)
             _obs_inc("requests_post_total")
-            if path != "/refresh":
+            if path not in {"/refresh", "/client-state"}:
                 self._send_json(404, {"ok": False, "error": "Not found"})
                 return
             if not self._is_authorized():
                 self._deny_unauthorized(path)
                 return
-            _handle_refresh_endpoint(
-                args=args,
-                out_path=out_path,
-                route_file=cfg.route_file,
+            if path == "/refresh":
+                _handle_refresh_endpoint(
+                    args=args,
+                    out_path=out_path,
+                    route_file=cfg.route_file,
+                    state=state,
+                    state_lock=state_lock,
+                    render_once=render_once,
+                    send_json=self._send_json,
+                    obs_inc=_obs_inc,
+                )
+                return
+            try:
+                content_len = int(self.headers.get("Content-Length") or "0")
+            except Exception:
+                content_len = 0
+            try:
+                raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
+                body = json.loads(raw.decode("utf-8", errors="replace"))
+            except Exception:
+                self._send_json(400, {"ok": False, "error": "Invalid JSON body."})
+                return
+            _handle_client_state_post(
+                body=body,
                 state=state,
                 state_lock=state_lock,
-                render_once=render_once,
+                state_file=state_file,
                 send_json=self._send_json,
-                obs_inc=_obs_inc,
             )
 
     server = server_factory((cfg.host, cfg.port), Handler)

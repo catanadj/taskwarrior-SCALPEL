@@ -154,6 +154,7 @@ scalpel --serve --out build/scalpel.html
 
 Then use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
 In `--serve` mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
+Serve mode now keeps a sidecar UI-state store next to the output HTML and exposes it through `GET/POST /client-state`, so serve-backed calendar preferences survive refreshes and server restarts.
 
 For remote/LAN use, `--allow-remote` is required and must be paired with `--serve-token` (or `SCALPEL_SERVE_TOKEN`). The printed URL includes `?token=...` and the server sets an auth cookie for follow-up UI/API calls.
 
