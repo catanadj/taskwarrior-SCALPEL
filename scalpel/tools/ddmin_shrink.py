@@ -4,13 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, cast
 
+from scalpel.process import CommandTimeoutError, run_command
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 
 
@@ -57,7 +57,7 @@ def _with_tasks(payload: Dict[str, Any], tasks: List[Dict[str, Any]], schema: in
     p = dict(payload)
     p["tasks"] = tasks
     p.pop("indices", None)  # force rebuild
-    return upgrade_payload(p, target_version=schema)  # type: ignore[arg-type]
+    return cast(Dict[str, Any], upgrade_payload(p, target_version=schema))
 
 
 def _cmd_replace(cmd: str, in_path: Path) -> List[str]:
@@ -77,10 +77,10 @@ def _fails(cmd: str, payload: Dict[str, Any], schema: int, timeout_s: int) -> bo
 
         argv = _cmd_replace(cmd, p)
         try:
-            r = subprocess.run(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=float(timeout_s))
-        except subprocess.TimeoutExpired:
+            result = run_command(argv, timeout_s=float(timeout_s))
+        except CommandTimeoutError:
             return False  # treat timeout as non-failure persistence
-        return r.returncode != 0
+        return bool(result.returncode != 0)
 
 
 @dataclass
@@ -203,7 +203,7 @@ def main(argv: List[str] | None = None) -> int:
         return _die(f"--schema {req_schema} is unsupported (latest={{LATEST_SCHEMA_VERSION}})")
 
     schema = _infer_schema(raw, ns.schema)
-    base = upgrade_payload(raw, target_version=schema)  # type: ignore[arg-type]
+    base = cast(Dict[str, Any], upgrade_payload(raw, target_version=schema))
     tasks = _get_tasks(base)
 
     cfg = DdminCfg(cmd=str(ns.cmd), timeout_s=int(ns.timeout), max_tests=int(ns.max_tests))

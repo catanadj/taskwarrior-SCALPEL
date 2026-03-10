@@ -17,7 +17,6 @@ Design:
 """
 
 from __future__ import annotations
-from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 import argparse
 import copy
 import difflib
@@ -25,11 +24,13 @@ import importlib
 import inspect
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
+
+from scalpel.process import CommandFailedError, run_checked
+from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 
 GEN_START = "2020-01-01"
 GEN_DAYS = 7
@@ -67,10 +68,10 @@ def _normalize(obj: Any) -> Any:
 
 def _build_smoke_payload_v1(repo: Path) -> Dict[str, Any]:
     """Run smoke_build deterministically and capture the JSON payload it emits."""
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
-        out_html = td / "smoke.html"
-        out_json = td / "payload.json"
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        out_html = tmp_path / "smoke.html"
+        out_json = tmp_path / "payload.json"
 
         env = os.environ.copy()
         env["PYTHONPATH"] = str(repo)
@@ -98,7 +99,13 @@ def _build_smoke_payload_v1(repo: Path) -> Dict[str, Any]:
             "--days",
             str(GEN_DAYS),
         ]
-        subprocess.run(cmd, cwd=str(repo), env=env, check=True)
+        try:
+            run_checked(cmd, cwd=repo, env=env)
+        except CommandFailedError as ex:
+            combined = ex.result.combined_output.strip()
+            if combined:
+                raise SystemExit(f"smoke_build fixture generation failed:\n{combined}")
+            raise SystemExit("smoke_build fixture generation failed.")
 
         raw = json.loads(out_json.read_text(encoding="utf-8", errors="replace"))
         if not isinstance(raw, dict):
@@ -106,7 +113,7 @@ def _build_smoke_payload_v1(repo: Path) -> Dict[str, Any]:
         return raw
 
 
-def _import_upgrade_payload(repo: Path):
+def _import_upgrade_payload(repo: Path) -> Callable[..., object]:
     """Import scalpel.schema.upgrade_payload with repo-root on sys.path."""
     if str(repo) not in sys.path:
         sys.path.insert(0, str(repo))
@@ -114,7 +121,7 @@ def _import_upgrade_payload(repo: Path):
     fn = getattr(mod, "upgrade_payload", None)
     if not callable(fn):
         raise SystemExit("scalpel.schema.upgrade_payload not found or not callable")
-    return fn
+    return cast(Callable[..., object], fn)
 
 
 def _upgrade_to_version(repo: Path, payload: Dict[str, Any], target_version: int) -> Dict[str, Any]:
