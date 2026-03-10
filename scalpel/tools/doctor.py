@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
+import subprocess
 import sys
 sys.dont_write_bytecode = True
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -17,6 +19,30 @@ def _find_repo_root(start: Path) -> Path | None:
             break
         cur = cur.parent
     return None
+
+
+def _git_ignored_paths(root: Path, rel_paths: List[str]) -> Set[str]:
+    """Return repo-relative paths ignored by git.
+
+    This lets doctor suppress warnings for transient local outputs that are
+    already covered by .gitignore while still flagging tracked/unignored
+    artifacts.
+    """
+
+    if not rel_paths or shutil.which("git") is None or not (root / ".git").exists():
+        return set()
+
+    payload = "\0".join(rel_paths) + "\0"
+    p = subprocess.run(
+        ["git", "check-ignore", "--stdin", "-z"],
+        cwd=str(root),
+        input=payload,
+        capture_output=True,
+        text=True,
+    )
+    if p.returncode not in {0, 1}:
+        return set()
+    return {item for item in p.stdout.split("\0") if item}
 
 
 def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str], List[str]]:
@@ -32,48 +58,73 @@ def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str
 
     bad_name = re.compile(r"^Copy \(\d+\) ")
     skip_dirs = {".git", "build", "dist", ".venv", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".ship-safe"}
-    pycache_count = 0
-    pyc_count = 0
-    bak_count = 0
+    pycache_dirs: List[str] = []
+    pyc_files: List[str] = []
+    bak_files: List[str] = []
+    copy_files: List[str] = []
+    rej_files: List[str] = []
+    orig_files: List[str] = []
 
     for p in root.rglob("*"):
         # Skip common generated directories.
         if any(part in skip_dirs for part in p.parts):
             continue
 
+        rel = str(p.relative_to(root))
+
         if p.is_dir():
             if p.name == "__pycache__":
-                pycache_count += 1
-                if verbose_artifacts:
-                    warnings.append(f"Found __pycache__ directory: {p.relative_to(root)} (consider cleaning it)")
+                pycache_dirs.append(rel)
             continue
 
         name = p.name
-        rel = str(p.relative_to(root))
 
         if bad_name.search(name):
-            errors.append(f"Stray copy artifact: {rel}")
+            copy_files.append(rel)
         if name.endswith(".rej"):
-            errors.append(f"Patch reject present: {rel}")
+            rej_files.append(rel)
         if name.endswith(".orig"):
-            errors.append(f"Patch artifact present: {rel}")
+            orig_files.append(rel)
 
         if name.endswith(".pyc"):
-            pyc_count += 1
-            if verbose_artifacts:
-                warnings.append(f"Bytecode file present: {rel} (consider cleaning)")
+            pyc_files.append(rel)
         if name.endswith(".bak"):
-            bak_count += 1
-            if verbose_artifacts:
-                warnings.append(f"Backup file present: {rel} (ok, but consider cleaning once stable)")
+            bak_files.append(rel)
+
+    ignored = _git_ignored_paths(
+        root,
+        pycache_dirs + pyc_files + bak_files + copy_files + rej_files + orig_files,
+    )
+
+    visible_pycache_dirs = [rel for rel in pycache_dirs if rel not in ignored]
+    visible_pyc_files = [rel for rel in pyc_files if rel not in ignored]
+    visible_bak_files = [rel for rel in bak_files if rel not in ignored]
+    visible_copy_files = [rel for rel in copy_files if rel not in ignored]
+    visible_rej_files = [rel for rel in rej_files if rel not in ignored]
+    visible_orig_files = [rel for rel in orig_files if rel not in ignored]
+
+    for rel in visible_copy_files:
+        errors.append(f"Stray copy artifact: {rel}")
+    for rel in visible_rej_files:
+        errors.append(f"Patch reject present: {rel}")
+    for rel in visible_orig_files:
+        errors.append(f"Patch artifact present: {rel}")
+
+    if verbose_artifacts:
+        for rel in visible_pycache_dirs:
+            warnings.append(f"Found __pycache__ directory: {rel} (consider cleaning it)")
+        for rel in visible_pyc_files:
+            warnings.append(f"Bytecode file present: {rel} (consider cleaning)")
+        for rel in visible_bak_files:
+            warnings.append(f"Backup file present: {rel} (ok, but consider cleaning once stable)")
 
     if not verbose_artifacts:
-        if pycache_count:
-            warnings.append(f"Found {pycache_count} __pycache__ directories (run clean to remove).")
-        if pyc_count:
-            warnings.append(f"Found {pyc_count} .pyc files (run clean to remove).")
-        if bak_count:
-            warnings.append(f"Found {bak_count} .bak files (consider cleaning once stable).")
+        if visible_pycache_dirs:
+            warnings.append(f"Found {len(visible_pycache_dirs)} repo-visible __pycache__ directories (run clean to remove).")
+        if visible_pyc_files:
+            warnings.append(f"Found {len(visible_pyc_files)} repo-visible .pyc files (run clean to remove).")
+        if visible_bak_files:
+            warnings.append(f"Found {len(visible_bak_files)} repo-visible .bak files (consider cleaning once stable).")
 
     return warnings, errors
 

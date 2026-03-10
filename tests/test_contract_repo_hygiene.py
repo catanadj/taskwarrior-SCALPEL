@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -61,6 +62,28 @@ class TestRepoHygieneContract(unittest.TestCase):
         self.assertNotIn(".venv", combined_warnings)
         self.assertNotIn("dist", combined_warnings)
         self.assertEqual(combined_errors, "")
+
+    def test_doctor_ignores_gitignored_artifacts_but_keeps_repo_visible_ones(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+            (root / ".gitignore").write_text("__pycache__/\n*.pyc\n*.bak\n", encoding="utf-8")
+            (root / "pkg").mkdir()
+            (root / "pkg" / "__pycache__").mkdir()
+            (root / "pkg" / "__pycache__" / "ignored.pyc").write_bytes(b"x")
+            (root / "ignored.py.bak").write_text("x", encoding="utf-8")
+            (root / "scratch.tmp").write_text("x", encoding="utf-8")
+            (root / "scratch.tmp.rej").write_text("x", encoding="utf-8")
+
+            warnings, errors = doctor._scan_tree(root)
+
+        combined_warnings = "\n".join(warnings)
+        combined_errors = "\n".join(errors)
+        self.assertEqual(combined_warnings, "")
+        self.assertIn("scratch.tmp.rej", combined_errors)
+        self.assertNotIn("__pycache__", combined_errors)
+        self.assertNotIn(".pyc", combined_errors)
+        self.assertNotIn(".bak", combined_errors)
 
 
 if __name__ == "__main__":
