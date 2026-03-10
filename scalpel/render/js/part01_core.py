@@ -103,6 +103,65 @@ try { if (typeof globalThis !== "undefined" && !globalThis.__scalpel_phase) glob
       };
     }
   } catch (_) {}
+
+  // Store helpers (prefer KV/prefs-backed persistence, fall back to local storage wrappers).
+  try {
+    const g = (typeof globalThis !== "undefined") ? globalThis : null;
+    if (g) {
+      g.__scalpel_storeGet = g.__scalpel_storeGet || function(k, fb){
+        try{
+          if (typeof g.__scalpel_kvGet === "function") return g.__scalpel_kvGet(String(k), fb);
+        }catch(_){ }
+        try{
+          if (typeof g.__scalpel_lsGet === "function") {
+            const v = g.__scalpel_lsGet(String(k));
+            return (v == null) ? fb : v;
+          }
+        }catch(_){ }
+        return fb;
+      };
+      g.__scalpel_storeSet = g.__scalpel_storeSet || function(k, v){
+        try{
+          if (typeof g.__scalpel_kvSet === "function") { g.__scalpel_kvSet(String(k), String(v)); return; }
+        }catch(_){ }
+        try{
+          if (typeof g.__scalpel_lsSet === "function") { g.__scalpel_lsSet(String(k), String(v)); return; }
+        }catch(_){ }
+      };
+      g.__scalpel_storeDel = g.__scalpel_storeDel || function(k){
+        try{
+          if (typeof g.__scalpel_kvDel === "function") { g.__scalpel_kvDel(String(k)); return; }
+        }catch(_){ }
+        try{
+          if (typeof g.__scalpel_lsDel === "function") { g.__scalpel_lsDel(String(k)); return; }
+        }catch(_){ }
+      };
+      g.__scalpel_storeGetJSON = g.__scalpel_storeGetJSON || function(k, fb){
+        try{
+          if (typeof g.__scalpel_kvGetJSON === "function") {
+            const v = g.__scalpel_kvGetJSON(String(k), null);
+            if (v != null) return v;
+          }
+        }catch(_){ }
+        try{
+          const raw = (typeof g.__scalpel_lsGet === "function") ? g.__scalpel_lsGet(String(k)) : null;
+          if (!raw) return fb;
+          const obj = JSON.parse(raw);
+          return (obj == null) ? fb : obj;
+        }catch(_){ }
+        return fb;
+      };
+      g.__scalpel_storeSetJSON = g.__scalpel_storeSetJSON || function(k, obj){
+        try{
+          if (typeof g.__scalpel_kvSetJSON === "function") { g.__scalpel_kvSetJSON(String(k), obj); return; }
+        }catch(_){ }
+        try{
+          if (typeof g.__scalpel_lsSet === "function") { g.__scalpel_lsSet(String(k), JSON.stringify(obj)); return; }
+        }catch(_){ }
+      };
+    }
+  } catch (_) {}
+
 function showFatal(msg, err) {
     try {
       const s = document.getElementById("status");
@@ -562,7 +621,9 @@ function showFatal(msg, err) {
             if (v != null) return (typeof v === "string") ? v : JSON.stringify(v);
           }
         }catch(_){ }
-        try{ return localStorage.getItem(k); }catch(_){ }
+        try{
+          if (typeof globalThis.__scalpel_storeGet === "function") return globalThis.__scalpel_storeGet(k, null);
+        }catch(_){ }
         return null;
       };
 
@@ -609,7 +670,9 @@ let START_YMD = (globalThis.__scalpel_seed_viewwin && globalThis.__scalpel_seed_
           if (v != null) return (typeof v === "string") ? v : JSON.stringify(v);
         }
       }catch(_){ }
-      try{ return localStorage.getItem(k); }catch(_){ }
+      try{
+        if (typeof globalThis.__scalpel_storeGet === "function") return globalThis.__scalpel_storeGet(k, null);
+      }catch(_){ }
       return null;
     };
 
@@ -763,22 +826,14 @@ startYmd: ymdFromMs(cfg.view_start_ms),
   resetPlanToBaseline();
 
   function loadJson(key, fallback) {
-    // Prefer KV (prefs-backed) storage, then fall back to raw localStorage.
+    // Prefer KV/prefs-backed storage, then fall back to local storage wrappers.
     try {
-      if (typeof globalThis.__scalpel_kvGetJSON === "function") {
-        const v = globalThis.__scalpel_kvGetJSON(key, null);
+      if (typeof globalThis.__scalpel_storeGetJSON === "function") {
+        const v = globalThis.__scalpel_storeGetJSON(key, null);
         if (v != null) return v;
       }
     } catch (_) {}
-
-    try {
-      const raw = globalThis.__scalpel_lsGet(key);
-      if (!raw) return fallback;
-      const obj = JSON.parse(raw);
-      return (obj && typeof obj === "object") ? obj : fallback;
-    } catch (_) {
-      return fallback;
-    }
+    return fallback;
   }
 
   function saveEdits() {
@@ -796,7 +851,9 @@ startYmd: ymdFromMs(cfg.view_start_ms),
         diffs[u] = { scheduled_ms: cur.scheduled_ms, due_ms: cur.due_ms, dur_ms: cur.dur_ms };
       }
     }
-    try { globalThis.__scalpel_lsSet(viewKey, JSON.stringify(diffs)); } catch (_) {}
+    try {
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(viewKey, diffs);
+    } catch (_) {}
   }
 
   function loadEdits() {

@@ -237,8 +237,7 @@ function _pulseEl(el){
 
     if (persist) {
       try {
-        if (typeof globalThis.__scalpel_kvSetJSON === "function") globalThis.__scalpel_kvSetJSON(NOTES_KEY, notesDoc);
-        else localStorage.setItem(NOTES_KEY, JSON.stringify(notesDoc));
+        if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(NOTES_KEY, notesDoc);
       } catch (_) {}
     }
   }
@@ -715,8 +714,7 @@ function _pulseEl(el){
 
   function saveNotesUIState(st){
     try{
-      if (typeof globalThis.__scalpel_kvSetJSON === "function") globalThis.__scalpel_kvSetJSON(NOTES_UI_KEY, st);
-      else localStorage.setItem(NOTES_UI_KEY, JSON.stringify(st));
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(NOTES_UI_KEY, st);
     }catch(_){ }
   }
 

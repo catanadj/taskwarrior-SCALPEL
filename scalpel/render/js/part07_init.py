@@ -137,9 +137,9 @@ JS_PART = r'''// Controls / rerender
 
   function readDensityPref(){
     try{
-      const raw = (typeof globalThis.__scalpel_kvGet === "function")
-        ? globalThis.__scalpel_kvGet(DENSITY_KEY, null)
-        : localStorage.getItem(DENSITY_KEY);
+      const raw = (typeof globalThis.__scalpel_storeGet === "function")
+        ? globalThis.__scalpel_storeGet(DENSITY_KEY, null)
+        : null;
       if (raw == null) return false;
       const s = String(raw).toLowerCase();
       return (s === "1" || s === "true" || s === "on" || s === "compact");
@@ -147,8 +147,7 @@ JS_PART = r'''// Controls / rerender
   }
   function writeDensityPref(on){
     try{
-      if (typeof globalThis.__scalpel_kvSet === "function") globalThis.__scalpel_kvSet(DENSITY_KEY, on ? "1" : "0");
-      else localStorage.setItem(DENSITY_KEY, on ? "1" : "0");
+      if (typeof globalThis.__scalpel_storeSet === "function") globalThis.__scalpel_storeSet(DENSITY_KEY, on ? "1" : "0");
     }catch(_){}
   }
   function applyDensity(on){
@@ -187,11 +186,7 @@ JS_PART = r'''// Controls / rerender
 
   function saveCommandSectionState(){
     try {
-      if (typeof globalThis.__scalpel_kvSetJSON === "function") {
-        globalThis.__scalpel_kvSetJSON(CMD_SECTIONS_KEY, cmdSectionState);
-      } else {
-        localStorage.setItem(CMD_SECTIONS_KEY, JSON.stringify(cmdSectionState));
-      }
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(CMD_SECTIONS_KEY, cmdSectionState);
     } catch (_) {}
   }
   function commandSectionIsOpen(name){
@@ -308,11 +303,7 @@ JS_PART = r'''// Controls / rerender
 
   function saveLeftSectionState(){
     try {
-      if (typeof globalThis.__scalpel_kvSetJSON === "function") {
-        globalThis.__scalpel_kvSetJSON(LEFT_SECTIONS_KEY, leftSectionState);
-      } else {
-        localStorage.setItem(LEFT_SECTIONS_KEY, JSON.stringify(leftSectionState));
-      }
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(LEFT_SECTIONS_KEY, leftSectionState);
     } catch (_) {}
   }
   function leftSectionIsOpen(name){
@@ -942,9 +933,9 @@ JS_PART = r'''// Controls / rerender
   (function initNauticalPreview(){
     if (!hasNauticalPreview) return;
     try {
-      const raw = (typeof globalThis.__scalpel_kvGet === "function")
-        ? globalThis.__scalpel_kvGet(NAUTICAL_PREVIEW_KEY, null)
-        : localStorage.getItem(NAUTICAL_PREVIEW_KEY);
+      const raw = (typeof globalThis.__scalpel_storeGet === "function")
+        ? globalThis.__scalpel_storeGet(NAUTICAL_PREVIEW_KEY, null)
+        : null;
       if (raw != null) {
         const s = String(raw).toLowerCase();
         showNauticalPreview = (s === "1" || s === "true" || s === "on");
@@ -962,10 +953,8 @@ JS_PART = r'''// Controls / rerender
       elBtnNauticalPreview.addEventListener("click", () => {
         showNauticalPreview = !showNauticalPreview;
         try {
-          if (typeof globalThis.__scalpel_kvSet === "function") {
-            globalThis.__scalpel_kvSet(NAUTICAL_PREVIEW_KEY, showNauticalPreview ? "1" : "0");
-          } else {
-            localStorage.setItem(NAUTICAL_PREVIEW_KEY, showNauticalPreview ? "1" : "0");
+          if (typeof globalThis.__scalpel_storeSet === "function") {
+            globalThis.__scalpel_storeSet(NAUTICAL_PREVIEW_KEY, showNauticalPreview ? "1" : "0");
           }
         } catch (_) {}
         applyNauticalPreviewUI();
@@ -989,16 +978,16 @@ JS_PART = r'''// Controls / rerender
     if (globalThis.__scalpel_viewwin_seed_locked) return null;
     // Priority: global -> per-view
     try{
-      const g = (typeof globalThis.__scalpel_kvGet === "function")
-        ? globalThis.__scalpel_kvGet(VIEWWIN_GLOBAL_KEY, null)
-        : (localStorage.getItem(VIEWWIN_GLOBAL_KEY));
+      const g = (typeof globalThis.__scalpel_storeGet === "function")
+        ? globalThis.__scalpel_storeGet(VIEWWIN_GLOBAL_KEY, null)
+        : null;
       const stG = __scalpel_safeParseJSON(g);
       if (stG && stG.startYmd) return stG;
     }catch(_){}
     try{
-      const p = (typeof globalThis.__scalpel_kvGet === "function")
-        ? globalThis.__scalpel_kvGet(viewWinKey, null)
-        : (localStorage.getItem(viewWinKey));
+      const p = (typeof globalThis.__scalpel_storeGet === "function")
+        ? globalThis.__scalpel_storeGet(viewWinKey, null)
+        : null;
       const stP = __scalpel_safeParseJSON(p);
       if (stP && stP.startYmd) return stP;
     }catch(_){}
@@ -1057,14 +1046,11 @@ JS_PART = r'''// Controls / rerender
 
     try {
       const s = JSON.stringify(obj);
-      if (typeof globalThis.__scalpel_kvSet === "function") {
+      if (typeof globalThis.__scalpel_storeSet === "function") {
         // Always keep a global copy (survives regenerated HTML / view_key changes).
-        globalThis.__scalpel_kvSet(VIEWWIN_GLOBAL_KEY, s);
+        globalThis.__scalpel_storeSet(VIEWWIN_GLOBAL_KEY, s);
         // Also keep per-view copy.
-        globalThis.__scalpel_kvSet(viewWinKey, s);
-      } else {
-        localStorage.setItem(VIEWWIN_GLOBAL_KEY, s);
-        localStorage.setItem(viewWinKey, s);
+        globalThis.__scalpel_storeSet(viewWinKey, s);
       }
     } catch (_) {}
   }
@@ -1126,7 +1112,7 @@ JS_PART = r'''// Controls / rerender
     if (typeof setActiveDay === "function") setActiveDay(clamp(di, 0, DAYS - 1), true);
     else {
       activeDayIndex = clamp(di, 0, DAYS - 1);
-      try { localStorage.setItem(activeDayKey, String(activeDayIndex)); } catch (_) {}
+      try { if (typeof globalThis.__scalpel_storeSet === "function") globalThis.__scalpel_storeSet(activeDayKey, String(activeDayIndex)); } catch (_) {}
     }
 
     buildCalendarSkeleton();
@@ -1269,8 +1255,7 @@ JS_PART = r'''// Controls / rerender
   }
   function dropStorageKey(key){
     if (!key) return;
-    try { if (typeof globalThis.__scalpel_kvDel === "function") globalThis.__scalpel_kvDel(key); } catch (_) {}
-    try { localStorage.removeItem(String(key)); } catch (_) {}
+    try { if (typeof globalThis.__scalpel_storeDel === "function") globalThis.__scalpel_storeDel(key); } catch (_) {}
   }
 
   window.addEventListener("beforeunload", (ev) => {
@@ -1335,8 +1320,7 @@ JS_PART = r'''// Controls / rerender
     dropStorageKey(CMD_SECTIONS_KEY);
     dropStorageKey(VIEWWIN_GLOBAL_KEY);
     try {
-      if (typeof globalThis.__scalpel_kvDel === "function") globalThis.__scalpel_kvDel(DENSITY_KEY);
-      else localStorage.removeItem(DENSITY_KEY);
+      if (typeof globalThis.__scalpel_storeDel === "function") globalThis.__scalpel_storeDel(DENSITY_KEY);
     } catch (_) {}
     applyDensity(false);
 

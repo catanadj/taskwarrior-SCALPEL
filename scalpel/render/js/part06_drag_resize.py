@@ -1121,14 +1121,21 @@ JS_PART = r'''// Drag / Resize engine
     pxPerMin = num;
     document.documentElement.style.setProperty("--px-per-min", pxPerMin);
     elZoomVal.textContent = `${pxPerMin.toFixed(1)} px/min`;
-    if (persist) localStorage.setItem(zoomKey, String(pxPerMin));
+    if (persist) {
+      try {
+        if (typeof globalThis.__scalpel_storeSet === "function") globalThis.__scalpel_storeSet(zoomKey, String(pxPerMin));
+      } catch (_) {}
+    }
 
     buildCalendarSkeleton();
     rerenderAll();
   }
 
   (function initZoom() {
-    const saved = localStorage.getItem(zoomKey);
+    let saved = null;
+    try {
+      if (typeof globalThis.__scalpel_storeGet === "function") saved = globalThis.__scalpel_storeGet(zoomKey, null);
+    } catch (_) {}
     const initial = saved ? Number(saved) : PX_PER_MIN_DEFAULT;
     elZoom.value = String(Number.isFinite(initial) ? initial : PX_PER_MIN_DEFAULT);
     applyZoom(elZoom.value, false);

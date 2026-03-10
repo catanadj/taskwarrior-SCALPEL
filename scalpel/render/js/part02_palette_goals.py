@@ -31,17 +31,11 @@ JS_PART = r'''// Palette colors (projects/tags)
     try { if (typeof loadJson === 'function') { const o = loadJson(String(key), null); if (o != null) return o; } } catch (_) {}
     const kv = _parseJSON(_kvGetRaw(key));
     if (kv != null) return kv;
-    try {
-      const s = localStorage.getItem(String(key));
-      const o = _parseJSON(s);
-      return (o != null) ? o : fallback;
-    } catch (_) {}
     return fallback;
   }
   function _saveJsonAny(key, obj) {
     try { if (typeof saveJson === 'function') { saveJson(String(key), obj); return; } } catch (_) {}
     try { _kvSetRaw(key, JSON.stringify(obj)); } catch (_) {}
-    try { localStorage.setItem(String(key), JSON.stringify(obj)); } catch (_) {}
   }
 
   // Strict CSS color validator for inline style usage.
@@ -649,7 +643,7 @@ function buildAddCommandForLocal(uuid, desc) {
 
   function _loadThemeStore(){
     try{
-      const raw = (typeof globalThis.__scalpel_kvGet === "function") ? globalThis.__scalpel_kvGet(THEME_STORE_KEY, null) : (localStorage.getItem(THEME_STORE_KEY));
+      const raw = (typeof globalThis.__scalpel_storeGet === "function") ? globalThis.__scalpel_storeGet(THEME_STORE_KEY, null) : null;
       if (!raw) return { schema: "scalpel-themes/v1", themes: [] };
       const obj = JSON.parse(raw);
       if (!obj || typeof obj !== "object") return { schema: "scalpel-themes/v1", themes: [] };
@@ -664,7 +658,6 @@ function buildAddCommandForLocal(uuid, desc) {
     try{
       const s = JSON.stringify(store);
       if (typeof globalThis.__scalpel_kvSet === "function") globalThis.__scalpel_kvSet(THEME_STORE_KEY, s);
-      else localStorage.setItem(THEME_STORE_KEY, s);
     }catch(_){ }
   }
 
@@ -694,7 +687,7 @@ function buildAddCommandForLocal(uuid, desc) {
   }
 
   function getPreferredTheme(){
-    const saved = (typeof globalThis.__scalpel_kvGet === "function") ? globalThis.__scalpel_kvGet(THEME_KEY, null) : (localStorage.getItem(THEME_KEY));
+    const saved = (typeof globalThis.__scalpel_kvGet === "function") ? globalThis.__scalpel_kvGet(THEME_KEY, null) : null;
     if (saved && themeExists(saved)) return saved;
     try{
       if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
@@ -711,7 +704,7 @@ function buildAddCommandForLocal(uuid, desc) {
 
   function getCurrentTheme(){
     // If a custom theme id is selected, return that id; else return base class
-    const saved = (typeof globalThis.__scalpel_kvGet === "function") ? globalThis.__scalpel_kvGet(THEME_KEY, null) : (localStorage.getItem(THEME_KEY));
+    const saved = (typeof globalThis.__scalpel_kvGet === "function") ? globalThis.__scalpel_kvGet(THEME_KEY, null) : null;
     if (saved && !BUILTIN_THEMES.includes(saved) && getCustomTheme(saved)) return saved;
     return getCurrentBaseTheme();
   }
@@ -772,7 +765,6 @@ function buildAddCommandForLocal(uuid, desc) {
 
     try{
       if (typeof globalThis.__scalpel_kvSet === "function") globalThis.__scalpel_kvSet(THEME_KEY, themeId);
-      else localStorage.setItem(THEME_KEY, themeId);
     }catch(_){ }
 
     const b = document.getElementById("btnTheme");
