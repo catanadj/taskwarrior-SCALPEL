@@ -731,6 +731,11 @@ function _pulseEl(el){
 
   function setNotesVisible(on, persist){
     const vis = !!on;
+    if (vis) {
+      try {
+        if (typeof setCommandSectionOpen === "function") setCommandSectionOpen("actions", true, true);
+      } catch (_) {}
+    }
     if (elNotesWrap) elNotesWrap.style.display = vis ? "block" : "none";
     if (elBtnNotes) elBtnNotes.classList.toggle("on", vis);
     if (persist) {
