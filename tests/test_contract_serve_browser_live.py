@@ -77,6 +77,25 @@ def _make_payload(generated_at: str) -> dict[str, Any]:
     }
 
 
+def _make_task_editor_payload(generated_at: str) -> dict[str, Any]:
+    payload = _make_payload(generated_at)
+    payload["tasks"] = [
+        {
+            "id": 42,
+            "uuid": "12345678-1111-2222-3333-abcdefabcdef",
+            "description": "Editor task",
+            "status": "pending",
+            "project": "work",
+            "tags": ["deep"],
+            "priority": "M",
+            "scheduled_ms": 1767258000000,
+            "due_ms": 1767261600000,
+            "duration_min": 60,
+        }
+    ]
+    return payload
+
+
 @dataclass
 class _BrowserServeHarness:
     root: Path
@@ -89,7 +108,7 @@ class _BrowserServeHarness:
 
     def __post_init__(self) -> None:
         self.out_file = self.root / "serve.html"
-        self.out_file.write_text(build_html(_make_payload("gen-0")), encoding="utf-8")
+        self.out_file.write_text(build_html(self._payload_for(0)), encoding="utf-8")
 
     def _args(self) -> argparse.Namespace:
         return argparse.Namespace(
@@ -102,7 +121,7 @@ class _BrowserServeHarness:
 
     def _render_once(self, _args: argparse.Namespace, out_path: str) -> dict[str, Any]:
         self.payload_count += 1
-        payload = _make_payload(f"gen-{self.payload_count}")
+        payload = self._payload_for(self.payload_count)
         Path(out_path).write_text(build_html(payload), encoding="utf-8")
         return payload
 
@@ -133,8 +152,11 @@ class _BrowserServeHarness:
         self.holder["server"] = server_obj
         return server_obj
 
+    def _payload_for(self, count: int) -> dict[str, Any]:
+        return _make_payload(f"gen-{count}")
+
     def start(self) -> "_BrowserServeHarness":
-        initial_payload = _make_payload("gen-0")
+        initial_payload = self._payload_for(0)
 
         def runner() -> None:
             try:
@@ -213,6 +235,21 @@ class _HeadlessChromium:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
             self.proc = None
+
+
+def _run_cdp_node_script(*, node_bin: str, devtools_port: int, page_url: str, script: str) -> None:
+    env = dict(os.environ)
+    env["SCALPEL_CDP_PORT"] = str(devtools_port)
+    env["SCALPEL_PAGE_URL"] = page_url
+    proc = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise AssertionError(f"browser contract failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
 
 
 def _run_cdp_browser_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
@@ -372,19 +409,185 @@ main().catch((err) => {
   process.exit(1);
 });
 """
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
-    env = dict(os.environ)
-    env["SCALPEL_CDP_PORT"] = str(devtools_port)
-    env["SCALPEL_PAGE_URL"] = page_url
-    proc = subprocess.run(
-        [node_bin, "-e", script],
-        cwd=str(Path(__file__).resolve().parents[1]),
-        env=env,
-        text=True,
-        capture_output=True,
-    )
-    if proc.returncode != 0:
-        raise AssertionError(f"browser contract failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
+
+def _run_cdp_task_editor_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("task event", () =>
+    evaluate(`
+      (() => document.readyState === 'complete'
+        && !!document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]'))()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const el = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+      if (!el) return false;
+      el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("task editor modal", () =>
+    evaluate(`
+      (() => {
+        const modal = document.getElementById('taskEditModal');
+        const meta = document.getElementById('taskEditMeta');
+        const udaField = document.querySelector('#taskEditGrid [data-field-key="review_status"]');
+        return !!(
+          modal && modal.style.display === 'flex' &&
+          meta && meta.textContent.includes('fresh task export') &&
+          udaField && udaField.value === 'draft'
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const proj = document.querySelector('#taskEditGrid [data-field-key="project"]');
+      const review = document.querySelector('#taskEditGrid [data-field-key="review_status"]');
+      if (proj) proj.value = 'ops';
+      if (review) review.value = 'approved';
+      const addBtn = document.getElementById('taskEditAddCustom');
+      if (addBtn) addBtn.click();
+      const key = document.querySelector('#taskEditCustomRows [data-custom-idx="1"][data-custom-kind="key"]');
+      const val = document.querySelector('#taskEditCustomRows [data-custom-idx="1"][data-custom-kind="val"]');
+      if (key) key.value = 'custom_flag';
+      if (val) val.value = 'yes';
+      const save = document.getElementById('taskEditSave');
+      if (save) save.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("queued modify command", () =>
+    evaluate(`
+      (() => {
+        const modal = document.getElementById('taskEditModal');
+        const commands = String((document.getElementById('commands') || {}).textContent || '');
+        return !!(
+          modal && modal.style.display === 'none' &&
+          commands.includes('task 12345678 modify') &&
+          commands.includes('project:ops') &&
+          commands.includes('review_status:approved') &&
+          commands.includes('custom_flag:yes')
+        );
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
+@dataclass
+class _TaskEditorServeHarness(_BrowserServeHarness):
+    def _payload_for(self, count: int) -> dict[str, Any]:
+        return _make_task_editor_payload(f"gen-{count}")
+
+    @staticmethod
+    def _task_lookup(uuid_query: str) -> dict[str, Any]:
+        return {
+            "task": {
+                "id": 42,
+                "uuid": "12345678-1111-2222-3333-abcdefabcdef",
+                "description": f"Editor task {uuid_query}",
+                "status": "pending",
+                "project": "work",
+                "tags": ["deep"],
+                "priority": "M",
+                "review_status": "draft",
+                "scheduled_ms": 1767258000000,
+                "due_ms": 1767261600000,
+                "duration_min": 60,
+            },
+            "matched": 1,
+            "exact": True,
+        }
 
 
 class TestServeBrowserLiveContract(unittest.TestCase):
@@ -404,6 +607,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
                         page_url=harness.base_url + "/?token=abc123",
                     )
                 self.assertGreaterEqual(harness.payload_count, 1)
+            finally:
+                harness.stop()
+
+    def test_live_browser_task_editor_queues_modify_command(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _TaskEditorServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_task_editor_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
             finally:
                 harness.stop()
 
