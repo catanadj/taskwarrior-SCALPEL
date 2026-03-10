@@ -96,6 +96,7 @@ files = [
   "scalpel/planner.py",
   "scalpel/query_lang.py",
   "scalpel/schema_v1.py",
+  "scalpel/serve.py",
   "scalpel/taskwarrior.py",
   "scalpel/util/timeparse.py",
   "scalpel/util/tz.py",
