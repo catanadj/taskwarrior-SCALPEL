@@ -49,7 +49,7 @@ class TestCliDefaultOutContract(unittest.TestCase):
                 with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
                     "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
                 ):
-                    cli.main(["--no-open", "--start", "2026-01-01"])
+                    cli.main(["--once", "--no-open", "--start", "2026-01-01"])
             finally:
                 os.chdir(old_cwd)
 
@@ -57,21 +57,21 @@ class TestCliDefaultOutContract(unittest.TestCase):
 
     def test_invalid_tz_reports_user_error(self) -> None:
         with self.assertRaises(SystemExit) as ctx:
-            cli.main(["--no-open", "--tz", "No/Such_Zone"])
+            cli.main(["--once", "--no-open", "--tz", "No/Such_Zone"])
         self.assertIn("Invalid --tz value", str(ctx.exception))
 
     def test_nautical_hooks_enabled_by_default(self) -> None:
         with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp, patch(
             "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
         ):
-            cli.main(["--no-open", "--start", "2026-01-01"])
+            cli.main(["--once", "--no-open", "--start", "2026-01-01"])
         self.assertTrue(bp.call_args.kwargs.get("nautical_hooks_enabled"))
 
     def test_no_nautical_hooks_flag_disables_preview_expansion(self) -> None:
         with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp, patch(
             "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
         ):
-            cli.main(["--no-open", "--start", "2026-01-01", "--no-nautical-hooks"])
+            cli.main(["--once", "--no-open", "--start", "2026-01-01", "--no-nautical-hooks"])
         self.assertFalse(bp.call_args.kwargs.get("nautical_hooks_enabled"))
 
     def test_default_out_falls_back_when_unwritable(self) -> None:
@@ -94,11 +94,11 @@ class TestCliDefaultOutContract(unittest.TestCase):
             ), patch("pathlib.Path.mkdir", new=fake_mkdir), patch(
                 "scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}
             ), patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"):
-                cli.main(["--no-open", "--start", "2026-01-01"])
+                cli.main(["--once", "--no-open", "--start", "2026-01-01"])
 
             self.assertTrue((home / ".scalpel" / "build" / "scalpel_schedule.html").exists())
 
-    def test_serve_mode_starts_http_server(self) -> None:
+    def test_live_mode_is_default(self) -> None:
         events: list[str] = []
 
         class FakeServer:
@@ -118,10 +118,20 @@ class TestCliDefaultOutContract(unittest.TestCase):
             with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
                 "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
             ), patch("scalpel.cli.ThreadingHTTPServer", FakeServer):
-                cli.main(["--serve", "--no-open", "--start", "2026-01-01", "--port", "0", "--out", str(outp)])
+                cli.main(["--no-open", "--start", "2026-01-01", "--port", "0", "--out", str(outp)])
 
             self.assertTrue(outp.exists())
             self.assertEqual(events, ["init", "serve_forever", "server_close"])
+
+    def test_once_flag_renders_without_starting_http_server(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            outp = Path(td) / "once.html"
+            with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
+                "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+            ), patch("scalpel.cli.ThreadingHTTPServer", side_effect=AssertionError("server should not start")):
+                cli.main(["--once", "--no-open", "--start", "2026-01-01", "--out", str(outp)])
+
+            self.assertTrue(outp.exists())
 
     def test_serve_remote_host_requires_allow_remote_flag(self) -> None:
         with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(

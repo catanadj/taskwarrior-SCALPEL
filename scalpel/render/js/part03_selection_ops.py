@@ -627,7 +627,7 @@ JS_PART = r'''// Selection model
 
     const canHttp = /^https?:$/i.test(String(location.protocol || ""));
     if (!canHttp) {
-      if (elStatus) elStatus.textContent = "Timewarrior day fetch requires --serve mode.";
+      if (elStatus) elStatus.textContent = "Timewarrior day fetch is available only in live mode.";
       return;
     }
 

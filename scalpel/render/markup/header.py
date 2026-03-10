@@ -58,7 +58,7 @@ MARKUP = r"""<header>
           <div class="overflow-menu" id="overflowMenu" role="menu" hidden>
             <button id="btnTogglePanels" class="btn-soft" data-ico="PN" role="menuitem">Hide panels</button>
             <button id="btnNotes" class="btn-soft" data-ico="NT" data-key="Ctrl+Shift+N" role="menuitem" title="Toggle notes (Ctrl+Shift+N)">Notes</button>
-            <button id="btnRefresh" class="btn-soft" data-ico="RF" role="menuitem" title="Refresh data from Taskwarrior (--serve mode)">Refresh data</button>
+            <button id="btnRefresh" class="btn-soft" data-ico="RF" role="menuitem" title="Refresh data from Taskwarrior">Refresh data</button>
             <button id="btnNauticalPreview" class="small toggle btn-soft" data-ico="NA" role="menuitem" title="Toggle future Nautical instances">Nautical: Off</button>
             <button id="btnClearSel" class="btn-soft" data-ico="CL" data-key="Esc" role="menuitem">Clear selection</button>
             <button id="btnReset" class="danger" data-ico="RS" role="menuitem">Reset view plan</button>

@@ -71,26 +71,35 @@ def _build_parser(default_out: str) -> argparse.ArgumentParser:
         action="store_true",
         help="Disable nautical anchor/cp preview task expansion for this run",
     )
-    ap.add_argument(
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument(
         "--serve",
+        dest="serve",
         action="store_true",
-        help="Run a local HTTP server with POST /refresh to rebuild data and reload in-browser.",
+        help="Run the live local HTTP server (default; retained for compatibility).",
     )
+    mode.add_argument(
+        "--once",
+        dest="serve",
+        action="store_false",
+        help="Render the HTML once and exit without starting the local server.",
+    )
+    ap.set_defaults(serve=True)
     ap.add_argument(
         "--host",
         default="127.0.0.1",
-        help="Host interface for --serve mode (default: 127.0.0.1).",
+        help="Host interface for live mode (default: 127.0.0.1).",
     )
     ap.add_argument(
         "--port",
         type=int,
         default=8765,
-        help="Port for --serve mode (default: 8765, use 0 for auto).",
+        help="Port for live mode (default: 8765, use 0 for auto).",
     )
     ap.add_argument(
         "--allow-remote",
         action="store_true",
-        help="Allow --serve to bind non-loopback interfaces (requires --serve-token).",
+        help="Allow live mode to bind non-loopback interfaces (requires --serve-token).",
     )
     ap.add_argument(
         "--serve-token",

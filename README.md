@@ -128,8 +128,9 @@ Common options:
 - `--workhours HH:MM-HH:MM`: visible planning window
 - `--tz` / `--display-tz`: bucketing vs display timezone
 - `--plan-overrides FILE.json` / `--plan-result FILE.json`: apply changes before render
-- `--serve [--host 127.0.0.1 --port 8765]`: keep a local server running with `POST /refresh`
-- `--allow-remote --serve-token TOKEN`: explicitly allow non-loopback serve mode with endpoint auth
+- `--once`: render the HTML once and exit without starting the live server
+- `--serve [--host 127.0.0.1 --port 8765]`: live mode (now the default runtime; kept for compatibility)
+- `--allow-remote --serve-token TOKEN`: explicitly allow non-loopback live mode with endpoint auth
 
 ## Common Workflows
 
@@ -146,15 +147,17 @@ Then:
 - Review them
 - Run them manually in your shell
 
-Optional live-refresh mode:
+That command now runs in live mode by default and keeps the local server available for refresh/task/timew actions.
+
+Explicit compatibility form:
 
 ```bash
 scalpel --serve --out build/scalpel.html
 ```
 
-Then use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
-In `--serve` mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
-Serve mode now keeps a sidecar UI-state store next to the output HTML and exposes it through `GET/POST /client-state`, so serve-backed calendar preferences survive refreshes and server restarts.
+Use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
+In live mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
+Live mode keeps a sidecar UI-state store next to the output HTML and exposes it through `GET/POST /client-state`, so serve-backed calendar preferences survive refreshes and server restarts.
 
 For remote/LAN use, `--allow-remote` is required and must be paired with `--serve-token` (or `SCALPEL_SERVE_TOKEN`). The printed URL includes `?token=...` and the server sets an auth cookie for follow-up UI/API calls.
 
@@ -169,7 +172,7 @@ Serve observability:
 Useful for debugging, sharing, testing, and offline iteration.
 
 ```bash
-scalpel --no-open --out build/scalpel.html
+scalpel --once --no-open --out build/scalpel.html
 scalpel-validate-payload --from-html build/scalpel.html --write-json build/payload.json
 scalpel-filter-payload --in build/payload.json --q "project:work -blocked" --out build/work.json --pretty
 scalpel-render-payload --in build/work.json --out build/work.html
@@ -180,7 +183,7 @@ scalpel-render-payload --in build/work.json --out build/work.html
 Deterministic stub planner flow:
 
 ```bash
-scalpel --no-open --out build/scalpel.html
+scalpel --once --no-open --out build/scalpel.html
 scalpel-validate-payload --from-html build/scalpel.html --write-json build/payload.json
 
 # build/selected.json contains a JSON array of selected task UUIDs

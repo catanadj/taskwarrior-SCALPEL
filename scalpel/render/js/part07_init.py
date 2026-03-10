@@ -489,7 +489,7 @@ JS_PART = r'''// Controls / rerender
     const canRefreshViaHttp = /^https?:$/i.test(String(location.protocol || ""));
     if (!canRefreshViaHttp) {
       elBtnRefresh.disabled = true;
-      elBtnRefresh.title = "Refresh is available only in --serve mode.";
+      elBtnRefresh.title = "Refresh is unavailable in one-shot mode.";
     } else {
       elBtnRefresh.addEventListener("click", async () => {
         closeOverflowMenu();
