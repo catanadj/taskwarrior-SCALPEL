@@ -3,11 +3,12 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+from ..process import run_command
 
 
 def _repo_root() -> Path:
@@ -31,16 +32,14 @@ def _run_step(*, label: str, cmd: List[str], cwd: Path, env: dict[str, str], ok_
     ok_returncodes = ok_returncodes or {0}
 
     start = time.time()
-    p = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
+    result = run_command(cmd, cwd=cwd, env=env)
     dur_ms = int((time.time() - start) * 1000)
 
-    out = (p.stdout or "")
-    err = (p.stderr or "")
-    combined = (out + ("\n" if out and err else "") + err).strip()
+    combined = result.combined_output.strip()
 
-    if p.returncode == 0:
+    if result.returncode == 0:
         status = "OK"
-    elif p.returncode in ok_returncodes:
+    elif result.returncode in ok_returncodes:
         status = "WARN"
     else:
         status = "FAIL"
@@ -49,7 +48,7 @@ def _run_step(*, label: str, cmd: List[str], cwd: Path, env: dict[str, str], ok_
         # Keep logs readable; do not indent each line to preserve copy/paste and pytest output.
         print(combined)
 
-    return p.returncode, combined
+    return result.returncode, combined
 
 
 def _have(cmd: str) -> bool:
@@ -62,8 +61,8 @@ def _is_truthy_env(name: str) -> bool:
 
 
 def _have_mypy(py_exec: str) -> bool:
-    p = subprocess.run([py_exec, "-m", "mypy", "--version"], capture_output=True, text=True)
-    return p.returncode == 0
+    result = run_command([py_exec, "-m", "mypy", "--version"])
+    return result.returncode == 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:

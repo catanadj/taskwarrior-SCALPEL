@@ -3,11 +3,12 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
-import subprocess
 import sys
 sys.dont_write_bytecode = True
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
+
+from ..process import run_command
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -33,16 +34,14 @@ def _git_ignored_paths(root: Path, rel_paths: List[str]) -> Set[str]:
         return set()
 
     payload = "\0".join(rel_paths) + "\0"
-    p = subprocess.run(
+    result = run_command(
         ["git", "check-ignore", "--stdin", "-z"],
-        cwd=str(root),
-        input=payload,
-        capture_output=True,
-        text=True,
+        cwd=root,
+        input_text=payload,
     )
-    if p.returncode not in {0, 1}:
+    if result.returncode not in {0, 1}:
         return set()
-    return {item for item in p.stdout.split("\0") if item}
+    return {item for item in result.stdout.split("\0") if item}
 
 
 def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str], List[str]]:

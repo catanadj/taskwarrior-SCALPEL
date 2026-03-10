@@ -6,11 +6,11 @@ import json
 import os
 import re
 import shlex
-import subprocess
 import time
 from typing import Optional
 
 from .model import RawTask
+from .process import CommandFailedError, CommandNotFoundError, CommandTimeoutError, run_checked
 from .util.console import eprint
 
 TW_UTC_RE = re.compile(r"^(\d{8})T(\d{6})Z$")  # e.g. 20251217T083000Z
@@ -71,32 +71,23 @@ def run_task_export(filter_str: str) -> list[RawTask]:
     timeout_s = _task_export_timeout_s()
     t0 = time.monotonic()
     try:
-        proc = subprocess.run(
+        result = run_checked(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
-    except FileNotFoundError:
+    except CommandNotFoundError:
         raise SystemExit("Taskwarrior binary 'task' not found on PATH.")
-    except subprocess.TimeoutExpired:
+    except CommandTimeoutError:
         raise SystemExit(f"Taskwarrior export timed out after {timeout_s:.1f}s.")
+    except CommandFailedError as ex:
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        out_err = ex.result.combined_output
+        if out_err:
+            eprint(out_err)
+        raise SystemExit(f"Taskwarrior export failed (exit {ex.result.returncode}, {elapsed_ms}ms).")
 
     elapsed_ms = int((time.monotonic() - t0) * 1000)
-    if proc.returncode != 0:
-        out_err = b""
-        if proc.stdout:
-            out_err += proc.stdout
-        if proc.stdout and proc.stderr:
-            out_err += b"\n"
-        if proc.stderr:
-            out_err += proc.stderr
-        if out_err:
-            eprint(out_err.decode("utf-8", errors="replace"))
-        raise SystemExit(f"Taskwarrior export failed (exit {proc.returncode}, {elapsed_ms}ms).")
-
-    text = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+    text = result.stdout.strip()
     if not text:
         if _obs_enabled():
             eprint(f"[scalpel.taskwarrior] export.ok ms={elapsed_ms} tasks=0")

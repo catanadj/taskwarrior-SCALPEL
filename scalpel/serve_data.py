@@ -4,9 +4,9 @@ import datetime as dt
 import json
 import os
 import re
-import subprocess
 from typing import Any, Callable
 
+from .process import CommandFailedError, CommandNotFoundError, CommandTimeoutError, run_checked
 from .serve import TaskExportLookupResult, TimewExportResult, TimewInterval
 from .util.timeparse import parse_date_yyyy_mm_dd
 from .util.tz import normalize_tz_name, resolve_tz
@@ -53,28 +53,23 @@ def run_timew_export_for_day(
     cmd = ["timew", day_ymd, "export"]
 
     try:
-        proc = run_proc(
+        result = run_checked(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=_timew_timeout_s(),
+            timeout_s=_timew_timeout_s(),
+            run_proc=run_proc,
         )
-    except FileNotFoundError:
+    except CommandNotFoundError:
         raise SystemExit("Timewarrior binary 'timew' not found on PATH.")
-    except subprocess.TimeoutExpired:
+    except CommandTimeoutError:
         raise SystemExit("Timewarrior export timed out.")
-
-    if int(getattr(proc, "returncode", 0)) != 0:
-        err = (getattr(proc, "stderr", b"") or getattr(proc, "stdout", b"") or b"").decode(
-            "utf-8", errors="replace"
-        ).strip()
-        msg = f"Timewarrior export failed (exit {proc.returncode})."
+    except CommandFailedError as ex:
+        err = ex.result.combined_output.strip()
+        msg = f"Timewarrior export failed (exit {ex.result.returncode})."
         if err:
             msg = f"{msg} {err}"
         raise SystemExit(msg)
 
-    text = (getattr(proc, "stdout", b"") or b"").decode("utf-8", errors="replace").strip()
+    text = result.stdout.strip()
     if not text:
         return {"day": day_ymd, "intervals": []}
 

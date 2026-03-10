@@ -94,6 +94,7 @@ files = [
   "scalpel/model.py",
   "scalpel/payload.py",
   "scalpel/planner.py",
+  "scalpel/process.py",
   "scalpel/query_lang.py",
   "scalpel/schema_v1.py",
   "scalpel/serve.py",

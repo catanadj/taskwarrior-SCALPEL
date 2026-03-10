@@ -4,12 +4,13 @@ import json
 import os
 import shlex
 import shutil
-import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NoReturn
+
+from ..process import run_command
 
 
 USAGE = """scalpel_ci_lite.sh - CI-lite runner for SCALPEL
@@ -218,10 +219,10 @@ def _selftest_match(name: str, want: str) -> bool:
 def _require_git_clean(repo_root: Path) -> None:
     if shutil.which("git") is None:
         return
-    p = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=repo_root, capture_output=True, text=True)
-    if p.returncode != 0:
+    result = run_command(["git", "rev-parse", "--is-inside-work-tree"], cwd=repo_root)
+    if result.returncode != 0:
         return
-    status = subprocess.run(["git", "status", "--porcelain"], cwd=repo_root, capture_output=True, text=True, check=False)
+    status = run_command(["git", "status", "--porcelain"], cwd=repo_root)
     if status.stdout.strip():
         sys.stderr.write(status.stdout)
         _die("Git working tree is dirty (use --allow-dirty to bypass)")
@@ -310,7 +311,7 @@ def _try_minify(opts: Options, query: str, out_path: Path) -> None:
     ]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(opts.repo_root)
-    subprocess.run(cmd, cwd=opts.repo_root, env=env, capture_output=True, text=True, check=False)
+    run_command(cmd, cwd=opts.repo_root, env=env)
     if not out_path.exists() or out_path.stat().st_size == 0:
         _minify_fallback(opts.fail_json, out_path)
 
@@ -378,12 +379,6 @@ def _failure_shrink(opts: Options, step: str) -> None:
         _try_minify(opts, f"uuid:{uuid_val}", opts.fail_dir / f"min_uuid_{idx}.json")
 
 
-def _combined_output(stdout: str, stderr: str) -> str:
-    if stdout and stderr:
-        return stdout + "\n" + stderr
-    return stdout or stderr
-
-
 def _run_step(ctx: StepContext, name: str, cmd: list[str], *, env: dict[str, str] | None = None) -> None:
     logfile = _log_path(ctx, name)
     ctx.log_files.append(logfile)
@@ -400,16 +395,9 @@ def _run_step(ctx: StepContext, name: str, cmd: list[str], *, env: dict[str, str
         rc = 99
         combined = f"[ci-lite] selftest: forced failure for step: {name}\n"
     else:
-        proc = subprocess.run(
-            cmd,
-            cwd=ctx.options.repo_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        rc = int(proc.returncode)
-        combined = _combined_output(proc.stdout or "", proc.stderr or "")
+        result = run_command(cmd, cwd=ctx.options.repo_root, env=env)
+        rc = result.returncode
+        combined = result.combined_output
         if combined and not combined.endswith("\n"):
             combined += "\n"
     elapsed_ms = int((time.time_ns() - t0) / 1_000_000)
