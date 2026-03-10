@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from ..process import run_command
+from .result import ToolIssue, ToolResult, ToolStatus, ToolStepResult, step_status_for_returncode
 
 
 USAGE = """scalpel_ci_lite.sh - CI-lite runner for SCALPEL
@@ -106,6 +107,7 @@ class Options:
 class StepContext:
     options: Options
     log_files: list[Path] = field(default_factory=list)
+    step_results: list[ToolStepResult] = field(default_factory=list)
     step_n: int = 0
 
 
@@ -262,10 +264,10 @@ def _ensure_summary_header(path: Path) -> None:
         path.write_text("step\trc\tms\tlog\n", encoding="utf-8")
 
 
-def _record_summary(path: Path, name: str, rc: int, elapsed_ms: int, logfile: Path) -> None:
+def _record_summary(path: Path, step: ToolStepResult, logfile: Path) -> None:
     _ensure_summary_header(path)
     with path.open("a", encoding="utf-8") as fh:
-        fh.write(f"{name}\t{rc}\t{elapsed_ms}\t{logfile}\n")
+        fh.write(f"{step.label}\t{step.returncode}\t{step.elapsed_ms}\t{logfile}\n")
 
 
 def _minify_fallback(in_path: Path, out_path: Path) -> None:
@@ -379,7 +381,7 @@ def _failure_shrink(opts: Options, step: str) -> None:
         _try_minify(opts, f"uuid:{uuid_val}", opts.fail_dir / f"min_uuid_{idx}.json")
 
 
-def _run_step(ctx: StepContext, name: str, cmd: list[str], *, env: dict[str, str] | None = None) -> None:
+def _run_step(ctx: StepContext, name: str, cmd: list[str], *, env: dict[str, str] | None = None) -> ToolStepResult:
     logfile = _log_path(ctx, name)
     ctx.log_files.append(logfile)
 
@@ -401,23 +403,32 @@ def _run_step(ctx: StepContext, name: str, cmd: list[str], *, env: dict[str, str
         if combined and not combined.endswith("\n"):
             combined += "\n"
     elapsed_ms = int((time.time_ns() - t0) / 1_000_000)
+    step = ToolStepResult(
+        label=name,
+        returncode=rc,
+        elapsed_ms=elapsed_ms,
+        output=combined.rstrip("\n"),
+        status=step_status_for_returncode(rc, {0}),
+    )
+    ctx.step_results.append(step)
 
     if combined:
         sys.stdout.write(combined)
         sys.stdout.flush()
         _append_log(logfile, combined)
 
-    _record_summary(ctx.options.summary, name, rc, elapsed_ms, logfile)
+    _record_summary(ctx.options.summary, step, logfile)
 
-    if rc != 0:
+    if step.status == "fail":
         print(file=sys.stderr)
-        print(f"[ci-lite] FAILED step: {name} (exit {rc})", file=sys.stderr)
+        print(f"[ci-lite] FAILED step: {name} (exit {step.returncode})", file=sys.stderr)
         _failure_shrink(ctx.options, name)
         print(f"[ci-lite] log: {logfile}", file=sys.stderr)
         print(f"[ci-lite] --- tail ({ctx.options.tail_lines} lines) ---", file=sys.stderr)
         sys.stderr.write(_tail_text(logfile, ctx.options.tail_lines))
         print("[ci-lite] --- /tail ---", file=sys.stderr)
-        raise SystemExit(rc)
+        raise SystemExit(step.returncode)
+    return step
 
 
 def _print_logs(ctx: StepContext) -> None:
@@ -449,12 +460,12 @@ def _load_perf_rules(rules: list[str]) -> dict[str, int]:
     return out
 
 
-def _check_perf_budgets(opts: Options) -> int:
+def _check_perf_budgets(opts: Options) -> ToolResult:
     rules = _load_perf_rules(opts.max_ms_rules)
     if not rules or not opts.summary.exists():
-        return 0
+        return ToolResult(tool="ci-lite-perf", status="ok")
 
-    violations = 0
+    issues: list[ToolIssue] = []
     lines = opts.summary.read_text(encoding="utf-8", errors="replace").splitlines()
     for line in lines[1:]:
         parts = line.split("\t")
@@ -469,12 +480,30 @@ def _check_perf_budgets(opts: Options) -> int:
         except Exception:
             continue
         if ms > budget:
-            violations += 1
+            issues.append(ToolIssue("warning", f"step '{step}' took {ms}ms > budget {budget}ms (log: {log})"))
             print(f"[ci-lite] PERF WARN: step '{step}' took {ms}ms > budget {budget}ms (log: {log})", file=sys.stderr)
-    if violations and opts.perf_strict:
-        print(f"[ci-lite] PERF STRICT: failing due to {violations} budget violation(s).", file=sys.stderr)
-        return 3
-    return 0
+    if issues and opts.perf_strict:
+        print(f"[ci-lite] PERF STRICT: failing due to {len(issues)} budget violation(s).", file=sys.stderr)
+        return ToolResult(tool="ci-lite-perf", status="fail", issues=tuple(issues))
+    if issues:
+        return ToolResult(tool="ci-lite-perf", status="warn", issues=tuple(issues))
+    return ToolResult(tool="ci-lite-perf", status="ok")
+
+
+def _build_result(ctx: StepContext, perf_result: ToolResult) -> ToolResult:
+    status: ToolStatus
+    if any(step.status == "fail" for step in ctx.step_results) or perf_result.status == "fail":
+        status = "fail"
+    elif perf_result.status == "warn":
+        status = "warn"
+    else:
+        status = "ok"
+    return ToolResult(
+        tool="scalpel-ci-lite",
+        status=status,
+        issues=perf_result.issues,
+        steps=tuple(ctx.step_results),
+    )
 
 
 def _script_cmd(repo_root: Path, name: str) -> Path:
@@ -584,9 +613,10 @@ def main(argv: list[str] | None = None) -> int:
         if not opts.allow_dirty:
             _require_git_clean(opts.repo_root)
 
-        perf_rc = _check_perf_budgets(opts)
-        if perf_rc != 0:
-            return perf_rc
+        perf_result = _check_perf_budgets(opts)
+        final = _build_result(ctx, perf_result)
+        if final.status == "fail":
+            return 3
 
         print()
         print(f"[ci-lite] OK: {opts.out}")

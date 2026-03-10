@@ -103,8 +103,11 @@ files = [
   "scalpel/util/timeparse.py",
   "scalpel/util/tz.py",
   "scalpel/util/duration.py",
+  "scalpel/tools/check.py",
   "scalpel/tools/ci.py",
   "scalpel/tools/ci_lite.py",
   "scalpel/tools/ddmin_shrink.py",
+  "scalpel/tools/doctor.py",
   "scalpel/tools/gen_fixtures.py",
+  "scalpel/tools/result.py",
 ]

@@ -5,6 +5,8 @@ import argparse
 from pathlib import Path
 import os
 
+from .result import ToolCliError
+
 
 def _scalpel_env_flag(name: str) -> bool:
     """Return True if env var is set to a truthy value."""
@@ -17,7 +19,7 @@ def _call(mod: str, argv: list[str]) -> int:
     m = __import__(f"scalpel.tools.{mod}", fromlist=["main"])
     fn = getattr(m, "main", None)
     if not callable(fn):
-        raise RuntimeError(f"scalpel.tools.{mod} missing main()")
+        raise ToolCliError(f"scalpel.tools.{mod} missing main()")
     try:
         rc = fn(argv)
     except TypeError:
@@ -39,21 +41,25 @@ def main(argv: list[str] | None = None) -> int:
 
     skip_doctor = bool(getattr(ns, "skip_doctor", False)) or _scalpel_env_flag("SCALPEL_SKIP_DOCTOR")
     skip_smoke  = bool(getattr(ns, "skip_smoke",  False)) or _scalpel_env_flag("SCALPEL_SKIP_SMOKE")
-    if not skip_doctor:
-        rc = _call("doctor", [])
-        if rc != 0:
-            return rc
-    if not skip_smoke:
-        rc = _call("smoke_build", ["--out", str(out)])
-        if rc != 0:
-            return rc
-    if not ns.skip_validate:
-        try:
-            rc = _call("smoke_validate", [str(out)])
-        except ModuleNotFoundError:
-            rc = 0
-        if rc != 0:
-            return rc
+    try:
+        if not skip_doctor:
+            rc = _call("doctor", [])
+            if rc != 0:
+                return rc
+        if not skip_smoke:
+            rc = _call("smoke_build", ["--out", str(out)])
+            if rc != 0:
+                return rc
+        if not ns.skip_validate:
+            try:
+                rc = _call("smoke_validate", [str(out)])
+            except ModuleNotFoundError:
+                rc = 0
+            if rc != 0:
+                return rc
+    except ToolCliError as ex:
+        print(f"[scalpel-check] ERROR: {ex}")
+        return ex.exit_code
 
     print(f"[scalpel-check] OK: {out}")
     return 0

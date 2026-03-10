@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
 from ..process import run_command
+from .result import ToolIssue, ToolResult, result_from_issues
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -44,7 +45,18 @@ def _git_ignored_paths(root: Path, rel_paths: List[str]) -> Set[str]:
     return {item for item in result.stdout.split("\0") if item}
 
 
+def _issues_to_legacy_lists(issues: list[ToolIssue]) -> tuple[list[str], list[str]]:
+    warnings = [issue.message for issue in issues if issue.level == "warning"]
+    errors = [issue.message for issue in issues if issue.level == "error"]
+    return warnings, errors
+
+
 def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str], List[str]]:
+    warnings, errors = _issues_to_legacy_lists(_scan_tree_issues(root, verbose_artifacts=verbose_artifacts))
+    return warnings, errors
+
+
+def _scan_tree_issues(root: Path, *, verbose_artifacts: bool = False) -> list[ToolIssue]:
     """Scan the repository for common hygiene issues.
 
     Keep this relatively conservative: focus on artifacts that tend to break
@@ -52,8 +64,7 @@ def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str
     semantic checks.
     """
 
-    warnings: List[str] = []
-    errors: List[str] = []
+    issues: list[ToolIssue] = []
 
     bad_name = re.compile(r"^Copy \(\d+\) ")
     skip_dirs = {".git", "build", "dist", ".venv", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".ship-safe"}
@@ -103,40 +114,56 @@ def _scan_tree(root: Path, *, verbose_artifacts: bool = False) -> Tuple[List[str
     visible_orig_files = [rel for rel in orig_files if rel not in ignored]
 
     for rel in visible_copy_files:
-        errors.append(f"Stray copy artifact: {rel}")
+        issues.append(ToolIssue("error", f"Stray copy artifact: {rel}"))
     for rel in visible_rej_files:
-        errors.append(f"Patch reject present: {rel}")
+        issues.append(ToolIssue("error", f"Patch reject present: {rel}"))
     for rel in visible_orig_files:
-        errors.append(f"Patch artifact present: {rel}")
+        issues.append(ToolIssue("error", f"Patch artifact present: {rel}"))
 
     if verbose_artifacts:
         for rel in visible_pycache_dirs:
-            warnings.append(f"Found __pycache__ directory: {rel} (consider cleaning it)")
+            issues.append(ToolIssue("warning", f"Found __pycache__ directory: {rel} (consider cleaning it)"))
         for rel in visible_pyc_files:
-            warnings.append(f"Bytecode file present: {rel} (consider cleaning)")
+            issues.append(ToolIssue("warning", f"Bytecode file present: {rel} (consider cleaning)"))
         for rel in visible_bak_files:
-            warnings.append(f"Backup file present: {rel} (ok, but consider cleaning once stable)")
+            issues.append(ToolIssue("warning", f"Backup file present: {rel} (ok, but consider cleaning once stable)"))
 
     if not verbose_artifacts:
         if visible_pycache_dirs:
-            warnings.append(f"Found {len(visible_pycache_dirs)} repo-visible __pycache__ directories (run clean to remove).")
+            issues.append(
+                ToolIssue(
+                    "warning",
+                    f"Found {len(visible_pycache_dirs)} repo-visible __pycache__ directories (run clean to remove).",
+                )
+            )
         if visible_pyc_files:
-            warnings.append(f"Found {len(visible_pyc_files)} repo-visible .pyc files (run clean to remove).")
+            issues.append(
+                ToolIssue("warning", f"Found {len(visible_pyc_files)} repo-visible .pyc files (run clean to remove).")
+            )
         if visible_bak_files:
-            warnings.append(f"Found {len(visible_bak_files)} repo-visible .bak files (consider cleaning once stable).")
+            issues.append(
+                ToolIssue(
+                    "warning",
+                    f"Found {len(visible_bak_files)} repo-visible .bak files (consider cleaning once stable).",
+                )
+            )
 
-    return warnings, errors
+    return issues
 
 
 def _smoke_inline_build(repo_root: Path) -> Tuple[List[str], List[str]]:
-    warnings: List[str] = []
-    errors: List[str] = []
+    warnings, errors = _issues_to_legacy_lists(_smoke_inline_build_issues(repo_root))
+    return warnings, errors
+
+
+def _smoke_inline_build_issues(repo_root: Path) -> list[ToolIssue]:
+    issues: list[ToolIssue] = []
 
     try:
         from scalpel.render.inline import build_html
     except Exception as e:
-        errors.append(f"Import failed: scalpel.render.inline.build_html ({e})")
-        return warnings, errors
+        issues.append(ToolIssue("error", f"Import failed: scalpel.render.inline.build_html ({e})"))
+        return issues
 
     data: Dict[str, Any] = {
         "cfg": {
@@ -157,19 +184,28 @@ def _smoke_inline_build(repo_root: Path) -> Tuple[List[str], List[str]]:
     try:
         html = build_html(data)
     except Exception as e:
-        errors.append(f"build_html(data) raised: {e}")
-        return warnings, errors
+        issues.append(ToolIssue("error", f"build_html(data) raised: {e}"))
+        return issues
 
     if not isinstance(html, str) or len(html) < 500:
-        errors.append("build_html returned an unexpectedly small result (HTML seems empty)")
-        return warnings, errors
+        issues.append(ToolIssue("error", "build_html returned an unexpectedly small result (HTML seems empty)"))
+        return issues
 
     if "__DATA_JSON__" in html:
-        errors.append("HTML still contains __DATA_JSON__ placeholder (template injection failed)")
+        issues.append(ToolIssue("error", "HTML still contains __DATA_JSON__ placeholder (template injection failed)"))
     if '"cfg"' not in html or '"tasks"' not in html:
-        warnings.append('HTML does not obviously contain "cfg"/"tasks" strings; template may have changed (verify manually)')
+        issues.append(
+            ToolIssue("warning", 'HTML does not obviously contain "cfg"/"tasks" strings; template may have changed (verify manually)')
+        )
 
-    return warnings, errors
+    return issues
+
+
+def _build_result(root: Path, *, strict: bool, verbose_artifacts: bool) -> ToolResult:
+    issues: list[ToolIssue] = []
+    issues.extend(_scan_tree_issues(root, verbose_artifacts=verbose_artifacts))
+    issues.extend(_smoke_inline_build_issues(root))
+    return result_from_issues(tool="scalpel-doctor", issues=issues, strict_warnings=strict)
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -189,37 +225,30 @@ def main(argv: List[str] | None = None) -> int:
     print(f"[scalpel-doctor] repo_root: {root}")
     print(f"[scalpel-doctor] python: {sys.executable}")
 
-    warnings: List[str] = []
-    errors: List[str] = []
-
-    w1, e1 = _scan_tree(root, verbose_artifacts=bool(args.verbose_artifacts))
-    warnings += w1
-    errors += e1
-
-    w2, e2 = _smoke_inline_build(root)
-    warnings += w2
-    errors += e2
+    result = _build_result(root, strict=bool(args.strict), verbose_artifacts=bool(args.verbose_artifacts))
+    warnings = result.issues_for_level("warning")
+    errors = result.issues_for_level("error")
 
     if errors:
         print("\n[scalpel-doctor] ERRORS:")
         for e in errors:
-            print(f"  - {e}")
+            print(f"  - {e.message}")
     if warnings:
         print("\n[scalpel-doctor] WARNINGS:")
         for w in warnings:
-            print(f"  - {w}")
+            print(f"  - {w.message}")
 
-    if errors:
-        print("\n[scalpel-doctor] RESULT: FAIL")
-        return 2
-    if warnings and args.strict:
+    if result.status == "fail" and warnings and not errors:
         print("\n[scalpel-doctor] RESULT: WARN (strict => FAIL)")
-        return 2
-    if warnings:
+        return result.exit_code
+    if result.status == "fail":
+        print("\n[scalpel-doctor] RESULT: FAIL")
+        return result.exit_code
+    if result.status == "warn":
         print("\n[scalpel-doctor] RESULT: WARN")
-        return 1
+        return result.exit_code
     print("\n[scalpel-doctor] RESULT: OK")
-    return 0
+    return result.exit_code
 
 
 if __name__ == "__main__":

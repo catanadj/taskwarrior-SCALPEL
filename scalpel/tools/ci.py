@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ..process import run_command
+from .result import ToolIssue, ToolResult, ToolStatus, ToolStepResult, step_status_for_returncode
 
 
 def _repo_root() -> Path:
@@ -27,8 +28,15 @@ def _fmt_ms(ms: int) -> str:
     return f"{m}m{ss:04.1f}s"
 
 
-def _run_step(*, label: str, cmd: List[str], cwd: Path, env: dict[str, str], ok_returncodes: set[int] | None = None) -> Tuple[int, str]:
-    """Run one step; return (rc, combined_output)."""
+def _run_step(
+    *,
+    label: str,
+    cmd: List[str],
+    cwd: Path,
+    env: dict[str, str],
+    ok_returncodes: set[int] | None = None,
+) -> ToolStepResult:
+    """Run one step and return a normalized result object."""
     ok_returncodes = ok_returncodes or {0}
 
     start = time.time()
@@ -36,19 +44,19 @@ def _run_step(*, label: str, cmd: List[str], cwd: Path, env: dict[str, str], ok_
     dur_ms = int((time.time() - start) * 1000)
 
     combined = result.combined_output.strip()
-
-    if result.returncode == 0:
-        status = "OK"
-    elif result.returncode in ok_returncodes:
-        status = "WARN"
-    else:
-        status = "FAIL"
-    print(f"[scalpel-ci] {status}: {label} ({_fmt_ms(dur_ms)})")
+    step = ToolStepResult(
+        label=label,
+        returncode=result.returncode,
+        elapsed_ms=dur_ms,
+        output=combined,
+        status=step_status_for_returncode(result.returncode, ok_returncodes),
+    )
+    print(f"[scalpel-ci] {step.status.upper()}: {label} ({_fmt_ms(dur_ms)})")
     if combined:
         # Keep logs readable; do not indent each line to preserve copy/paste and pytest output.
         print(combined)
 
-    return result.returncode, combined
+    return step
 
 
 def _have(cmd: str) -> bool:
@@ -63,6 +71,17 @@ def _is_truthy_env(name: str) -> bool:
 def _have_mypy(py_exec: str) -> bool:
     result = run_command([py_exec, "-m", "mypy", "--version"])
     return result.returncode == 0
+
+
+def _build_result(*, issues: list[ToolIssue], steps: list[ToolStepResult]) -> ToolResult:
+    status: ToolStatus
+    if any(step.status == "fail" for step in steps):
+        status = "fail"
+    elif any(step.status == "warn" for step in steps) or issues:
+        status = "warn"
+    else:
+        status = "ok"
+    return ToolResult(tool="scalpel-ci", status=status, issues=tuple(issues), steps=tuple(steps))
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -110,6 +129,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         pass
 
     require_tooling = bool(ns.strict) or _is_truthy_env("CI")
+    issues: list[ToolIssue] = []
 
     steps: List[Tuple[str, List[str]]] = []
 
@@ -139,6 +159,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if require_tooling:
                 print("[scalpel-ci] FAIL: ruff is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
                 return 2
+            issues.append(ToolIssue("warning", "ruff not found; skipping lint"))
             print(msg)
 
     if not ns.skip_typecheck:
@@ -148,6 +169,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if require_tooling:
                 print("[scalpel-ci] FAIL: mypy is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
                 return 2
+            issues.append(ToolIssue("warning", "mypy not found; skipping typecheck"))
             print("[scalpel-ci] WARN: mypy not found; skipping typecheck")
 
     if not ns.skip_tests:
@@ -168,20 +190,21 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Execute.
     started = time.time()
-    any_fail = False
+    step_results: list[ToolStepResult] = []
     for label, cmd in steps:
         cmd = [c for c in cmd if c]  # drop empty strings
         ok_rcs: set[int] = {0}
         if label == "doctor" and not ns.strict:
             ok_rcs = {0, 1}
-        rc, _ = _run_step(label=label, cmd=cmd, cwd=repo, env=env, ok_returncodes=ok_rcs)
-        if rc not in ok_rcs:
-            any_fail = True
+        step = _run_step(label=label, cmd=cmd, cwd=repo, env=env, ok_returncodes=ok_rcs)
+        step_results.append(step)
+        if step.status == "fail":
             # Do not continue after a failure; fail fast to reduce noise.
             break
 
     total_ms = int((time.time() - started) * 1000)
-    if any_fail:
+    final = _build_result(issues=issues, steps=step_results)
+    if final.status == "fail":
         print(f"[scalpel-ci] RESULT: FAIL ({_fmt_ms(total_ms)})")
         return 2
 
