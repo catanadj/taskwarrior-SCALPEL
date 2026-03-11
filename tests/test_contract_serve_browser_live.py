@@ -97,6 +97,56 @@ def _make_task_editor_payload(generated_at: str) -> dict[str, Any]:
     return payload
 
 
+def _make_conflict_payload(generated_at: str) -> dict[str, Any]:
+    payload = _make_payload(generated_at)
+    payload["cfg"]["work_start_min"] = 540
+    payload["cfg"]["work_end_min"] = 1020
+    payload["tasks"] = [
+        {
+            "id": 1,
+            "uuid": "aaaa1111-1111-2222-3333-abcdefabcdef",
+            "description": "Deep work block",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767258000000,
+            "due_ms": 1767268800000,
+            "duration_min": 180,
+        },
+        {
+            "id": 2,
+            "uuid": "bbbb2222-1111-2222-3333-abcdefabcdef",
+            "description": "Overlapping review",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767265200000,
+            "due_ms": 1767279600000,
+            "duration_min": 240,
+        },
+        {
+            "id": 3,
+            "uuid": "cccc3333-1111-2222-3333-abcdefabcdef",
+            "description": "Late support",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767279600000,
+            "due_ms": 1767294000000,
+            "duration_min": 240,
+        },
+        {
+            "id": 4,
+            "uuid": "dddd4444-1111-2222-3333-abcdefabcdef",
+            "description": "Early prep",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767256200000,
+            "due_ms": 1767263400000,
+            "duration_min": 120,
+        },
+    ]
+    payload["meta"] = {"generated_at": generated_at}
+    return payload
+
+
 @dataclass
 class _BrowserServeHarness:
     root: Path
@@ -1504,6 +1554,132 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_conflict_warnings_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("conflict warnings", () =>
+    evaluate(`
+      (() => {
+        const warn = String((document.querySelector('.day-h[data-day-index="0"] .daywarn') || {}).textContent || '');
+        const panel = String((document.getElementById('conflictsBox') || {}).textContent || '');
+        const overlapCards = document.querySelectorAll('.evt.warn-overlap').length;
+        return !!(
+          warn.includes('Overbooked') &&
+          warn.includes('overlap') &&
+          warn.includes('out of hours') &&
+          panel.includes('Planning warnings') &&
+          panel.includes('Overbooked') &&
+          panel.includes('Outside workhours') &&
+          panel.includes('Overlap') &&
+          overlapCards >= 2
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      if (typeof window.__scalpel_select_conflict === 'function') {
+        window.__scalpel_select_conflict(
+          ['aaaa1111-1111-2222-3333-abcdefabcdef', 'bbbb2222-1111-2222-3333-abcdefabcdef'],
+          0,
+          540
+        );
+      }
+      return true;
+    })()
+  `);
+
+  await waitFor("selected overlap tasks", () =>
+    evaluate(`
+      (() => document.querySelectorAll('.evt.selected').length >= 2)()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 @dataclass
 class _TaskEditorServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
@@ -1528,6 +1704,12 @@ class _TaskEditorServeHarness(_BrowserServeHarness):
             "matched": 1,
             "exact": True,
         }
+
+
+@dataclass
+class _ConflictServeHarness(_BrowserServeHarness):
+    def _payload_for(self, count: int) -> dict[str, Any]:
+        return _make_conflict_payload(f"gen-{count}")
 
 
 class TestServeBrowserLiveContract(unittest.TestCase):
@@ -1685,6 +1867,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_timew_day_actions_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_conflict_warnings_surface_in_ui(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _ConflictServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_conflict_warnings_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",

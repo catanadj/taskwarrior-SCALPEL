@@ -133,6 +133,30 @@ CSS_PART = r'''  .cal-wrap {
     white-space: nowrap;
     flex: 0 0 auto;
   }
+  .day-h .daywarn {
+    min-height: 16px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .day-h.has-warning .daywarn {
+    color: rgba(var(--warn-rgb), 0.98);
+    font-weight: 700;
+  }
+  .day-h.has-warning:not(.today):not(.active-day) {
+    background:
+      linear-gradient(180deg, rgba(var(--warn-rgb), 0.14), rgba(0,0,0,0)),
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
+    border-bottom: 1px solid rgba(var(--warn-rgb), 0.34);
+  }
+  .day-h.has-overload .loadtxt,
+  .day-h.has-overlap .loadtxt,
+  .day-h.has-out-hours .loadtxt {
+    color: rgba(var(--warn-rgb), 0.96);
+  }
 
   .days-body {
     display: grid;
@@ -620,6 +644,47 @@ CSS_PART = r'''  .cal-wrap {
   .evt.queued-done .resize,
   .evt.queued-delete .resize { display: none; }
 
+  .evt.warn-overlap {
+    box-shadow:
+      0 0 0 1px rgba(var(--warn-rgb), 0.22) inset,
+      0 10px 16px rgba(0,0,0,0.22);
+  }
+  .evt.warn-overlap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        135deg,
+        rgba(var(--warn-rgb), 0.14),
+        rgba(var(--warn-rgb), 0.14) 6px,
+        rgba(0,0,0,0) 6px,
+        rgba(0,0,0,0) 12px
+      );
+    opacity: 0.9;
+    z-index: 0;
+  }
+  .evt.warn-overlap .evt-top,
+  .evt.warn-overlap .evt-bot,
+  .evt.warn-overlap .evt-time {
+    position: relative;
+    z-index: 1;
+  }
+  .evt.warn-overlap .evt-time::after {
+    content: "OVERLAP";
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--warn-rgb), 0.40);
+    background: rgba(var(--warn-rgb), 0.10);
+    color: rgba(var(--warn-rgb), 0.98);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 1px 7px;
+  }
+
   .evt.queued-done::after,
   .evt.queued-delete::after {
     position: absolute;
@@ -1023,6 +1088,7 @@ CSS_PART = r'''  .cal-wrap {
   .conf-day .dh { display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; }
   .conf-day .dh .d { font-weight: 650; }
   .conf-day .dh .n { color: var(--muted); font-size: 12px; }
+  .conf-day .dh .s { color: var(--muted); font-size: 11px; margin-top: 2px; }
 
   .conf-item {
     border: 1px solid var(--code-bd);
@@ -1037,6 +1103,17 @@ CSS_PART = r'''  .cal-wrap {
   .conf-item .top .count { color: var(--muted); font-size: 12px; }
   .conf-item .bots { margin-top: 6px; color: var(--muted); font-size: 12px; }
   .conf-item .acts { display:flex; gap:8px; margin-top: 8px; }
+  .conf-item.issue-overload {
+    border-color: rgba(var(--warn-rgb), 0.42);
+    background:
+      linear-gradient(180deg, rgba(var(--warn-rgb), 0.10), rgba(0,0,0,0.02)),
+      rgba(255,255,255,0.02);
+  }
+  .conf-item.issue-overlap .top .range,
+  .conf-item.issue-out-hours .top .range,
+  .conf-item.issue-overload .top .range {
+    color: rgba(var(--warn-rgb), 0.98);
+  }
 
   /* Add tasks modal */
   .modal-backdrop {

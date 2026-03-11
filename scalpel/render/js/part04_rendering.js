@@ -3,6 +3,7 @@
   const __eventNodeByUuid = new Map();
   const __selectedVisualUuids = new Set();
   const __nauticalSelectedPreviewUuids = new Set();
+  const __taskWarningKinds = new Map();
   let __nauticalSelectionMode = false;
 
   function __replaceChildrenSafe(parent, nodes) {
@@ -1215,24 +1216,49 @@
   // -----------------------------
   function renderConflicts(allConflictByDay) {
     let total = 0;
-    for (const segs of allConflictByDay) total += segs.length;
+    for (const day of (allConflictByDay || [])) {
+      total += Number(day && day.issueCount) || 0;
+    }
 
-    const summary = total ? `${total} segment${total===1?"":"s"}` : "None";
+    const summary = total ? `${total} issue${total===1?"":"s"}` : "Clean";
 
     let body = "";
     if (!total) {
-      body = `<div class="hint">No overlapping segments detected.</div>`;
+      body = `<div class="hint">No overlaps, overload, or out-of-hours issues detected.</div>`;
     } else {
       for (let di = 0; di < DAYS; di++) {
-        const segs = allConflictByDay[di];
-        if (!segs || !segs.length) continue;
+        const day = allConflictByDay[di];
+        if (!day || !day.issueCount) continue;
 
         const lab = fmtDayLabel(dayStarts[di]);
+        const sumBits = Array.isArray(day.summaryBits) ? day.summaryBits : [];
         body += `<div class="conf-day">
-          <div class="dh"><div class="d">${escapeHtml(lab.top)} <span style="color:var(--muted);font-weight:500">${escapeHtml(lab.bot)}</span></div>
-          <div class="n">${segs.length} segment${segs.length===1?"":"s"}</div></div>`;
+          <div class="dh">
+            <div>
+              <div class="d">${escapeHtml(lab.top)} <span style="color:var(--muted);font-weight:500">${escapeHtml(lab.bot)}</span></div>
+              <div class="s">${escapeHtml(sumBits.join(" • "))}</div>
+            </div>
+            <div class="n">${day.issueCount} issue${day.issueCount===1?"":"s"}</div>
+          </div>`;
 
-        for (const seg of segs) {
+        if (Number(day.overloadMin) > 0) {
+          const uu = JSON.stringify(day.allUuids || []);
+          const jumpMin = Number.isFinite(day.firstMinute) ? day.firstMinute : WORK_START;
+          body += `
+            <div class="conf-item issue-overload">
+              <div class="top">
+                <div class="range">Overbooked</div>
+                <div class="count">${escapeHtml(fmtDuration(day.overloadMin))}</div>
+              </div>
+              <div class="bots">Planned load ${escapeHtml(fmtDuration(day.loadMin))} against ${escapeHtml(fmtDuration(CAL_MINUTES))} available work time.</div>
+              <div class="acts">
+                <button class="small" onclick='window.__scalpel_select_conflict(${uu}, ${di}, ${jumpMin})'>Select day</button>
+                <button class="small" onclick='window.__scalpel_jump(${di}, ${jumpMin})'>Jump</button>
+              </div>
+            </div>`;
+        }
+
+        for (const seg of (day.overlapSegments || [])) {
           const range = `${fmtHm(seg.startMs)}–${fmtHm(seg.endMs)}`;
           const count = seg.uuids.length;
 
@@ -1248,12 +1274,31 @@
           const jumpMin = minuteOfDayFromMs(seg.startMs);
 
           body += `
-            <div class="conf-item">
+            <div class="conf-item issue-overlap">
               <div class="top">
-                <div class="range">${escapeHtml(range)}</div>
-                <div class="count">${count} tasks</div>
+                <div class="range">Overlap ${escapeHtml(range)}</div>
+                <div class="count">${count} task${count===1?"":"s"}</div>
               </div>
               <div class="bots">${bots}</div>
+              <div class="acts">
+                <button class="small" onclick='window.__scalpel_select_conflict(${uu}, ${di}, ${jumpMin})'>Select</button>
+                <button class="small" onclick='window.__scalpel_jump(${di}, ${jumpMin})'>Jump</button>
+              </div>
+            </div>`;
+        }
+
+        for (const issue of (day.outOfHours || [])) {
+          const t = tasksByUuid.get(issue.uuid);
+          const label = t ? t.description : String(issue.uuid || "").slice(0, 8);
+          const uu = JSON.stringify([issue.uuid]);
+          const jumpMin = minuteOfDayFromMs(issue.startMs);
+          body += `
+            <div class="conf-item issue-out-hours">
+              <div class="top">
+                <div class="range">Outside workhours ${escapeHtml(fmtHm(issue.startMs))}–${escapeHtml(fmtHm(issue.endMs))}</div>
+                <div class="count">${escapeHtml(fmtDuration((issue.endMs - issue.startMs) / 60000))}</div>
+              </div>
+              <div class="bots">${escapeHtml(label)}</div>
               <div class="acts">
                 <button class="small" onclick='window.__scalpel_select_conflict(${uu}, ${di}, ${jumpMin})'>Select</button>
                 <button class="small" onclick='window.__scalpel_jump(${di}, ${jumpMin})'>Jump</button>
@@ -1266,7 +1311,7 @@
 
     elConflictsBox.innerHTML = `
       <div class="ctitle" id="confToggle">
-        <div class="t">Conflicts</div>
+        <div class="t">Planning warnings</div>
         <div class="s">${escapeHtml(summary)}</div>
         <div class="chev" id="confChev">${confCollapsed ? "▸" : "▾"}</div>
       </div>
@@ -1285,37 +1330,107 @@
     applyConfCollapsed(confCollapsed, false);
   }
 
+  function __computeDayIssueSummary(dayEvents, dayIndex) {
+    const events = Array.isArray(dayEvents) ? dayEvents.filter(ev => ev && ev.uuid && Number.isFinite(ev.startMs) && Number.isFinite(ev.dueMs) && ev.dueMs > ev.startMs) : [];
+    const overlapSegments = computeConflictSegments(events);
+    const dayStart = dayStarts[dayIndex];
+    const workStartMs = dayStart + WORK_START * 60000;
+    const workEndMs = dayStart + WORK_END * 60000;
+    const outOfHours = [];
+    let loadMin = 0;
+    const allUuids = [];
+
+    for (const ev of events) {
+      allUuids.push(ev.uuid);
+      loadMin += Math.max(0, (ev.dueMs - ev.startMs) / 60000);
+
+      if (ev.startMs < workStartMs) {
+        outOfHours.push({
+          uuid: ev.uuid,
+          startMs: ev.startMs,
+          endMs: Math.min(ev.dueMs, workStartMs),
+        });
+      }
+      if (ev.dueMs > workEndMs) {
+        outOfHours.push({
+          uuid: ev.uuid,
+          startMs: Math.max(ev.startMs, workEndMs),
+          endMs: ev.dueMs,
+        });
+      }
+    }
+
+    const overloadMin = Math.max(0, Math.round(loadMin - CAL_MINUTES));
+    const summaryBits = [];
+    if (overloadMin > 0) summaryBits.push(`Overbooked ${fmtDuration(overloadMin)}`);
+    if (overlapSegments.length) summaryBits.push(`${overlapSegments.length} overlap${overlapSegments.length===1?"":"s"}`);
+    if (outOfHours.length) summaryBits.push(`${outOfHours.length} out of hours`);
+
+    let firstMinute = null;
+    if (events.length) {
+      const firstMs = Math.min.apply(null, events.map(ev => ev.startMs));
+      firstMinute = minuteOfDayFromMs(firstMs);
+    }
+
+    return {
+      loadMin: Math.round(loadMin),
+      overlapSegments,
+      outOfHours,
+      overloadMin,
+      summaryBits,
+      issueCount: overlapSegments.length + outOfHours.length + (overloadMin > 0 ? 1 : 0),
+      firstMinute,
+      allUuids,
+    };
+  }
+
   function renderDayLoadsAndConflicts(byDay) {
     const headers = document.querySelectorAll(".day-h");
-    const allConflictByDay = [];
+    const daySummaries = [];
+    __taskWarningKinds.clear();
 
     for (let i = 0; i < DAYS; i++) {
       const dayEvents = byDay[i] || [];
-      const loadMin = dayEvents.reduce((acc, ev) => acc + Math.max(0, (ev.dueMs - ev.startMs) / 60000), 0);
-      const util = CAL_MINUTES > 0 ? (loadMin / CAL_MINUTES) : 0;
+      const day = __computeDayIssueSummary(dayEvents, i);
+      const util = CAL_MINUTES > 0 ? (day.loadMin / CAL_MINUTES) : 0;
+      daySummaries.push(day);
 
-      const segs = computeConflictSegments(dayEvents);
-      allConflictByDay.push(segs);
+      for (const seg of day.overlapSegments) {
+        for (const uuid of (seg.uuids || [])) {
+          if (!__taskWarningKinds.has(uuid)) __taskWarningKinds.set(uuid, new Set());
+          __taskWarningKinds.get(uuid).add("overlap");
+        }
+      }
+      for (const issue of day.outOfHours) {
+        if (!__taskWarningKinds.has(issue.uuid)) __taskWarningKinds.set(issue.uuid, new Set());
+        __taskWarningKinds.get(issue.uuid).add("out_of_hours");
+      }
 
       const h = headers[i];
       if (h) {
         const fill = h.querySelector(".loadfill");
         const txt = h.querySelector(".loadtxt");
+        const warn = h.querySelector(".daywarn");
         const pct = Math.min(200, Math.round(util * 100));
         if (fill) {
           fill.style.width = `${Math.min(100, pct)}%`;
           if (util > 1.0) fill.classList.add("over");
           else fill.classList.remove("over");
         }
+        h.classList.toggle("has-warning", day.issueCount > 0);
+        h.classList.toggle("has-overload", day.overloadMin > 0);
+        h.classList.toggle("has-overlap", day.overlapSegments.length > 0);
+        h.classList.toggle("has-out-hours", day.outOfHours.length > 0);
         if (txt) {
-          const confN = segs.length;
-          const loadLabel = `${fmtDuration(loadMin)} / ${fmtDuration(CAL_MINUTES)}`;
-          txt.textContent = confN ? `${loadLabel} • ${confN} conflict${confN===1?"":"s"}` : loadLabel;
+          txt.textContent = `${fmtDuration(day.loadMin)} / ${fmtDuration(CAL_MINUTES)}`;
+        }
+        if (warn) {
+          warn.textContent = day.summaryBits.length ? day.summaryBits.join(" • ") : "Clean";
         }
       }
     }
 
-    renderConflicts(allConflictByDay);
+    renderConflicts(daySummaries);
   }
 
   // -----------------------------
@@ -1402,12 +1517,14 @@
     const leftPct = ev.laneIndex * w;
 
     const qk = queuedActionKind(ev.uuid);
+    const warnKinds = __taskWarningKinds.get(ev.uuid);
     let cls = "evt"
       + (selected.has(ev.uuid) ? " selected" : "")
       + (qk ? (` queued-${qk}`) : "")
       + (isPreview ? " nautical-preview" : "")
       + (previewPicked ? " nautical-picked" : "")
       + (isDimmedTask(t) ? " dimmed" : "");
+    if (warnKinds && warnKinds.has("overlap")) cls += " warn-overlap";
 
     const acc = resolveTaskAccent(t);
     if (acc && acc.color) {
@@ -1471,6 +1588,7 @@
 
   function renderCalendar(events, allByDay) {
     const byDay = Array.from({length: DAYS}, () => []);
+    const byDayAll = Array.from({length: DAYS}, () => []);
     const eventByUuid = new Map();
     for (const ev of (events || [])) {
       if (!ev || !ev.uuid) continue;
@@ -1481,6 +1599,11 @@
         const dayItems = allByDay[di] || [];
         for (const item of dayItems) {
           if (!item || !item.uuid) continue;
+          byDayAll[di].push({
+            uuid: item.uuid,
+            startMs: item.startMs,
+            dueMs: item.dueMs,
+          });
           const ev = eventByUuid.get(item.uuid);
           if (ev) byDay[di].push(ev);
         }
@@ -1490,10 +1613,15 @@
         const di = dayIndexFromMs(ev.dueMs);
         if (di === null) continue;
         byDay[di].push(ev);
+        byDayAll[di].push({
+          uuid: ev.uuid,
+          startMs: ev.startMs,
+          dueMs: ev.dueMs,
+        });
       }
     }
 
-    renderDayLoadsAndConflicts(byDay);
+    renderDayLoadsAndConflicts(byDayAll);
 
     const dayCols = document.querySelectorAll(".day-col");
 
@@ -1506,7 +1634,7 @@
 
       try { renderNotesInColumn(i, col); } catch (e) { /* ignore */ }
 
-      renderGapsForDay(i, col, allByDay ? allByDay[i] : []);
+      renderGapsForDay(i, col, byDayAll[i]);
 
       const laidOut = layoutOverlapGroups(byDay[i] || []);
 

@@ -834,6 +834,7 @@ JS_PART = r'''// Selection model
           <div class="loadbar"><div class="loadfill"></div></div>
           <div class="loadtxt">0m</div>
         </div>
+        <div class="daywarn">Clean</div>
         <div class="day-notes"></div>
       `;
       h.addEventListener("pointerdown", (ev) => {
