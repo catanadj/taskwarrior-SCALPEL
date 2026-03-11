@@ -1055,6 +1055,199 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_local_placeholder_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 12000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("initial ui", () =>
+    evaluate(`(() => document.readyState === 'complete' && !!document.getElementById('actAdd'))()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('actAdd');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("add modal", () =>
+    evaluate(`(() => {
+      const modal = document.getElementById('addModal');
+      return !!(modal && modal.style.display === 'flex');
+    })()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const ta = document.getElementById('addLines');
+      if (ta) ta.value = 'Local draft';
+      const btn = document.getElementById('addQueue');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("local placeholder event", () =>
+    evaluate(`
+      (() => {
+        const el = document.querySelector('.evt[data-uuid^="local-"]');
+        return el ? el.getAttribute('data-uuid') : null;
+      })()
+    `)
+  );
+
+  const localUuid = await evaluate(`
+    (() => {
+      const el = document.querySelector('.evt[data-uuid^="local-"]');
+      return el ? el.getAttribute('data-uuid') : null;
+    })()
+  `);
+  if (!localUuid) throw new Error('missing local placeholder uuid');
+
+  await evaluate(`
+    (() => {
+      const el = document.querySelector('.evt[data-uuid^="local-"]');
+      if (!el) return false;
+      el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("local task editor", () =>
+    evaluate(`(() => {
+      const modal = document.getElementById('taskEditModal');
+      const meta = String((document.getElementById('taskEditMeta') || {}).textContent || '');
+      const save = document.getElementById('taskEditSave');
+      return !!(
+        modal && modal.style.display === 'flex' &&
+        meta.includes('local placeholder draft') &&
+        save && save.textContent.includes('Save local draft')
+      );
+    })()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const proj = document.querySelector('#taskEditGrid [data-field-key="project"]');
+      const pri = document.querySelector('#taskEditGrid [data-field-key="priority"]');
+      const tags = document.querySelector('#taskEditGrid [data-field-key="tags"]');
+      if (proj) proj.value = 'ops';
+      if (pri) pri.value = 'H';
+      if (tags) tags.value = 'focus,deep';
+      const addBtn = document.getElementById('taskEditAddCustom');
+      if (addBtn) addBtn.click();
+      const key = document.querySelector('#taskEditCustomRows [data-custom-idx="1"][data-custom-kind="key"]');
+      const val = document.querySelector('#taskEditCustomRows [data-custom-idx="1"][data-custom-kind="val"]');
+      if (key) key.value = 'review_status';
+      if (val) val.value = 'draft';
+      const save = document.getElementById('taskEditSave');
+      if (save) save.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("updated add command", () =>
+    evaluate(`
+      (() => {
+        const commands = String((document.getElementById('commands') || {}).textContent || '');
+        const status = String((document.getElementById('status') || {}).textContent || '');
+        return !!(
+          commands.includes('task add "Local draft"') &&
+          commands.includes('project:ops') &&
+          commands.includes('priority:H') &&
+          commands.includes('+focus') &&
+          commands.includes('+deep') &&
+          commands.includes('review_status:draft') &&
+          status.includes('Updated local placeholder')
+        );
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 @dataclass
 class _TaskEditorServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
@@ -1112,6 +1305,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_task_editor_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_local_placeholder_edit_updates_add_command(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _BrowserServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_local_placeholder_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",

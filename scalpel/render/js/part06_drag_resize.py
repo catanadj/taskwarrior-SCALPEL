@@ -1021,11 +1021,14 @@ JS_PART = r'''// Drag / Resize engine
         uuid,
         id: null,
         description: desc,
+        status: "pending",
         project: "",
+        priority: "",
         tags: [],
         scheduled_ms: startMs,
         due_ms: dueMs,
         duration: `${durMin}min`,
+        duration_min: durMin,
         local: true,
       };
 

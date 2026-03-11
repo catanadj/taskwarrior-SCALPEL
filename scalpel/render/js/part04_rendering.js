@@ -203,7 +203,7 @@
     return !!(elTaskEditModal && elTaskEditModal.style.display === "flex");
   }
 
-  let __taskEditState = null; // { uuid, ident, fields, custom_rows }
+  let __taskEditState = null; // { uuid, ident, local, fields, custom_rows }
 
   function __newTaskEditCustomRow(key, val) {
     return { key: String(key || "").trim(), val: String(val || "").trim() };
@@ -432,9 +432,82 @@
     return { args, error: "" };
   }
 
+  function __applyLocalTaskEdit() {
+    const st = __taskEditState;
+    if (!st || !st.uuid || !elTaskEditGrid) return false;
+    const t = tasksByUuid.get(st.uuid);
+    if (!t) return false;
+
+    const out = __collectTaskEditArgs();
+    if (out.error) {
+      if (elStatus) elStatus.textContent = out.error;
+      return false;
+    }
+    const args = Array.isArray(out.args) ? out.args : [];
+    if (!args.length) {
+      if (elStatus) elStatus.textContent = `No field changes detected for ${st.ident}.`;
+      return false;
+    }
+
+    for (let i = 0; i < st.fields.length; i++) {
+      const f = st.fields[i] || {};
+      const key = String(f.key || "").trim();
+      if (!key) continue;
+      const inp = elTaskEditGrid.querySelector(`[data-field-idx="${i}"]`);
+      const cur = String((inp && inp.value) || "").trim();
+      if (String(f.kind || "") === "tags") {
+        t.tags = __taskParseTagList(cur);
+        f.value = Array.isArray(t.tags) ? t.tags.join(", ") : "";
+        continue;
+      }
+      if (key === "description" && !cur) {
+        if (elStatus) elStatus.textContent = "Description cannot be empty.";
+        return false;
+      }
+      if (cur) t[key] = cur;
+      else if (key === "project" || key === "priority") t[key] = "";
+      else delete t[key];
+      f.value = String(t[key] || "");
+    }
+
+    const existingKeys = new Set(st.fields.map(f => String((f && f.key) || "").trim().toLowerCase()).filter(Boolean));
+    const customRows = __ensureTaskEditCustomRows();
+    const keepKeys = new Set();
+    for (let i = 0; i < customRows.length; i++) {
+      const inpKey = elTaskEditCustomRows && elTaskEditCustomRows.querySelector(`[data-custom-idx="${i}"][data-custom-kind="key"]`);
+      const inpVal = elTaskEditCustomRows && elTaskEditCustomRows.querySelector(`[data-custom-idx="${i}"][data-custom-kind="val"]`);
+      const key = String((inpKey && inpKey.value) || "").trim();
+      const val = String((inpVal && inpVal.value) || "").trim();
+      if (!key || existingKeys.has(key.toLowerCase())) continue;
+      keepKeys.add(key);
+      if (val) t[key] = val;
+      else delete t[key];
+    }
+
+    for (const key of Object.keys(t)) {
+      if (keepKeys.has(key)) continue;
+      if ([
+        "id", "uuid", "description", "status", "project", "tags", "priority",
+        "scheduled_ms", "due_ms", "duration", "duration_min", "local",
+      ].includes(String(key))) continue;
+      if (String(key || "").startsWith("_")) continue;
+      if (!existingKeys.has(String(key || "").toLowerCase())) delete t[key];
+    }
+
+    const localRow = localAdds.find(x => x && x.uuid === st.uuid);
+    if (localRow) localRow.desc = String(t.description || "").trim();
+    if (typeof __scalpelIndexTaskForSearch === "function") __scalpelIndexTaskForSearch(t);
+    try { renderCommands(); } catch (_) {}
+    try { rerenderAll(); } catch (_) {}
+    if (elStatus) elStatus.textContent = `Updated local placeholder ${st.ident}.`;
+    __closeTaskEditModal();
+    return true;
+  }
+
   function __queueTaskEditSave() {
     const st = __taskEditState;
     if (!st || !st.ident) return false;
+    if (st.local) return __applyLocalTaskEdit();
 
     const out = __collectTaskEditArgs();
     if (out.error) {
@@ -482,10 +555,6 @@
     const t = tasksByUuid.get(u);
     if (!t) return false;
     if (t.nautical_preview) return false;
-    if (t.local) {
-      if (elStatus) elStatus.textContent = "Local placeholder tasks cannot be edited via `task modify` yet.";
-      return false;
-    }
     if (queuedActionKind(u)) {
       if (elStatus) elStatus.textContent = "Task already has queued done/delete action. Clear final actions first.";
       return false;
@@ -503,14 +572,16 @@
 
     let detailsTask = t;
     let usedFreshTask = false;
-    try {
-      if (elStatus) elStatus.textContent = `Loading task attributes for ${ident}...`;
-      const fresh = await __fetchFreshTaskForEdit(u);
-      if (fresh && typeof fresh === "object") {
-        detailsTask = fresh;
-        usedFreshTask = true;
-      }
-    } catch (_) {}
+    if (!t.local) {
+      try {
+        if (elStatus) elStatus.textContent = `Loading task attributes for ${ident}...`;
+        const fresh = await __fetchFreshTaskForEdit(u);
+        if (fresh && typeof fresh === "object") {
+          detailsTask = fresh;
+          usedFreshTask = true;
+        }
+      } catch (_) {}
+    }
 
     const iv = effectiveInterval(u);
     const sch = (iv && Number.isFinite(iv.startMs)) ? formatLocalNoOffset(iv.startMs) : "-";
@@ -522,16 +593,18 @@
       && String(r && r.key || "").toLowerCase() !== "priority"
       && String(r && r.key || "").toLowerCase() !== "tags").length;
 
-    __taskEditState = { uuid: u, ident, fields: rows, custom_rows: [__newTaskEditCustomRow("", "")] };
+    __taskEditState = { uuid: u, ident, local: !!t.local, fields: rows, custom_rows: [__newTaskEditCustomRow("", "")] };
     if (elTaskEditTitle) elTaskEditTitle.textContent = `Edit task ${ident}`;
     if (elTaskEditMeta) {
-      elTaskEditMeta.textContent =
-        `Source: ${usedFreshTask ? "fresh task export" : "cached payload"} • `
-        + `Scheduled: ${sch} • Due: ${due} • Duration: ${dur} • `
-        + `UDAs: ${udaCount}`;
+      elTaskEditMeta.textContent = t.local
+        ? `Source: local placeholder draft • Scheduled: ${sch} • Due: ${due} • Duration: ${dur} • UDAs: ${udaCount}`
+        : (`Source: ${usedFreshTask ? "fresh task export" : "cached payload"} • `
+          + `Scheduled: ${sch} • Due: ${due} • Duration: ${dur} • `
+          + `UDAs: ${udaCount}`);
     }
 
     __renderTaskEditGrid();
+    if (elTaskEditSave) elTaskEditSave.textContent = t.local ? "Save local draft" : "Queue modify";
     elTaskEditModal.style.display = "flex";
     setTimeout(() => {
       try {

@@ -464,8 +464,9 @@ function removeLocalTask(uuid) {
 }
 
 function buildAddCommandForLocal(uuid, desc) {
+  const t = tasksByUuid.get(uuid);
   const cur = plan.get(uuid);
-  if (!cur || !Number.isFinite(cur.due_ms)) return null;
+  if (!t || !cur || !Number.isFinite(cur.due_ms)) return null;
   const durMs = Number.isFinite(cur.dur_ms) ? cur.dur_ms : (DEFAULT_DUR * 60000);
   const dueMs = cur.due_ms;
   const schMs = dueMs - durMs;
@@ -474,8 +475,37 @@ function buildAddCommandForLocal(uuid, desc) {
   const sch = formatLocalNoOffset(schMs);
   const due = formatLocalNoOffset(dueMs);
   const durMin = Math.max(1, Math.round(durMs / 60000));
-  const descRaw = String(desc || "").replace(/\s+/g, " ").trim();
-  return `task add ${descRaw} scheduled:${sch} due:${due} duration:${durMin}min`;
+  const descRaw = String((t && t.description) || desc || "").replace(/\s+/g, " ").trim();
+  if (!descRaw) return null;
+
+  const args = ["task", "add", __twQuotedAtom(descRaw)];
+  const proj = String((t && t.project) || "").trim();
+  const pri = String((t && t.priority) || "").trim();
+  const tags = Array.isArray(t && t.tags) ? t.tags : [];
+  if (proj) args.push(`project:${__twQuotedAtom(proj)}`);
+  if (pri) args.push(`priority:${__twQuotedAtom(pri)}`);
+  for (const tag of tags.map(v => String(v || "").trim()).filter(Boolean)) args.push(`+${tag}`);
+
+  const builtin = new Set([
+    "id", "uuid", "description", "status", "project", "tags", "priority",
+    "entry", "modified", "start", "end", "scheduled", "due", "wait", "until",
+    "recur", "mask", "imask", "parent", "depends", "annotations", "urgency",
+    "scheduled_ms", "due_ms", "duration_min", "duration", "local",
+    "nautical_preview", "nautical_source_uuid", "nauticalSourceUuid",
+    "nautical_source", "nauticalSource",
+  ]);
+  for (const [keyRaw, value] of Object.entries(t || {})) {
+    const key = String(keyRaw || "").trim();
+    if (!key || builtin.has(key) || key.startsWith("_")) continue;
+    const val = __taskFieldValue(value);
+    if (!val) continue;
+    args.push(`${key}:${__twQuotedAtom(val)}`);
+  }
+
+  args.push(`scheduled:${sch}`);
+  args.push(`due:${due}`);
+  args.push(`duration:${durMin}min`);
+  return args.join(" ");
 }
 
   // Effective interval: [due - dur, due]

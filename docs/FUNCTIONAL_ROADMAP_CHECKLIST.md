@@ -5,7 +5,7 @@ Last updated: 2026-03-11
 ## Batch 1: Complete The Core Loop
 
 - [x] Add direct apply/sync to Taskwarrior with preview, confirm, and per-command safety controls.
-- [ ] Promote placeholder/local tasks to first-class editable items with clean materialization into Taskwarrior.
+- [x] Promote placeholder/local tasks to first-class editable items with clean materialization into Taskwarrior.
 - [ ] Add undo/redo for drag, resize, task edits, note edits, clears, and imports.
 
 ## Batch 2: Planning Intelligence

@@ -52,6 +52,7 @@ Important:
 - Drag/resize scheduling with snap-to-grid behavior
 - Selection-driven planning actions
 - Queue actions for selected tasks: complete, delete, add placeholders
+- Local placeholders can be edited like normal task drafts before they materialize into `task add ...`
 - Copy command output for shell execution
 - Live apply flow with preview, per-command selection, and explicit confirmation
 - Export/import plan JSON (`scalpel.plan.v1`)
