@@ -161,9 +161,7 @@ CSS_PART = r'''  .modal {
     margin-top: 2px;
   }
   .apply-row-main{
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: block;
     min-width: 0;
   }
   .apply-row-meta{
@@ -185,11 +183,15 @@ CSS_PART = r'''  .modal {
     font-weight: 650;
   }
   .apply-line{
-    margin: 0;
+    display: inline;
+    flex: 1 1 320px;
+    min-width: 0;
+    margin: 0 0 0 2px;
     white-space: pre-wrap;
     word-break: break-word;
     font-size: 12px;
     line-height: 1.45;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   /* Global transient status toast */

@@ -224,12 +224,12 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
       ord.textContent = `#${idx + 1}`;
       meta.appendChild(ord);
 
-      const pre = document.createElement("pre");
-      pre.className = "apply-line";
-      pre.textContent = String((entry && entry.line) || "");
+      const line = document.createElement("span");
+      line.className = "apply-line";
+      line.textContent = String((entry && entry.line) || "");
+      meta.appendChild(line);
 
       main.appendChild(meta);
-      main.appendChild(pre);
       row.appendChild(box);
       row.appendChild(main);
       elApplyList.appendChild(row);
