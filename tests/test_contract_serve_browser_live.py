@@ -728,6 +728,162 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_apply_failure_badge_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 12000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("task event", () =>
+    evaluate(`
+      (() => document.readyState === 'complete'
+        && !!document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]'))()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      window.confirm = () => true;
+      const el = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+      if (!el) return false;
+      el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("task editor modal", () =>
+    evaluate(`(() => {
+      const modal = document.getElementById('taskEditModal');
+      return !!(modal && modal.style.display === 'flex');
+    })()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const proj = document.querySelector('#taskEditGrid [data-field-key="project"]');
+      if (proj) proj.value = 'ops';
+      const save = document.getElementById('taskEditSave');
+      if (save) save.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("queued modify command", () =>
+    evaluate(`(() => String((document.getElementById('commands') || {}).textContent || '').includes('task 12345678 modify project:ops'))()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnApplyChanges');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("apply modal", () =>
+    evaluate(`(() => {
+      const modal = document.getElementById('applyModal');
+      return !!(modal && modal.style.display === 'flex');
+    })()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('applyConfirm');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("error badge", () =>
+    evaluate(`(() => {
+      const badge = document.querySelector('.apply-badge.is-err');
+      const log = String((document.getElementById('applyResult') || {}).textContent || '');
+      return !!(badge && badge.textContent.includes('ERR') && log.includes('failed'));
+    })()`)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 def _run_cdp_timew_day_actions_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
     script = r"""
 const port = String(process.env.SCALPEL_CDP_PORT || "");
@@ -999,6 +1155,47 @@ class TestServeBrowserLiveContract(unittest.TestCase):
                 self.assertEqual(len(seen), 1)
                 self.assertIn("task 12345678 modify project:ops", str(seen[0][0]))
                 self.assertGreaterEqual(harness.payload_count, 1)
+            finally:
+                harness.stop()
+
+    def test_live_browser_apply_failure_shows_error_badge(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        def fake_apply(commands: list[object], *, selected: list[object] | None = None) -> dict[str, Any]:
+            self.assertEqual(selected, [0])
+            return {
+                "ok": False,
+                "applied": 0,
+                "selected": 1,
+                "stopped_after_index": 0,
+                "commands": [
+                    {
+                        "index": 0,
+                        "kind": "modify",
+                        "line": str(commands[0]),
+                        "argv": ["task", "12345678", "modify", "project:ops"],
+                        "ok": False,
+                        "returncode": 1,
+                        "stdout": "",
+                        "stderr": "boom",
+                        "error": "Taskwarrior command failed with exit 1.",
+                    }
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _TaskEditorServeHarness(Path(td)).start()
+            try:
+                with patch("scalpel.serve.execute_apply_commands", side_effect=fake_apply):
+                    with _HeadlessChromium(chromium_bin) as browser:
+                        _run_cdp_apply_failure_badge_contract(
+                            node_bin=node_bin,
+                            devtools_port=browser.port,
+                            page_url=harness.base_url + "/?token=abc123",
+                        )
             finally:
                 harness.stop()
 

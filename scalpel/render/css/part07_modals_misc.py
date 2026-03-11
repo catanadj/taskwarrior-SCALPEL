@@ -182,6 +182,33 @@ CSS_PART = r'''  .modal {
     color: var(--text);
     font-weight: 650;
   }
+  .apply-badge{
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--btn-bd);
+    background: rgba(255,255,255,0.03);
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .apply-badge.is-ok{
+    border-color: rgba(68, 196, 122, 0.45);
+    background: rgba(68, 196, 122, 0.12);
+    color: rgb(159, 236, 186);
+  }
+  .apply-badge.is-err{
+    border-color: rgba(226, 90, 90, 0.45);
+    background: rgba(226, 90, 90, 0.12);
+    color: rgb(255, 180, 180);
+  }
+  .apply-badge.is-skip{
+    border-color: rgba(var(--accent-rgb), 0.40);
+    background: rgba(var(--accent-rgb), 0.10);
+    color: var(--text);
+  }
   .apply-line{
     display: inline;
     flex: 1 1 320px;

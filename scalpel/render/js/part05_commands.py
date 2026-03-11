@@ -159,6 +159,9 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
 
   let __applyEntries = [];
   let __applySelected = new Set();
+  let __applyResultByIndex = new Map();
+  let __applyLastSelected = new Set();
+  let __applyStopped = false;
 
   function _canLiveApply() {
     return /^https?:$/i.test(String(location.protocol || ""));
@@ -183,7 +186,11 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     const entries = buildApplyCommandEntries();
     __applyEntries = entries;
     if (!entries.length) __applySelected = new Set();
-    else if (__applySelected.size !== entries.length) __applySelected = new Set(entries.map((_, idx) => idx));
+    else if (!__applySelected.size) __applySelected = new Set(entries.map((_, idx) => idx));
+    else {
+      __applySelected = new Set(Array.from(__applySelected).filter(idx => idx >= 0 && idx < entries.length));
+      if (!__applySelected.size) __applySelected = new Set(entries.map((_, idx) => idx));
+    }
 
     if (elApplySummary) elApplySummary.textContent = _applySummaryText(entries);
     if (elApplyList) elApplyList.textContent = "";
@@ -224,6 +231,25 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
       ord.textContent = `#${idx + 1}`;
       meta.appendChild(ord);
 
+      const badgeState = __applyResultByIndex.get(idx);
+      const wasSelected = __applyLastSelected.has(idx);
+      if (badgeState || (__applyStopped && wasSelected)) {
+        const badge = document.createElement("span");
+        badge.className = "apply-badge";
+        if (badgeState && badgeState.ok) {
+          badge.classList.add("is-ok");
+          badge.textContent = "OK";
+        } else if (badgeState && badgeState.error) {
+          badge.classList.add("is-err");
+          badge.textContent = "ERR";
+          badge.title = String(badgeState.error || "");
+        } else {
+          badge.classList.add("is-skip");
+          badge.textContent = "not run";
+        }
+        meta.appendChild(badge);
+      }
+
       const line = document.createElement("span");
       line.className = "apply-line";
       line.textContent = String((entry && entry.line) || "");
@@ -244,6 +270,9 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     if (!elApplyModal) return;
     if (elApplyStatus) elApplyStatus.textContent = "";
     if (elApplyResult) elApplyResult.textContent = "";
+    __applyResultByIndex = new Map();
+    __applyLastSelected = new Set();
+    __applyStopped = false;
     _renderApplyPreview();
     elApplyModal.style.display = "flex";
   }
@@ -274,22 +303,34 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   }
 
   function _renderApplyResults(payload) {
+    __applyResultByIndex = new Map();
+    __applyStopped = false;
     if (!elApplyResult) return;
     if (!payload || !Array.isArray(payload.commands) || !payload.commands.length) {
       elApplyResult.textContent = "";
+      _renderApplyPreview();
       return;
     }
     const lines = [];
     for (const cmd of payload.commands) {
+      const idx = Number(cmd && cmd.index);
+      if (Number.isFinite(idx)) {
+        __applyResultByIndex.set(idx, {
+          ok: !!(cmd && cmd.ok),
+          error: String((cmd && cmd.error) || ""),
+        });
+      }
       const prefix = cmd && cmd.ok ? "OK" : "ERR";
-      lines.push(`[${prefix}] #${Number(cmd && cmd.index) + 1} ${String((cmd && cmd.line) || "")}`.trim());
+      lines.push(`[${prefix}] #${idx + 1} ${String((cmd && cmd.line) || "")}`.trim());
       if (cmd && cmd.error) lines.push(`  ${String(cmd.error)}`);
       const out = String((cmd && cmd.stdout) || "").trim();
       const err = String((cmd && cmd.stderr) || "").trim();
       if (out) lines.push(`  stdout: ${out}`);
       if (err) lines.push(`  stderr: ${err}`);
     }
+    __applyStopped = !!(payload && payload.ok !== true);
     elApplyResult.textContent = lines.join("\n");
+    _renderApplyPreview();
   }
 
   async function _applySelectedCommands() {
@@ -305,6 +346,7 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     }
     if (elApplyConfirm) elApplyConfirm.disabled = true;
     if (elApplyStatus) elApplyStatus.textContent = "Applying queued commands...";
+    __applyLastSelected = new Set(selected);
     try {
       const res = await fetch("/apply", {
         method: "POST",
