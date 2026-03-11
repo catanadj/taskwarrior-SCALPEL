@@ -200,6 +200,14 @@ function _pulseEl(el){
   let notesDoc = null;
   let notesById = new Map();
 
+  function _cloneNotesPayload(value){
+    try {
+      return JSON.parse(JSON.stringify(value == null ? null : value));
+    } catch (_) {
+      return null;
+    }
+  }
+
   function loadNotes(){
     let doc = null;
     try { doc = (typeof globalThis.__scalpel_kvGetJSON === "function") ? globalThis.__scalpel_kvGetJSON(NOTES_KEY, null) : null; } catch (_) { doc = null; }
@@ -246,7 +254,42 @@ function _pulseEl(el){
 
   function getNote(id){ return notesById.get(String(id)) || null; }
 
+  function exportNotesState(){
+    syncNotesDocFromIndex(false);
+    return _cloneNotesPayload(notesDoc || _notesEmptyDoc());
+  }
+
+  function importNotesState(doc, opts){
+    const o = opts || {};
+    let next = _cloneNotesPayload(doc);
+    if (!_isObj(next) || next.schema !== NOTES_SCHEMA || !Array.isArray(next.notes)) {
+      next = _notesEmptyDoc();
+    }
+
+    notesDoc = next;
+    notesById = new Map();
+    for (const raw of (notesDoc.notes || [])) {
+      const nn = _normNote(raw);
+      notesById.set(nn.id, nn);
+    }
+    syncNotesDocFromIndex(!!o.persist);
+
+    try { if (typeof closeNoteModal === "function") closeNoteModal(); } catch (_) {}
+    if (o.render !== false) {
+      try { renderNotesPanel(); } catch (_) {}
+      try { rerenderAll({ mode: "full", immediate: true }); } catch (_) {}
+    }
+    return exportNotesState();
+  }
+
   function upsertNote(note, persist){
+    if (persist) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot("note update");
+        }
+      } catch (_) {}
+    }
     const nn = _normNote(note);
     nn.modified_ms = _notesNow();
     notesById.set(nn.id, nn);
@@ -256,6 +299,13 @@ function _pulseEl(el){
   }
 
   function removeNote(id, persist){
+    if (persist && notesById.has(String(id))) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot("note delete");
+        }
+      } catch (_) {}
+    }
     const key = String(id);
     notesById.delete(key);
     if (persist) saveNotes();
@@ -264,6 +314,20 @@ function _pulseEl(el){
 
   function clearArchivedNotes(){
     const before = notesById.size;
+    let hasArchived = false;
+    for (const n of notesById.values()) {
+      if (n && n.archived) {
+        hasArchived = true;
+        break;
+      }
+    }
+    if (hasArchived) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot("clear archived notes");
+        }
+      } catch (_) {}
+    }
     for (const [id, n] of notesById.entries()) {
       if (n && n.archived) notesById.delete(id);
     }
@@ -1244,6 +1308,12 @@ function _pulseEl(el){
           return;
         }
 
+        try {
+          if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+            globalThis.__scalpel_recordUndoSnapshot("notes import");
+          }
+        } catch (_) {}
+
         let added = 0;
         let updated = 0;
 
@@ -1440,6 +1510,12 @@ function _pulseEl(el){
     const dayEndMs = dayStartMs + 86400000;
     let removed = 0;
 
+    try {
+      if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+        globalThis.__scalpel_recordUndoSnapshot(`timew notes ${ymd}`);
+      }
+    } catch (_) {}
+
     for (const [id, n] of Array.from(notesById.entries())) {
       if (!_isTimewNote(n)) continue;
       if (String(n.bucket_day_key || "") !== ymd) continue;
@@ -1496,6 +1572,20 @@ function _pulseEl(el){
     const ymd = String(dayYmd || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return { removed: 0 };
     let removed = 0;
+    let hasMatching = false;
+    for (const n of notesById.values()) {
+      if (_isTimewNote(n) && String(n.bucket_day_key || "") === ymd) {
+        hasMatching = true;
+        break;
+      }
+    }
+    if (hasMatching) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot(`clear timew notes ${ymd}`);
+        }
+      } catch (_) {}
+    }
     for (const [id, n] of Array.from(notesById.entries())) {
       if (!_isTimewNote(n)) continue;
       if (String(n.bucket_day_key || "") !== ymd) continue;
@@ -1512,6 +1602,8 @@ function _pulseEl(el){
 
   globalThis.__scalpel_applyTimewIntervalsAsNotes = applyTimewIntervalsAsNotes;
   globalThis.__scalpel_clearTimewIntervalNotesDay = clearTimewIntervalNotesDay;
+  globalThis.__scalpel_exportNotesState = exportNotesState;
+  globalThis.__scalpel_importNotesState = importNotesState;
 
   // Expose placement fns used by calendar drop handlers
   // (in-scope functions, referenced directly)

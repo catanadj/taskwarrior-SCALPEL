@@ -1173,6 +1173,186 @@ JS_PART = r'''// Controls / rerender
   function hasLocalPaletteEdits(){
     try { return !!(colorMap && Object.keys(colorMap).length); } catch (_) { return false; }
   }
+  const HISTORY_LIMIT = 48;
+  let undoStack = [];
+  let redoStack = [];
+  let historyRestoring = false;
+
+  function cloneJsonValue(value){
+    try {
+      return JSON.parse(JSON.stringify(value == null ? null : value));
+    } catch (_) {
+      return null;
+    }
+  }
+  function snapshotPlanState(){
+    const out = {};
+    try {
+      for (const [uuid, cur] of plan.entries()) {
+        if (!cur) continue;
+        out[uuid] = {
+          scheduled_ms: cur.scheduled_ms == null ? null : Number(cur.scheduled_ms),
+          due_ms: cur.due_ms == null ? null : Number(cur.due_ms),
+          dur_ms: Number.isFinite(Number(cur.dur_ms)) ? Number(cur.dur_ms) : (DEFAULT_DUR * 60000),
+        };
+      }
+    } catch (_) {}
+    return out;
+  }
+  function snapshotLocalTaskState(){
+    const out = [];
+    try {
+      for (const t of (DATA.tasks || [])) {
+        if (!(t && t.local && t.uuid)) continue;
+        const copy = cloneJsonValue(t);
+        if (copy) out.push(copy);
+      }
+    } catch (_) {}
+    out.sort((a, b) => String(a.uuid || "").localeCompare(String(b.uuid || "")));
+    return out;
+  }
+  function exportRuntimeState(){
+    const selectedUuids = [];
+    try {
+      for (const u of selected.values()) {
+        if (tasksByUuid.has(u)) selectedUuids.push(u);
+      }
+    } catch (_) {}
+    const notesState = (typeof globalThis.__scalpel_exportNotesState === "function")
+      ? globalThis.__scalpel_exportNotesState()
+      : null;
+    return {
+      plan: snapshotPlanState(),
+      actionQueue: Array.isArray(actionQueue) ? actionQueue.slice() : [],
+      actionMeta: cloneJsonValue(actionMeta || {}) || {},
+      localAdds: cloneJsonValue(Array.isArray(localAdds) ? localAdds : []) || [],
+      localTasks: snapshotLocalTaskState(),
+      selected: selectedUuids,
+      selectionLead: selectionLead || null,
+      notes: cloneJsonValue(notesState),
+    };
+  }
+  function restoreLocalTaskState(state){
+    try { purgeLocalTasks(); } catch (_) {}
+
+    const locals = Array.isArray(state && state.localTasks) ? state.localTasks : [];
+    let maxLocalCounter = localTaskCounter;
+    for (const raw of locals) {
+      const t = cloneJsonValue(raw);
+      if (!(t && typeof t === "object" && t.uuid)) continue;
+      t.local = true;
+      if (typeof __scalpelIndexTaskForSearch === "function") __scalpelIndexTaskForSearch(t);
+      DATA.tasks.push(t);
+      tasksByUuid.set(t.uuid, t);
+
+      const planCur = state && state.plan && state.plan[t.uuid] ? state.plan[t.uuid] : null;
+      const scheduledMs = (planCur && Number.isFinite(Number(planCur.scheduled_ms))) ? Number(planCur.scheduled_ms) : (Number.isFinite(Number(t.scheduled_ms)) ? Number(t.scheduled_ms) : null);
+      const dueMs = (planCur && Number.isFinite(Number(planCur.due_ms))) ? Number(planCur.due_ms) : (Number.isFinite(Number(t.due_ms)) ? Number(t.due_ms) : null);
+      const durMs = (planCur && Number.isFinite(Number(planCur.dur_ms)) && Number(planCur.dur_ms) > 0)
+        ? Number(planCur.dur_ms)
+        : (Number.isFinite(Number(t.duration_min)) && Number(t.duration_min) > 0)
+          ? (Math.round(Number(t.duration_min)) * 60000)
+          : (parseDurationToMs(t.duration) || (DEFAULT_DUR * 60000));
+
+      baseline.set(t.uuid, { scheduled_ms: scheduledMs, due_ms: dueMs });
+      baselineDur.set(t.uuid, durMs);
+      plan.set(t.uuid, { scheduled_ms: scheduledMs, due_ms: dueMs, dur_ms: durMs });
+      __scalpelDropEffectiveIntervalCache(t.uuid);
+
+      const m = String(t.uuid).match(/^local-\d+-(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > maxLocalCounter) maxLocalCounter = n;
+      }
+    }
+    localTaskCounter = maxLocalCounter;
+  }
+  function restoreRuntimeState(state, label){
+    const snap = state && typeof state === "object" ? state : {};
+    historyRestoring = true;
+    try {
+      resetPlanToBaseline();
+      restoreLocalTaskState(snap);
+
+      const planState = (snap && snap.plan && typeof snap.plan === "object") ? snap.plan : {};
+      for (const [uuid, raw] of Object.entries(planState)) {
+        if (!tasksByUuid.has(uuid) || !raw || typeof raw !== "object") continue;
+        const cur = plan.get(uuid) || { scheduled_ms: null, due_ms: null, dur_ms: DEFAULT_DUR * 60000 };
+        const scheduledMs = raw.scheduled_ms == null ? null : Number(raw.scheduled_ms);
+        const dueMs = raw.due_ms == null ? null : Number(raw.due_ms);
+        const durMs = Number(raw.dur_ms);
+        plan.set(uuid, {
+          scheduled_ms: Number.isFinite(scheduledMs) ? scheduledMs : cur.scheduled_ms,
+          due_ms: Number.isFinite(dueMs) ? dueMs : cur.due_ms,
+          dur_ms: Number.isFinite(durMs) && durMs > 0 ? durMs : cur.dur_ms,
+        });
+        __scalpelDropEffectiveIntervalCache(uuid);
+      }
+      saveEdits();
+
+      actionQueue = Array.isArray(snap.actionQueue) ? snap.actionQueue.slice() : [];
+      saveActions();
+      actionMeta = cloneJsonValue(snap.actionMeta || {}) || {};
+      saveActionMeta();
+      localAdds = cloneJsonValue(Array.isArray(snap.localAdds) ? snap.localAdds : []) || [];
+
+      if (snap.notes != null && typeof globalThis.__scalpel_importNotesState === "function") {
+        globalThis.__scalpel_importNotesState(cloneJsonValue(snap.notes), { persist: true, render: false });
+      }
+
+      selected.clear();
+      const selectedUuids = Array.isArray(snap.selected) ? snap.selected : [];
+      for (const uuid of selectedUuids) {
+        if (tasksByUuid.has(uuid)) selected.add(uuid);
+      }
+      selectionLead = (snap.selectionLead && tasksByUuid.has(snap.selectionLead)) ? snap.selectionLead : null;
+
+      try { if (typeof __closeTaskEditModal === "function") __closeTaskEditModal(); } catch (_) {}
+      try { if (typeof closeNoteModal === "function") closeNoteModal(); } catch (_) {}
+
+      setRangeMeta();
+      renderCommands();
+      rerenderAll({ mode: "full", immediate: true });
+      if (elStatus) elStatus.textContent = label || "Local state restored.";
+    } finally {
+      historyRestoring = false;
+      updateHistoryButtonStates();
+    }
+  }
+  function recordUndoSnapshot(label){
+    if (historyRestoring) return false;
+    undoStack.push({
+      label: String(label || "change"),
+      state: exportRuntimeState(),
+    });
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+    updateHistoryButtonStates();
+    return true;
+  }
+  function undoLastChange(){
+    if (!undoStack.length) return false;
+    const entry = undoStack.pop();
+    redoStack.push({
+      label: entry && entry.label ? entry.label : "change",
+      state: exportRuntimeState(),
+    });
+    restoreRuntimeState(entry && entry.state ? entry.state : null, `Undid ${entry && entry.label ? entry.label : "change"}.`);
+    return true;
+  }
+  function redoLastChange(){
+    if (!redoStack.length) return false;
+    const entry = redoStack.pop();
+    undoStack.push({
+      label: entry && entry.label ? entry.label : "change",
+      state: exportRuntimeState(),
+    });
+    restoreRuntimeState(entry && entry.state ? entry.state : null, `Redid ${entry && entry.label ? entry.label : "change"}.`);
+    return true;
+  }
+  function historyDepth(which){
+    return which === "redo" ? redoStack.length : undoStack.length;
+  }
   function _actionBtn(id){
     return document.getElementById(id);
   }
@@ -1233,8 +1413,18 @@ JS_PART = r'''// Controls / rerender
       "Apply selected command output in live mode."
     );
     updateCommandGuide();
+    updateHistoryButtonStates();
   }
   globalThis.__scalpel_updateActionButtonStates = updateActionButtonStates;
+  function updateHistoryButtonStates(){
+    const undoCount = historyDepth("undo");
+    const redoCount = historyDepth("redo");
+    _setDisabledState(_actionBtn("btnUndo"), undoCount < 1, "Nothing to undo.", "Undo last local change.");
+    _setDisabledState(_actionBtn("btnRedo"), redoCount < 1, "Nothing to redo.", "Redo last undone change.");
+  }
+  globalThis.__scalpel_recordUndoSnapshot = recordUndoSnapshot;
+  globalThis.__scalpel_undoLastChange = undoLastChange;
+  globalThis.__scalpel_redoLastChange = redoLastChange;
   function updatePendingMeta(){
     if (!elPendingMeta) return;
     const nEdits = countPlanOverrides();
@@ -1350,6 +1540,41 @@ JS_PART = r'''// Controls / rerender
   document.getElementById("btnClearSel").addEventListener("click", () => {
     clearSelection();
     rerenderAll({ mode: "selection", immediate: true });
+  });
+
+  const btnUndo = document.getElementById("btnUndo");
+  if (btnUndo) {
+    btnUndo.addEventListener("click", () => {
+      if (!undoLastChange() && elStatus) elStatus.textContent = "Nothing to undo.";
+    });
+  }
+  const btnRedo = document.getElementById("btnRedo");
+  if (btnRedo) {
+    btnRedo.addEventListener("click", () => {
+      if (!redoLastChange() && elStatus) elStatus.textContent = "Nothing to redo.";
+    });
+  }
+
+  function eventTargetsEditable(ev){
+    const el = ev && ev.target && ev.target.closest
+      ? ev.target.closest('input, textarea, select, [contenteditable="true"]')
+      : null;
+    return !!el;
+  }
+  document.addEventListener("keydown", (ev) => {
+    try {
+      if (!ev || eventTargetsEditable(ev)) return;
+      const key = String(ev.key || "").toLowerCase();
+      if (key !== "z") return;
+      if (!(ev.ctrlKey || ev.metaKey)) return;
+      if (ev.altKey) return;
+      ev.preventDefault();
+      if (ev.shiftKey) {
+        if (!redoLastChange() && elStatus) elStatus.textContent = "Nothing to redo.";
+        return;
+      }
+      if (!undoLastChange() && elStatus) elStatus.textContent = "Nothing to undo.";
+    } catch (_) {}
   });
 
   // Now line refresh

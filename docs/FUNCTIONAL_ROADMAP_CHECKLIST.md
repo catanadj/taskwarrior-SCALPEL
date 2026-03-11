@@ -6,7 +6,7 @@ Last updated: 2026-03-11
 
 - [x] Add direct apply/sync to Taskwarrior with preview, confirm, and per-command safety controls.
 - [x] Promote placeholder/local tasks to first-class editable items with clean materialization into Taskwarrior.
-- [ ] Add undo/redo for drag, resize, task edits, note edits, clears, and imports.
+- [x] Add undo/redo for drag, resize, task edits, note edits, clears, and imports.
 
 ## Batch 2: Planning Intelligence
 
@@ -30,7 +30,7 @@ Last updated: 2026-03-11
 
 - [ ] 1. Direct apply/sync
 - [ ] 2. Placeholder lifecycle
-- [ ] 3. Undo/redo
+- [x] 3. Undo/redo
 - [ ] 4. Conflict detection
 - [ ] 5. Replanning actions
 - [ ] 6. Dependencies/blockers

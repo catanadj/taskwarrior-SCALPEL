@@ -53,6 +53,7 @@ Important:
 - Selection-driven planning actions
 - Queue actions for selected tasks: complete, delete, add placeholders
 - Local placeholders can be edited like normal task drafts before they materialize into `task add ...`
+- Undo/redo for local plan edits, queued commands, placeholder drafts, and notes (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`)
 - Copy command output for shell execution
 - Live apply flow with preview, per-command selection, and explicit confirmation
 - Export/import plan JSON (`scalpel.plan.v1`)
@@ -162,6 +163,7 @@ scalpel --serve --out build/scalpel.html
 Use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
 In live mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
 Live mode keeps a sidecar UI-state store next to the output HTML and exposes it through `GET/POST /client-state`, so serve-backed calendar preferences survive refreshes and server restarts.
+Use **Undo** / **Redo** from the overflow actions menu or `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` to revert or reapply local planning changes without touching Taskwarrior until you explicitly apply them.
 
 For remote/LAN use, `--allow-remote` is required and must be paired with `--serve-token` (or `SCALPEL_SERVE_TOKEN`). The printed URL includes `?token=...` and the server sets an auth cookie for follow-up UI/API calls.
 

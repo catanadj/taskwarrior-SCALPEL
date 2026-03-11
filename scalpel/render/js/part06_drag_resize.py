@@ -768,8 +768,16 @@ JS_PART = r'''// Drag / Resize engine
   // -----------------------------
   // Actions queue
   // -----------------------------
-  function queueAction(line) {
+  function queueAction(line, opts) {
     if (!line || typeof line !== "string") return;
+    const o = opts || {};
+    if (!o.skipHistory) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot(String(o.label || "queue action"));
+        }
+      } catch (_) {}
+    }
     actionQueue.push(line);
     saveActions();
     renderCommands();
@@ -781,12 +789,27 @@ JS_PART = r'''// Drag / Resize engine
 
     let queued = 0;
     let skippedLocal = 0;
+    const realU = [];
 
     for (const u of uuids) {
       const t = tasksByUuid.get(u);
       if (!t) continue;
       if (t.local) { skippedLocal++; continue; }
-      queueAction(`task ${getIdentifier(t)} done`);
+      realU.push(u);
+    }
+
+    if (realU.length) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot(`queue done (${realU.length})`);
+        }
+      } catch (_) {}
+    }
+
+    for (const u of realU) {
+      const t = tasksByUuid.get(u);
+      if (!t) continue;
+      queueAction(`task ${getIdentifier(t)} done`, { skipHistory: true });
       setQueuedAction(u, "done");
       queued++;
     }
@@ -819,6 +842,13 @@ JS_PART = r'''// Drag / Resize engine
 
     // Remove local placeholders immediately (non-destructive).
     let removedLocal = 0;
+    if (localU.length || realU.length) {
+      try {
+        if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+          globalThis.__scalpel_recordUndoSnapshot(`delete selection (${localU.length + realU.length})`);
+        }
+      } catch (_) {}
+    }
     if (localU.length) {
       for (const u of localU) {
         if (removeLocalTask(u)) removedLocal++;
@@ -841,7 +871,7 @@ JS_PART = r'''// Drag / Resize engine
       for (const u of realU) {
         const t = tasksByUuid.get(u);
         if (!t || t.local) continue;
-        queueAction(`task ${getIdentifier(t)} delete`);
+        queueAction(`task ${getIdentifier(t)} delete`, { skipHistory: true });
         setQueuedAction(u, "delete");
         queued++;
       }
@@ -867,6 +897,12 @@ JS_PART = r'''// Drag / Resize engine
   function clearActions() {
     if (!actionQueue.length && !localAdds.length) return;
     if (!confirm("Clear all queued actions (and local add placeholders) for this view?")) return;
+
+    try {
+      if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+        globalThis.__scalpel_recordUndoSnapshot("clear queued changes");
+      }
+    } catch (_) {}
 
     actionQueue = [];
     localAdds = [];
@@ -921,6 +957,12 @@ JS_PART = r'''// Drag / Resize engine
     const raw = elAddLines.value || "";
     const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!lines.length) { elStatus.textContent = "No lines to add."; closeAddModal(); return; }
+
+    try {
+      if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+        globalThis.__scalpel_recordUndoSnapshot(`add local task${lines.length === 1 ? "" : "s"}`);
+      }
+    } catch (_) {}
 
     const durMs = DEFAULT_DUR * 60000;
 

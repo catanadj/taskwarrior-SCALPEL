@@ -449,6 +449,12 @@
       return false;
     }
 
+    try {
+      if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+        globalThis.__scalpel_recordUndoSnapshot(`edit local placeholder ${st.ident}`);
+      }
+    } catch (_) {}
+
     for (let i = 0; i < st.fields.length; i++) {
       const f = st.fields[i] || {};
       const key = String(f.key || "").trim();

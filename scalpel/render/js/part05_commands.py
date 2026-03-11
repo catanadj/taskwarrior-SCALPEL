@@ -1261,6 +1261,13 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
 
     for (const uuid of Object.keys(valid)) {
       const ch = valid[uuid];
+      if (applied === 0) {
+        try {
+          if (typeof globalThis.__scalpel_recordUndoSnapshot === "function") {
+            globalThis.__scalpel_recordUndoSnapshot(`plan change${Object.keys(valid).length === 1 ? "" : "s"}`);
+          }
+        } catch (_) {}
+      }
       plan.set(uuid, { scheduled_ms: ch.scheduledMs, due_ms: ch.dueMs, dur_ms: ch.durMs });
       __scalpelDropEffectiveIntervalCache(uuid);
       applied++;

@@ -59,6 +59,8 @@ MARKUP = r"""<header>
             <button id="btnTogglePanels" class="btn-soft" data-ico="PN" role="menuitem">Hide panels</button>
             <button id="btnNotes" class="btn-soft" data-ico="NT" data-key="Ctrl+Shift+N" role="menuitem" title="Toggle notes (Ctrl+Shift+N)">Notes</button>
             <button id="btnRefresh" class="btn-soft" data-ico="RF" role="menuitem" title="Refresh data from Taskwarrior">Refresh data</button>
+            <button id="btnUndo" class="btn-soft" data-ico="UN" data-key="Ctrl/Cmd+Z" role="menuitem" title="Undo last local change (Ctrl/Cmd+Z)">Undo</button>
+            <button id="btnRedo" class="btn-soft" data-ico="RD" data-key="Ctrl/Cmd+Shift+Z" role="menuitem" title="Redo last undone change (Ctrl/Cmd+Shift+Z)">Redo</button>
             <button id="btnNauticalPreview" class="small toggle btn-soft" data-ico="NA" role="menuitem" title="Toggle future Nautical instances">Nautical: Off</button>
             <button id="btnClearSel" class="btn-soft" data-ico="CL" data-key="Esc" role="menuitem">Clear selection</button>
             <button id="btnReset" class="danger" data-ico="RS" role="menuitem">Reset view plan</button>
