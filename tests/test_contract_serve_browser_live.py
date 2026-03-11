@@ -560,6 +560,169 @@ main().catch((err) => {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+    """
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
+def _run_cdp_timew_day_actions_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("calendar day header", () =>
+    evaluate(`
+      (() => document.readyState === 'complete'
+        && !!document.querySelector('.day-h[data-day-index="0"]'))()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const header = document.querySelector('.day-h[data-day-index="0"]');
+      if (!header) return false;
+      header.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: 120,
+        clientY: 120
+      }));
+      return true;
+    })()
+  `);
+
+  await waitFor("day actions menu", () =>
+    evaluate(`
+      (() => {
+        const btn = document.querySelector('.day-ctx-menu button[data-act="show"]');
+        return !!(btn && !btn.closest('[hidden]'));
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.querySelector('.day-ctx-menu button[data-act="show"]');
+      if (!btn) return false;
+      btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("timew note visible", () =>
+    evaluate(`
+      (() => {
+        const note = document.querySelector('.day-col[data-day-index="0"] .note .ntxt');
+        const status = String((document.getElementById('status') || {}).textContent || '');
+        return !!(
+          note &&
+          note.textContent.includes('[timew] Deep work') &&
+          note.textContent.includes('#focus') &&
+          status.includes('Timewarrior notes updated for 2026-01-01')
+        );
+      })()
+    `)
+  );
+
+  const beforeReload = await evaluate(`
+    (() => {
+      const note = document.querySelector('.day-col[data-day-index="0"] .note .ntxt');
+      return note ? note.textContent : '';
+    })()
+  `);
+  if (!String(beforeReload || "").includes('[timew] Deep work')) {
+    throw new Error(`expected imported timew note before reload, got ${beforeReload}`);
+  }
+
+  await evaluate(`(() => { location.reload(); return true; })()`);
+
+  await waitFor("timew note after reload", () =>
+    evaluate(`
+      (() => {
+        const note = document.querySelector('.day-col[data-day-index="0"] .note .ntxt');
+        return !!(note && note.textContent.includes('[timew] Deep work') && note.textContent.includes('#focus'));
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
 """
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
@@ -621,6 +784,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_task_editor_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_timew_day_actions_persist_notes(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _BrowserServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_timew_day_actions_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",
