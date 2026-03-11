@@ -162,12 +162,35 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   let __applyResultByIndex = new Map();
   let __applyLastSelected = new Set();
   let __applyStopped = false;
+  let __applyStoppedAfterIndex = null;
+
+  function _resetApplyRunState() {
+    __applyResultByIndex = new Map();
+    __applyLastSelected = new Set();
+    __applyStopped = false;
+    __applyStoppedAfterIndex = null;
+  }
 
   function _canLiveApply() {
     return /^https?:$/i.test(String(location.protocol || ""));
   }
 
   function _applySummaryText(entries) {
+    if (__applyLastSelected.size && (__applyResultByIndex.size || __applyStopped)) {
+      let okCount = 0;
+      let failCount = 0;
+      for (const state of __applyResultByIndex.values()) {
+        if (state && state.ok) okCount += 1;
+        else failCount += 1;
+      }
+      const selectedCount = __applyLastSelected.size;
+      const skippedCount = Math.max(0, selectedCount - __applyResultByIndex.size);
+      const bits = [`Applied ${okCount}/${selectedCount}`];
+      if (failCount) bits.push(`${failCount} failed`);
+      if (skippedCount) bits.push(`${skippedCount} not run`);
+      if (Number.isFinite(__applyStoppedAfterIndex)) bits.push(`stopped at #${Number(__applyStoppedAfterIndex) + 1}`);
+      return bits.join(" • ");
+    }
     if (!entries.length) return "No commands are currently queued.";
     const counts = { modify: 0, add: 0, done: 0, delete: 0, unknown: 0 };
     for (const entry of entries) {
@@ -211,9 +234,10 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
       box.checked = __applySelected.has(idx);
       box.dataset.applyIdx = String(idx);
       box.addEventListener("change", () => {
+        _resetApplyRunState();
         if (box.checked) __applySelected.add(idx);
         else __applySelected.delete(idx);
-        if (elApplySummary) elApplySummary.textContent = `${__applySelected.size} of ${entries.length} command(s) selected.`;
+        if (elApplySummary) elApplySummary.textContent = _applySummaryText(entries);
       });
 
       const main = document.createElement("div");
@@ -270,9 +294,7 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     if (!elApplyModal) return;
     if (elApplyStatus) elApplyStatus.textContent = "";
     if (elApplyResult) elApplyResult.textContent = "";
-    __applyResultByIndex = new Map();
-    __applyLastSelected = new Set();
-    __applyStopped = false;
+    _resetApplyRunState();
     _renderApplyPreview();
     elApplyModal.style.display = "flex";
   }
@@ -305,6 +327,7 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   function _renderApplyResults(payload) {
     __applyResultByIndex = new Map();
     __applyStopped = false;
+    __applyStoppedAfterIndex = null;
     if (!elApplyResult) return;
     if (!payload || !Array.isArray(payload.commands) || !payload.commands.length) {
       elApplyResult.textContent = "";
@@ -329,6 +352,9 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
       if (err) lines.push(`  stderr: ${err}`);
     }
     __applyStopped = !!(payload && payload.ok !== true);
+    __applyStoppedAfterIndex = Number.isFinite(Number(payload && payload.stopped_after_index))
+      ? Number(payload.stopped_after_index)
+      : null;
     elApplyResult.textContent = lines.join("\n");
     _renderApplyPreview();
   }
@@ -411,13 +437,16 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   if (elApplyRefreshPreview) elApplyRefreshPreview.addEventListener("click", () => {
     if (elApplyStatus) elApplyStatus.textContent = "";
     if (elApplyResult) elApplyResult.textContent = "";
+    _resetApplyRunState();
     _renderApplyPreview();
   });
   if (elApplySelectAll) elApplySelectAll.addEventListener("click", () => {
+    _resetApplyRunState();
     __applySelected = new Set(__applyEntries.map((_, idx) => idx));
     _renderApplyPreview();
   });
   if (elApplySelectNone) elApplySelectNone.addEventListener("click", () => {
+    _resetApplyRunState();
     __applySelected = new Set();
     _renderApplyPreview();
   });

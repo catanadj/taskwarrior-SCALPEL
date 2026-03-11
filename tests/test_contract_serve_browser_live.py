@@ -868,8 +868,16 @@ async function main() {
   await waitFor("error badge", () =>
     evaluate(`(() => {
       const badge = document.querySelector('.apply-badge.is-err');
+      const summary = String((document.getElementById('applySummary') || {}).textContent || '');
       const log = String((document.getElementById('applyResult') || {}).textContent || '');
-      return !!(badge && badge.textContent.includes('ERR') && log.includes('failed'));
+      return !!(
+        badge &&
+        badge.textContent.includes('ERR') &&
+        summary.includes('Applied 0/1') &&
+        summary.includes('1 failed') &&
+        summary.includes('stopped at #1') &&
+        log.includes('failed')
+      );
     })()`)
   );
 
