@@ -66,6 +66,8 @@ MARKUP = r"""<section class="card commands">
             <button class="small btn-soft" id="opAlignEnd" data-ico="AE" data-key="Ctrl+Shift+E">Align ends</button>
             <button class="small btn-soft" id="opStack" data-ico="ST" data-key="Ctrl+Shift+S">Stack</button>
             <button class="small btn-soft" id="opDistribute" data-ico="DS" data-key="Ctrl+Shift+D">Distribute</button>
+            <button class="small btn-soft" id="opNextFree" data-ico="NF">Next free slot</button>
+            <button class="small btn-soft" id="opRebalanceDay" data-ico="RB">Rebalance day</button>
           </div>
           <div class="hint">
             Shortcuts:

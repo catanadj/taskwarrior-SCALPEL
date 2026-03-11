@@ -1253,6 +1253,7 @@
               <div class="bots">Planned load ${escapeHtml(fmtDuration(day.loadMin))} against ${escapeHtml(fmtDuration(CAL_MINUTES))} available work time.</div>
               <div class="acts">
                 <button class="small" onclick='window.__scalpel_select_conflict(${uu}, ${di}, ${jumpMin})'>Select day</button>
+                <button class="small" onclick='window.__scalpel_rebalance_day(${di})'>Rebalance</button>
                 <button class="small" onclick='window.__scalpel_jump(${di}, ${jumpMin})'>Jump</button>
               </div>
             </div>`;

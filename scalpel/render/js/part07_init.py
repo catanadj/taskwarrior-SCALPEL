@@ -1167,6 +1167,15 @@ JS_PART = r'''// Controls / rerender
   function countLocalAdds(){
     return (Array.isArray(localAdds) ? localAdds.length : 0);
   }
+  function countActiveDayScheduled(){
+    try {
+      if (!lastDayVis || !Number.isInteger(activeDayIndex) || activeDayIndex < 0 || activeDayIndex >= DAYS) return 0;
+      const arr = lastDayVis[activeDayIndex];
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
   function hasPendingActions(){
     return (countPendingActions() + countLocalAdds()) > 0;
   }
@@ -1378,10 +1387,14 @@ JS_PART = r'''// Controls / rerender
     if (nAny > 0) {
       el.classList.add("focus");
       if (nCal >= 2) {
-        el.textContent = "Selection active. Use Align/Stack/Distribute or drag tasks to build command output.";
+        el.textContent = "Selection active. Use Align/Stack/Distribute, Next free slot, or drag tasks to build command output.";
       } else {
-        el.textContent = "Selection active. Use Complete/Delete or move a calendar task to create command output.";
+        el.textContent = "Selection active. Use Next free slot, Complete/Delete, or move a calendar task to create command output.";
       }
+      return;
+    }
+    if (countActiveDayScheduled() > 1) {
+      el.textContent = "No changes yet. Rebalance the active day, or select tasks and use Arrange tools to start building commands.";
       return;
     }
     el.textContent = "No changes yet. Select tasks or drag on the calendar to start building commands.";
@@ -1397,6 +1410,7 @@ JS_PART = r'''// Controls / rerender
     const nCal = (typeof getSelectedCalendarUuids === "function") ? getSelectedCalendarUuids().length : 0;
     const nEdits = countPlanOverrides();
     const nQueued = countPendingActions() + countLocalAdds();
+    const nActiveDay = countActiveDayScheduled();
 
     _setDisabledState(_actionBtn("actDone"), nAny < 1, "Select at least one task.", "Queue complete for selected tasks.");
     _setDisabledState(_actionBtn("actDelete"), nAny < 1, "Select at least one task.", "Queue delete for selected tasks.");
@@ -1404,6 +1418,8 @@ JS_PART = r'''// Controls / rerender
     _setDisabledState(_actionBtn("opAlignEnd"), nCal < 2, "Select at least two calendar tasks.", "Align end times.");
     _setDisabledState(_actionBtn("opStack"), nCal < 2, "Select at least two calendar tasks.", "Stack selected tasks.");
     _setDisabledState(_actionBtn("opDistribute"), nCal < 3, "Select at least three calendar tasks.", "Distribute selected tasks.");
+    _setDisabledState(_actionBtn("opNextFree"), nCal < 1, "Select at least one calendar task.", "Move selected tasks to the next free slot.");
+    _setDisabledState(_actionBtn("opRebalanceDay"), nActiveDay < 2, "Active day needs at least two scheduled tasks.", "Rebalance the active day inside workhours.");
     _setDisabledState(_actionBtn("actClearActions"), nQueued < 1, "No queued actions to clear.", "Clear queued actions and local placeholders.");
     _setDisabledState(_actionBtn("btnCopy"), (nEdits + nQueued) < 1, "No commands to copy.", "Copy command output.");
     _setDisabledState(

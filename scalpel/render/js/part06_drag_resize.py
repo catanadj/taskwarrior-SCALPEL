@@ -495,10 +495,194 @@ JS_PART = r'''// Drag / Resize engine
     commitPlanMany(changes);
   }
 
+  function __mergeBusyIntervals(ivs) {
+    const arr = (ivs || [])
+      .filter(iv => iv && Number.isFinite(iv.s) && Number.isFinite(iv.e) && iv.e > iv.s)
+      .sort((a, b) => (a.s - b.s) || (a.e - b.e));
+    if (!arr.length) return [];
+    const out = [];
+    let cs = arr[0].s;
+    let ce = arr[0].e;
+    for (let i = 1; i < arr.length; i++) {
+      const iv = arr[i];
+      if (iv.s <= ce) ce = Math.max(ce, iv.e);
+      else {
+        out.push({ s: cs, e: ce });
+        cs = iv.s;
+        ce = iv.e;
+      }
+    }
+    out.push({ s: cs, e: ce });
+    return out;
+  }
+
+  function __busyIntervalsExcluding(excluded) {
+    const ex = excluded || new Set();
+    const ivs = [];
+    for (const [u] of tasksByUuid.entries()) {
+      if (ex.has(u)) continue;
+      if (queuedActionKind(u)) continue;
+      const it = taskInterval(u);
+      if (!it || !Number.isFinite(it.startMs) || !Number.isFinite(it.endMs) || it.endMs <= it.startMs) continue;
+      ivs.push({ s: it.startMs, e: it.endMs });
+    }
+    return __mergeBusyIntervals(ivs);
+  }
+
+  function __snapMinuteUp(min) {
+    if (!Number.isFinite(min)) return WORK_START;
+    if (min <= WORK_START) return WORK_START;
+    const rel = min - WORK_START;
+    return WORK_START + Math.ceil(rel / SNAP) * SNAP;
+  }
+
+  function __snapMsUp(ms) {
+    const di = dayIndexFromMs(ms);
+    if (di == null) return ms;
+    const dayStart = dayStarts[di];
+    const snappedMin = clamp(__snapMinuteUp(minuteOfDayFromMs(ms)), WORK_START, WORK_END);
+    return dayStart + minuteToMs(snappedMin);
+  }
+
+  function __findNextFreeSlot(mergedBusy, startMs, durMs) {
+    let cursor = __snapMsUp(startMs);
+    let guard = 0;
+    while (guard++ < 400) {
+      const di = dayIndexFromMs(cursor);
+      if (di == null || di < 0 || di >= DAYS) return null;
+      const dayStart = dayStarts[di];
+      const workStartMs = dayStart + minuteToMs(WORK_START);
+      const workEndMs = dayStart + minuteToMs(WORK_END);
+
+      if (cursor < workStartMs) cursor = workStartMs;
+      if ((cursor + durMs) > workEndMs) {
+        if (di + 1 >= DAYS) return null;
+        cursor = dayStarts[di + 1] + minuteToMs(WORK_START);
+        continue;
+      }
+
+      let bumped = false;
+      for (const iv of mergedBusy) {
+        if (!iv || iv.e <= cursor) continue;
+        if (iv.s >= (cursor + durMs)) break;
+        cursor = __snapMsUp(iv.e);
+        bumped = true;
+        break;
+      }
+      if (bumped) continue;
+      if ((cursor + durMs) > workEndMs) {
+        if (di + 1 >= DAYS) return null;
+        cursor = dayStarts[di + 1] + minuteToMs(WORK_START);
+        continue;
+      }
+      return { startMs: cursor, dueMs: cursor + durMs };
+    }
+    return null;
+  }
+
+  function computeMoveSelectedNextFreeChanges() {
+    const uuids = getSelectedCalendarUuids();
+    if (!uuids.length) return {};
+
+    const items = uuids
+      .map(u => ({ u, e: effectiveInterval(u) }))
+      .filter(x => x.e && Number.isFinite(x.e.startMs) && Number.isFinite(x.e.durMs));
+    if (!items.length) return {};
+    items.sort((a, b) => (a.e.startMs - b.e.startMs) || (a.u.localeCompare(b.u)));
+
+    const excluded = new Set(items.map(x => x.u));
+    let mergedBusy = __busyIntervalsExcluding(excluded);
+    let cursor = Math.max.apply(null, items.map(x => x.e.dueMs));
+    cursor = __snapMsUp(cursor);
+    const changes = {};
+
+    for (const it of items) {
+      const slot = __findNextFreeSlot(mergedBusy, cursor, it.e.durMs);
+      if (!slot) return {};
+      changes[it.u] = { scheduledMs: slot.startMs, dueMs: slot.dueMs, durMs: it.e.durMs };
+      mergedBusy = __mergeBusyIntervals(mergedBusy.concat([{ s: slot.startMs, e: slot.dueMs }]));
+      cursor = slot.dueMs;
+    }
+
+    return changes;
+  }
+
+  function moveSelectedToNextFreeSlot() {
+    const changes = computeMoveSelectedNextFreeChanges();
+    if (!Object.keys(changes).length) {
+      if (elStatus) elStatus.textContent = "No next free slot found for the selected tasks in this view.";
+      return;
+    }
+    commitPlanMany(changes);
+    if (elStatus) elStatus.textContent = `Moved ${Object.keys(changes).length} task(s) to the next free slot.`;
+  }
+
+  function __tasksForDayIndex(di) {
+    const out = [];
+    if (!Number.isInteger(di) || di < 0 || di >= DAYS) return out;
+    for (const [u] of tasksByUuid.entries()) {
+      if (queuedActionKind(u)) continue;
+      const eff = effectiveInterval(u);
+      if (!eff || !Number.isFinite(eff.startMs) || !Number.isFinite(eff.dueMs)) continue;
+      const taskDi = dayIndexFromMs(eff.dueMs);
+      if (taskDi !== di) continue;
+      out.push({ u, e: eff });
+    }
+    out.sort((a, b) => (a.e.startMs - b.e.startMs) || (a.u.localeCompare(b.u)));
+    return out;
+  }
+
+  function computeRebalanceDayChanges(dayIndex) {
+    const items = __tasksForDayIndex(dayIndex);
+    if (!items.length) return {};
+
+    const totalDur = items.reduce((sum, it) => sum + it.e.durMs, 0);
+    if (totalDur > (CAL_MINUTES * 60000)) return null;
+
+    const dayStart = dayStarts[dayIndex];
+    let cursor = dayStart + minuteToMs(WORK_START);
+    const changes = {};
+    for (const it of items) {
+      const ns = cursor;
+      const nd = ns + it.e.durMs;
+      if (minuteOfDayFromMs(nd) > WORK_END) return null;
+      changes[it.u] = { scheduledMs: ns, dueMs: nd, durMs: it.e.durMs };
+      cursor = nd;
+    }
+    return changes;
+  }
+
+  function rebalanceDay(dayIndex) {
+    let di = dayIndex;
+    if (!Number.isInteger(di)) {
+      const leadEff = selectionLead ? effectiveInterval(selectionLead) : null;
+      di = leadEff ? dayIndexFromMs(leadEff.dueMs) : activeDayIndex;
+    }
+    if (!Number.isInteger(di) || di < 0 || di >= DAYS) {
+      if (elStatus) elStatus.textContent = "No active day to rebalance.";
+      return;
+    }
+
+    const changes = computeRebalanceDayChanges(di);
+    if (changes == null) {
+      if (elStatus) elStatus.textContent = `Day cannot be rebalanced inside workhours: over capacity by ${fmtDuration(Math.max(0, (__tasksForDayIndex(di).reduce((s, it) => s + it.e.durMs, 0) / 60000) - CAL_MINUTES))}.`;
+      return;
+    }
+    if (!Object.keys(changes).length) {
+      if (elStatus) elStatus.textContent = "No scheduled tasks found for the active day.";
+      return;
+    }
+    commitPlanMany(changes);
+    if (elStatus) elStatus.textContent = `Rebalanced ${Object.keys(changes).length} task(s) on ${ymdFromMs(dayStarts[di])}.`;
+  }
+
   document.getElementById("opAlignStart").addEventListener("click", alignStarts);
   document.getElementById("opAlignEnd").addEventListener("click", alignEnds);
   document.getElementById("opStack").addEventListener("click", stackSequentially);
   document.getElementById("opDistribute").addEventListener("click", distributeEvenly);
+  document.getElementById("opNextFree").addEventListener("click", moveSelectedToNextFreeSlot);
+  document.getElementById("opRebalanceDay").addEventListener("click", () => rebalanceDay(activeDayIndex));
+  window.__scalpel_rebalance_day = rebalanceDay;
 
   function shouldIgnoreKey(ev) {
     const a = document.activeElement;

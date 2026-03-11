@@ -11,7 +11,7 @@ Last updated: 2026-03-11
 ## Batch 2: Planning Intelligence
 
 - [x] Detect conflicts, overload, overlaps, and impossible schedules directly in the calendar UI.
-- [ ] Add replanning actions such as rebalance day, move to next free slot, compress/spread selection, and protect focus blocks.
+- [x] Add replanning actions such as rebalance day, move to next free slot, compress/spread selection, and protect focus blocks.
 - [ ] Surface task dependencies/blockers in the planning view and warn on invalid ordering.
 
 ## Batch 3: Richer Planning Model
@@ -32,7 +32,7 @@ Last updated: 2026-03-11
 - [ ] 2. Placeholder lifecycle
 - [x] 3. Undo/redo
 - [x] 4. Conflict detection
-- [ ] 5. Replanning actions
+- [x] 5. Replanning actions
 - [ ] 6. Dependencies/blockers
 - [ ] 7. Scenario planning
 - [ ] 8. Recurring templates

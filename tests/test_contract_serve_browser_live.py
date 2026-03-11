@@ -147,6 +147,46 @@ def _make_conflict_payload(generated_at: str) -> dict[str, Any]:
     return payload
 
 
+def _make_replan_payload(generated_at: str) -> dict[str, Any]:
+    payload = _make_payload(generated_at)
+    payload["cfg"]["work_start_min"] = 540
+    payload["cfg"]["work_end_min"] = 1020
+    payload["tasks"] = [
+        {
+            "id": 11,
+            "uuid": "eeee1111-1111-2222-3333-abcdefabcdef",
+            "description": "Planning block A",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767258000000,
+            "due_ms": 1767265200000,
+            "duration_min": 120,
+        },
+        {
+            "id": 12,
+            "uuid": "ffff2222-1111-2222-3333-abcdefabcdef",
+            "description": "Planning block B",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767261600000,
+            "due_ms": 1767268800000,
+            "duration_min": 120,
+        },
+        {
+            "id": 13,
+            "uuid": "gggg3333-1111-2222-3333-abcdefabcdef",
+            "description": "Planning block C",
+            "status": "pending",
+            "project": "ops",
+            "scheduled_ms": 1767268800000,
+            "due_ms": 1767272400000,
+            "duration_min": 60,
+        },
+    ]
+    payload["meta"] = {"generated_at": generated_at}
+    return payload
+
+
 @dataclass
 class _BrowserServeHarness:
     root: Path
@@ -1680,6 +1720,152 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_replan_actions_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("initial overlap", () =>
+    evaluate(`
+      (() => {
+        const warn = String((document.querySelector('.day-h[data-day-index="0"] .daywarn') || {}).textContent || '');
+        return warn.includes('overlap');
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const evt = document.querySelector('.evt[data-uuid="eeee1111-1111-2222-3333-abcdefabcdef"]');
+      if (evt) evt.click();
+      const btn = document.getElementById('opNextFree');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("next free command", () =>
+    evaluate(`
+      (() => {
+        const commands = String((document.getElementById('commands') || {}).textContent || '');
+        const status = String((document.getElementById('status') || {}).textContent || '');
+        return !!(
+          commands.includes('task eeee1111 modify') &&
+          commands.includes('scheduled:2026-01-01T13:00') &&
+          commands.includes('due:2026-01-01T15:00') &&
+          status.includes('next free slot')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('opRebalanceDay');
+      if (btn) btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("day rebalanced", () =>
+    evaluate(`
+      (() => {
+        const warn = String((document.querySelector('.day-h[data-day-index="0"] .daywarn') || {}).textContent || '');
+        const commands = String((document.getElementById('commands') || {}).textContent || '');
+        const status = String((document.getElementById('status') || {}).textContent || '');
+        return !!(
+          warn === 'Clean' &&
+          commands.includes('task eeee1111 modify') &&
+          commands.includes('task ffff2222 modify') &&
+          commands.includes('task gggg3333 modify') &&
+          status.includes('Rebalanced')
+        );
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 @dataclass
 class _TaskEditorServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
@@ -1710,6 +1896,12 @@ class _TaskEditorServeHarness(_BrowserServeHarness):
 class _ConflictServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
         return _make_conflict_payload(f"gen-{count}")
+
+
+@dataclass
+class _ReplanServeHarness(_BrowserServeHarness):
+    def _payload_for(self, count: int) -> dict[str, Any]:
+        return _make_replan_payload(f"gen-{count}")
 
 
 class TestServeBrowserLiveContract(unittest.TestCase):
@@ -1885,6 +2077,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_conflict_warnings_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_replan_actions_fix_day(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _ReplanServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_replan_actions_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",
