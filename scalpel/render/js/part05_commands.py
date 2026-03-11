@@ -7,7 +7,7 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     return (t.uuid || "").slice(0,8);
   }
 
-  function buildScheduleCommands() {
+  function buildScheduleCommandEntries() {
     const cmds = [];
     for (const t of (DATA.tasks || [])) {
       const b = baseline.get(t.uuid) || { scheduled_ms: null, due_ms: null };
@@ -27,10 +27,34 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
       const due = formatLocalNoOffset(cur.due_ms);
       const durMin = Math.max(1, Math.round(cur.dur_ms / 60000));
 
-      cmds.push({ when: schMs, line: `task ${ident} modify scheduled:${sch} due:${due} duration:${durMin}min` });
+      cmds.push({ when: schMs, kind: "modify", line: `task ${ident} modify scheduled:${sch} due:${due} duration:${durMin}min` });
     }
     cmds.sort((a,b) => a.when - b.when);
-    return cmds.map(x => x.line);
+    return cmds.map(x => ({ kind: x.kind, line: x.line }));
+  }
+
+  function buildScheduleCommands() {
+    return buildScheduleCommandEntries().map(x => x.line);
+  }
+
+  function inferApplyCommandKind(line) {
+    const raw = String(line || "").trim();
+    if (!raw) return "unknown";
+    if (/^task\s+add\b/i.test(raw)) return "add";
+    if (/^task\s+\S+\s+modify\b/i.test(raw)) return "modify";
+    if (/^task\s+\S+\s+done\s*$/i.test(raw)) return "done";
+    if (/^task\s+\S+\s+delete\s*$/i.test(raw)) return "delete";
+    return "unknown";
+  }
+
+  function buildApplyCommandEntries() {
+    const scheduleEntries = buildScheduleCommandEntries();
+    const localAddEntries = localAdds
+      .map(x => buildAddCommandForLocal(x.uuid, x.desc))
+      .filter(Boolean)
+      .map(line => ({ kind: "add", line }));
+    const queuedEntries = actionQueue.slice().map(line => ({ kind: inferApplyCommandKind(line), line: String(line || "") }));
+    return scheduleEntries.concat(localAddEntries, queuedEntries);
   }
 
   const planTaskUpdates = Object.create(null); // uuid -> patch
@@ -99,13 +123,9 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   }
 
   function renderCommands() {
-    const scheduleLines = buildScheduleCommands();
-
-    // Local adds are rendered as `task add` lines derived from the current plan (so they stay correct if you move them).
-    const localAddLines = localAdds.map(x => buildAddCommandForLocal(x.uuid, x.desc)).filter(Boolean);
-
-    // Other queued actions are plain strings (done/delete/etc.)
-    const actionLines = localAddLines.concat(actionQueue.slice());
+    const scheduleLines = buildScheduleCommandEntries().map(x => x.line);
+    const allEntries = buildApplyCommandEntries();
+    const actionLines = allEntries.slice(scheduleLines.length).map(x => x.line);
 
     const blocks = [];
     blocks.push(`# Schedule changes (${scheduleLines.length})`);
@@ -124,6 +144,242 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
     const cur = String((elStatus && elStatus.textContent) || "").trim();
     if (!cur) elStatus.textContent = hint;
   }
+
+  const elBtnApplyChanges = document.getElementById("btnApplyChanges");
+  const elApplyModal = document.getElementById("applyModal");
+  const elApplyClose = document.getElementById("applyClose");
+  const elApplySummary = document.getElementById("applySummary");
+  const elApplyList = document.getElementById("applyList");
+  const elApplyStatus = document.getElementById("applyStatus");
+  const elApplyResult = document.getElementById("applyResult");
+  const elApplySelectAll = document.getElementById("applySelectAll");
+  const elApplySelectNone = document.getElementById("applySelectNone");
+  const elApplyRefreshPreview = document.getElementById("applyRefreshPreview");
+  const elApplyConfirm = document.getElementById("applyConfirm");
+
+  let __applyEntries = [];
+  let __applySelected = new Set();
+
+  function _canLiveApply() {
+    return /^https?:$/i.test(String(location.protocol || ""));
+  }
+
+  function _applySummaryText(entries) {
+    if (!entries.length) return "No commands are currently queued.";
+    const counts = { modify: 0, add: 0, done: 0, delete: 0, unknown: 0 };
+    for (const entry of entries) {
+      const kind = String((entry && entry.kind) || "unknown");
+      counts[Object.prototype.hasOwnProperty.call(counts, kind) ? kind : "unknown"] += 1;
+    }
+    const bits = [];
+    for (const key of ["modify", "add", "done", "delete"]) {
+      if (counts[key]) bits.push(`${counts[key]} ${key}`);
+    }
+    if (counts.unknown) bits.push(`${counts.unknown} other`);
+    return `${entries.length} command${entries.length === 1 ? "" : "s"} selected for live apply: ${bits.join(" • ")}.`;
+  }
+
+  function _renderApplyPreview() {
+    const entries = buildApplyCommandEntries();
+    __applyEntries = entries;
+    if (!entries.length) __applySelected = new Set();
+    else if (__applySelected.size !== entries.length) __applySelected = new Set(entries.map((_, idx) => idx));
+
+    if (elApplySummary) elApplySummary.textContent = _applySummaryText(entries);
+    if (elApplyList) elApplyList.textContent = "";
+    if (!elApplyList) return;
+    if (!entries.length) {
+      const empty = document.createElement("div");
+      empty.className = "hint";
+      empty.textContent = "No pending commands to apply.";
+      elApplyList.appendChild(empty);
+      return;
+    }
+    entries.forEach((entry, idx) => {
+      const row = document.createElement("label");
+      row.className = "apply-row";
+
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = __applySelected.has(idx);
+      box.dataset.applyIdx = String(idx);
+      box.addEventListener("change", () => {
+        if (box.checked) __applySelected.add(idx);
+        else __applySelected.delete(idx);
+        if (elApplySummary) elApplySummary.textContent = `${__applySelected.size} of ${entries.length} command(s) selected.`;
+      });
+
+      const main = document.createElement("div");
+      main.className = "apply-row-main";
+
+      const meta = document.createElement("div");
+      meta.className = "apply-row-meta";
+
+      const chip = document.createElement("span");
+      chip.className = "apply-chip";
+      chip.textContent = String((entry && entry.kind) || "task");
+      meta.appendChild(chip);
+
+      const ord = document.createElement("span");
+      ord.textContent = `#${idx + 1}`;
+      meta.appendChild(ord);
+
+      const pre = document.createElement("pre");
+      pre.className = "apply-line";
+      pre.textContent = String((entry && entry.line) || "");
+
+      main.appendChild(meta);
+      main.appendChild(pre);
+      row.appendChild(box);
+      row.appendChild(main);
+      elApplyList.appendChild(row);
+    });
+  }
+
+  function _openApplyModal() {
+    if (!_canLiveApply()) {
+      if (elStatus) elStatus.textContent = "Direct apply requires live mode (`scalpel`, not `scalpel --once`).";
+      return;
+    }
+    if (!elApplyModal) return;
+    if (elApplyStatus) elApplyStatus.textContent = "";
+    if (elApplyResult) elApplyResult.textContent = "";
+    _renderApplyPreview();
+    elApplyModal.style.display = "flex";
+  }
+
+  function _closeApplyModal() {
+    if (!elApplyModal) return;
+    elApplyModal.style.display = "none";
+  }
+
+  function _clearPendingStateAfterApply() {
+    try { if (typeof resetPlanToBaseline === "function") resetPlanToBaseline(); } catch (_) {}
+    try { actionQueue = []; saveActions(); } catch (_) {}
+    try { if (typeof clearAllQueuedActions === "function") clearAllQueuedActions(); } catch (_) {}
+    try { if (typeof purgeLocalTasks === "function") purgeLocalTasks(); } catch (_) {}
+    for (const key of Object.keys(planTaskUpdates)) {
+      delete planTaskUpdates[key];
+    }
+    try {
+      if (typeof globalThis.__scalpel_storeDel === "function") {
+        globalThis.__scalpel_storeDel(viewKey);
+        globalThis.__scalpel_storeDel(actionsKey);
+        globalThis.__scalpel_storeDel(actionsMetaKey);
+      }
+    } catch (_) {}
+    try { if (typeof saveEdits === "function") saveEdits(); } catch (_) {}
+    try { renderCommands(); } catch (_) {}
+    try { if (typeof rerenderAll === "function") rerenderAll(); } catch (_) {}
+  }
+
+  function _renderApplyResults(payload) {
+    if (!elApplyResult) return;
+    if (!payload || !Array.isArray(payload.commands) || !payload.commands.length) {
+      elApplyResult.textContent = "";
+      return;
+    }
+    const lines = [];
+    for (const cmd of payload.commands) {
+      const prefix = cmd && cmd.ok ? "OK" : "ERR";
+      lines.push(`[${prefix}] #${Number(cmd && cmd.index) + 1} ${String((cmd && cmd.line) || "")}`.trim());
+      if (cmd && cmd.error) lines.push(`  ${String(cmd.error)}`);
+      const out = String((cmd && cmd.stdout) || "").trim();
+      const err = String((cmd && cmd.stderr) || "").trim();
+      if (out) lines.push(`  stdout: ${out}`);
+      if (err) lines.push(`  stderr: ${err}`);
+    }
+    elApplyResult.textContent = lines.join("\n");
+  }
+
+  async function _applySelectedCommands() {
+    const entries = Array.isArray(__applyEntries) ? __applyEntries.slice() : [];
+    const selected = entries.map((_, idx) => idx).filter(idx => __applySelected.has(idx));
+    if (!selected.length) {
+      if (elApplyStatus) elApplyStatus.textContent = "Select at least one command to apply.";
+      return;
+    }
+    if (!confirm(`Apply ${selected.length} Taskwarrior command(s) now?`)) {
+      if (elApplyStatus) elApplyStatus.textContent = "Apply cancelled.";
+      return;
+    }
+    if (elApplyConfirm) elApplyConfirm.disabled = true;
+    if (elApplyStatus) elApplyStatus.textContent = "Applying queued commands...";
+    try {
+      const res = await fetch("/apply", {
+        method: "POST",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({
+          commands: entries.map(entry => String((entry && entry.line) || "")),
+          selected,
+          confirm: true,
+        }),
+      });
+      const body = await res.json();
+      _renderApplyResults(body);
+      if (!res.ok) {
+        if (elApplyStatus) elApplyStatus.textContent = String((body && body.error) || `Apply failed (${res.status}).`);
+        return;
+      }
+      if (!body || body.ok !== true) {
+        const applied = Number((body && body.applied) || 0);
+        const selectedCount = Number((body && body.selected) || 0);
+        if (elApplyStatus) {
+          elApplyStatus.textContent = `Apply stopped after ${applied} of ${selectedCount} command(s). Review the failed command below.`;
+        }
+        return;
+      }
+
+      _clearPendingStateAfterApply();
+      try {
+        if (typeof globalThis.__scalpel_kvFlush === "function") {
+          await globalThis.__scalpel_kvFlush();
+        }
+      } catch (_) {}
+      if (elApplyStatus) elApplyStatus.textContent = `Applied ${Number(body.applied) || selected.length} command(s). Refreshing live data...`;
+
+      try {
+        const refreshRes = await fetch("/refresh", {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({}),
+        });
+        const refreshBody = await refreshRes.json();
+        if (refreshRes.ok && refreshBody && refreshBody.ok) {
+          window.location.reload();
+          return;
+        }
+        if (elApplyStatus) elApplyStatus.textContent = "Apply succeeded, but live refresh failed. Use Refresh data.";
+      } catch (_) {
+        if (elApplyStatus) elApplyStatus.textContent = "Apply succeeded, but live refresh failed. Use Refresh data.";
+      }
+    } catch (err) {
+      if (elApplyStatus) elApplyStatus.textContent = `Apply failed: ${String((err && err.message) || err || "unknown error")}`;
+    } finally {
+      if (elApplyConfirm) elApplyConfirm.disabled = false;
+    }
+  }
+
+  if (elBtnApplyChanges) elBtnApplyChanges.addEventListener("click", _openApplyModal);
+  if (elApplyClose) elApplyClose.addEventListener("click", _closeApplyModal);
+  if (elApplyRefreshPreview) elApplyRefreshPreview.addEventListener("click", () => {
+    if (elApplyStatus) elApplyStatus.textContent = "";
+    if (elApplyResult) elApplyResult.textContent = "";
+    _renderApplyPreview();
+  });
+  if (elApplySelectAll) elApplySelectAll.addEventListener("click", () => {
+    __applySelected = new Set(__applyEntries.map((_, idx) => idx));
+    _renderApplyPreview();
+  });
+  if (elApplySelectNone) elApplySelectNone.addEventListener("click", () => {
+    __applySelected = new Set();
+    _renderApplyPreview();
+  });
+  if (elApplyConfirm) elApplyConfirm.addEventListener("click", _applySelectedCommands);
 
   const elBtnExportPlan = document.getElementById("btnExportPlan");
   if (elBtnExportPlan) elBtnExportPlan.addEventListener("click", () => {

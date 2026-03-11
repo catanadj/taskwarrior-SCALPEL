@@ -14,6 +14,7 @@ from typing import Any, Callable, TypedDict, cast
 from urllib.parse import parse_qs, quote, urlsplit
 
 from .model import Payload, RawTask
+from .serve_apply import execute_apply_commands
 from .util.console import eprint
 
 
@@ -186,6 +187,7 @@ def _serve_bootstrap_script(client_state: dict[str, Any]) -> str:
         "    try { safeLsSet(k, JSON.stringify(obj)); } catch (_) {}\n"
         "    scheduleFlush();\n"
         "  };\n"
+        "  g.__scalpel_kvFlush = flushNow;\n"
         "})();\n"
         "</script>\n"
     )
@@ -454,6 +456,52 @@ def _handle_client_state_post(
     send_json(200, {"ok": True, "state": snapshot})
 
 
+def _handle_apply_post(
+    *,
+    body: object,
+    send_json: Callable[[int, dict[str, Any]], None],
+    obs_inc: Callable[[str], None],
+) -> None:
+    if not isinstance(body, dict):
+        send_json(400, {"ok": False, "error": "JSON body must be an object."})
+        return
+    commands = body.get("commands")
+    selected = body.get("selected")
+    confirm = bool(body.get("confirm"))
+    if not confirm:
+        send_json(400, {"ok": False, "error": "Field 'confirm' must be true."})
+        return
+    if not isinstance(commands, list):
+        send_json(400, {"ok": False, "error": "Field 'commands' must be an array."})
+        return
+    if selected is not None and not isinstance(selected, list):
+        send_json(400, {"ok": False, "error": "Field 'selected' must be an array."})
+        return
+    if not commands:
+        send_json(400, {"ok": False, "error": "No commands supplied for apply."})
+        return
+    try:
+        result = execute_apply_commands(commands, selected=cast(list[object] | None, selected))
+    except SystemExit as ex:
+        obs_inc("apply_error_total")
+        _obs_log("serve.apply_error", error=str(ex))
+        send_json(400, {"ok": False, "error": str(ex)})
+        return
+    if result["ok"]:
+        obs_inc("apply_success_total")
+        _obs_log("serve.apply_ok", applied=result["applied"], selected=result["selected"])
+        send_json(200, cast(dict[str, Any], result))
+        return
+    obs_inc("apply_error_total")
+    _obs_log(
+        "serve.apply_error",
+        applied=result["applied"],
+        selected=result["selected"],
+        stopped_after_index=result["stopped_after_index"],
+    )
+    send_json(200, cast(dict[str, Any], result))
+
+
 def serve(
     args: argparse.Namespace,
     out_path: str,
@@ -642,7 +690,7 @@ def serve(
             path = urlsplit(self.path).path
             _obs_inc("requests_total", path=path)
             _obs_inc("requests_post_total")
-            if path not in {"/refresh", "/client-state"}:
+            if path not in {"/refresh", "/client-state", "/apply"}:
                 self._send_json(404, {"ok": False, "error": "Not found"})
                 return
             if not self._is_authorized():
@@ -669,6 +717,13 @@ def serve(
                 body = json.loads(raw.decode("utf-8", errors="replace"))
             except Exception:
                 self._send_json(400, {"ok": False, "error": "Invalid JSON body."})
+                return
+            if path == "/apply":
+                _handle_apply_post(
+                    body=body,
+                    send_json=self._send_json,
+                    obs_inc=_obs_inc,
+                )
                 return
             _handle_client_state_post(
                 body=body,

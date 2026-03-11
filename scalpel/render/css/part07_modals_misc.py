@@ -132,6 +132,65 @@ CSS_PART = r'''  .modal {
     overflow: auto;
     margin: 0;
   }
+  .apply-modal { width: min(860px, 100%); }
+  .apply-summary{
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--code-bd);
+    background: rgba(255,255,255,0.03);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .apply-list{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 360px;
+    overflow: auto;
+  }
+  .apply-row{
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--code-bd);
+    background: rgba(255,255,255,0.02);
+  }
+  .apply-row input[type="checkbox"]{
+    margin-top: 2px;
+  }
+  .apply-row-main{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .apply-row-meta{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .apply-chip{
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--btn-bd);
+    background: var(--btn-bg);
+    color: var(--text);
+    font-weight: 650;
+  }
+  .apply-line{
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.45;
+  }
 
   /* Global transient status toast */
   .toast{

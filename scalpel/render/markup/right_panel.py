@@ -123,6 +123,9 @@ MARKUP = r"""<section class="card commands">
           <div class="conflicts" id="conflictsBox"></div>
 
           <div id="cmdGuide" class="cmd-guide" aria-live="polite"></div>
+          <div class="ops">
+            <button class="small btn-primary" id="btnApplyChanges" data-ico="OK">Apply in Taskwarrior</button>
+          </div>
           <div class="hint">Command output includes schedule changes and queued actions. Times emitted as local time (no offset).</div>
           <div class="space-10" aria-hidden="true"></div>
           <pre id="commands"></pre>

@@ -34,13 +34,15 @@ Stable `1.0.0` release line.
 - A safe way to test schedule changes before applying them in Taskwarrior
 - Optional AI-assisted planning on top of a stable payload/render contract
 
-Important: SCALPEL generates command output and plan JSON. It does not execute Taskwarrior commands automatically.
+Important:
+- `scalpel --once` remains a render/copy workflow.
+- Live mode can now apply queued Taskwarrior commands directly, but only after explicit preview, per-command selection, and confirmation.
 
 ## Use
 
 1. Run `scalpel` to export your Taskwarrior tasks and open a planning page in your browser.
 2. Drag/resize tasks, queue adds/completes/deletes, and shape the schedule visually.
-3. Copy the generated `task ... modify` / action commands or export a plan JSON for later replay/apply.
+3. Copy the generated `task ... modify` / action commands, apply them directly in live mode, or export a plan JSON for later replay/apply.
 
 ## Product Highlights
 
@@ -51,6 +53,7 @@ Important: SCALPEL generates command output and plan JSON. It does not execute T
 - Selection-driven planning actions
 - Queue actions for selected tasks: complete, delete, add placeholders
 - Copy command output for shell execution
+- Live apply flow with preview, per-command selection, and explicit confirmation
 - Export/import plan JSON (`scalpel.plan.v1`)
 - Notes panel and quick command palette (`Ctrl/Cmd+K`)
 - Goal/project/tag color mapping and theme customization
@@ -143,9 +146,9 @@ scalpel --filter "status:pending" --days 7 --out build/scalpel.html
 Then:
 
 - Adjust the schedule in the browser
-- Copy generated commands
-- Review them
-- Run them manually in your shell
+- Either apply the reviewed command set directly in live mode, or copy it
+- Review generated changes before confirming
+- Run them manually in your shell if you prefer the copy workflow
 
 That command now runs in live mode by default and keeps the local server available for refresh/task/timew actions.
 

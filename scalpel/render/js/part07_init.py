@@ -1192,7 +1192,7 @@ JS_PART = r'''// Controls / rerender
 
     if (total > 0) {
       el.classList.add("ready");
-      el.textContent = `Ready: ${total} command${total === 1 ? "" : "s"} pending. Copy commands or export plan.`;
+      el.textContent = `Ready: ${total} command${total === 1 ? "" : "s"} pending. Apply live, copy commands, or export plan.`;
       return;
     }
     if (nAny > 0) {
@@ -1226,6 +1226,12 @@ JS_PART = r'''// Controls / rerender
     _setDisabledState(_actionBtn("opDistribute"), nCal < 3, "Select at least three calendar tasks.", "Distribute selected tasks.");
     _setDisabledState(_actionBtn("actClearActions"), nQueued < 1, "No queued actions to clear.", "Clear queued actions and local placeholders.");
     _setDisabledState(_actionBtn("btnCopy"), (nEdits + nQueued) < 1, "No commands to copy.", "Copy command output.");
+    _setDisabledState(
+      _actionBtn("btnApplyChanges"),
+      (nEdits + nQueued) < 1 || !/^https?:$/i.test(String(location.protocol || "")),
+      !/^https?:$/i.test(String(location.protocol || "")) ? "Direct apply requires live mode." : "No commands to apply.",
+      "Apply selected command output in live mode."
+    );
     updateCommandGuide();
   }
   globalThis.__scalpel_updateActionButtonStates = updateActionButtonStates;

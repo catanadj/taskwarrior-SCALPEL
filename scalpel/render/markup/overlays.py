@@ -124,6 +124,33 @@ Review PR #142"></textarea>
   </div>
 </div>
 
+<div class="modal-backdrop" id="applyModal">
+  <div class="modal apply-modal">
+    <div class="mh">
+      <div class="t">Apply queued changes</div>
+      <button class="small btn-soft" id="applyClose">Close</button>
+    </div>
+    <div class="mb">
+      <div class="hint">
+        Live mode only. Commands run through the local <code>task</code> binary without a shell. Review the selection, then confirm.
+      </div>
+      <div class="apply-summary" id="applySummary"></div>
+      <div class="ops">
+        <button class="small btn-soft" id="applySelectAll">Select all</button>
+        <button class="small btn-soft" id="applySelectNone">Select none</button>
+      </div>
+      <div class="apply-list" id="applyList"></div>
+      <div class="hint" id="applyStatus"></div>
+      <pre id="applyResult" class="ai-preview"></pre>
+    </div>
+    <div class="mf">
+      <button class="small btn-soft" id="applyRefreshPreview">Refresh preview</button>
+      <div class="grow" aria-hidden="true"></div>
+      <button class="small btn-primary" id="applyConfirm">Apply selected</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="noteModal">
   <div class="modal">
     <div class="mh">

@@ -11,6 +11,7 @@ from http.cookiejar import CookieJar
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
@@ -217,6 +218,57 @@ class TestServeEndToEndContract(unittest.TestCase):
                 self.assertEqual(state_again["state"]["scalpel.viewwin.global"]["futureDays"], 9)
             finally:
                 harness2.stop()
+
+    def test_apply_endpoint_executes_selected_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            jar = CookieJar()
+            opener = build_opener(HTTPCookieProcessor(jar))
+            harness = _ServeHarness(root, token="abc123").start()
+            try:
+                with opener.open(harness.base_url + "/?token=abc123", timeout=5):
+                    pass
+
+                def fake_apply(commands: list[object], *, selected: list[object] | None = None) -> dict[str, Any]:
+                    self.assertEqual(commands, ["task 12345678 done", "task 12345678 delete"])
+                    self.assertEqual(selected, [1])
+                    return {
+                        "ok": True,
+                        "applied": 1,
+                        "selected": 1,
+                        "stopped_after_index": None,
+                        "commands": [
+                            {
+                                "index": 1,
+                                "kind": "delete",
+                                "line": "task 12345678 delete",
+                                "argv": ["task", "12345678", "delete"],
+                                "ok": True,
+                                "returncode": 0,
+                                "stdout": "",
+                                "stderr": "",
+                                "error": None,
+                            }
+                        ],
+                    }
+
+                with patch("scalpel.serve.execute_apply_commands", side_effect=fake_apply):
+                    with _request_json(
+                        opener,
+                        harness.base_url + "/apply",
+                        method="POST",
+                        body={
+                            "commands": ["task 12345678 done", "task 12345678 delete"],
+                            "selected": [1],
+                            "confirm": True,
+                        },
+                    ) as resp:
+                        body = json.loads(resp.read().decode("utf-8"))
+                self.assertTrue(body["ok"])
+                self.assertEqual(body["applied"], 1)
+                self.assertEqual(body["commands"][0]["kind"], "delete")
+            finally:
+                harness.stop()
 
 
 if __name__ == "__main__":
