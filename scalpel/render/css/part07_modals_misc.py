@@ -330,7 +330,7 @@ CSS_PART = r'''  .modal {
   .cmdk-item{
     text-align:left;
     display:flex;
-    align-items:baseline;
+    align-items:flex-start;
     justify-content:space-between;
     gap: 8px;
     border-radius: 11px;
@@ -338,21 +338,58 @@ CSS_PART = r'''  .modal {
     background: var(--btn-bg);
     padding: 7px 9px;
   }
+  .cmdk-main{
+    min-width: 0;
+    display:flex;
+    flex-direction:column;
+    gap: 4px;
+  }
+  .cmdk-top{
+    min-width: 0;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .cmdk-kind{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width: 48px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--btn-bd);
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 760;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .cmdk-kind.kind-command{ color: var(--text); }
+  .cmdk-kind.kind-task{ color: rgba(var(--accent-rgb), 0.98); border-color: rgba(var(--accent-rgb), 0.45); background: rgba(var(--accent-rgb), 0.12); }
+  .cmdk-kind.kind-note{ color: #f3d684; border-color: rgba(243,214,132,0.35); background: rgba(243,214,132,0.10); }
+  .cmdk-kind.kind-timew{ color: #f29ab2; border-color: rgba(242,154,178,0.35); background: rgba(242,154,178,0.10); }
+  .cmdk-kind.kind-day{ color: #8fd6ff; border-color: rgba(143,214,255,0.35); background: rgba(143,214,255,0.10); }
+  .cmdk-kind.kind-queued{ color: #b8f0ba; border-color: rgba(184,240,186,0.35); background: rgba(184,240,186,0.10); }
   .cmdk-item .l{
     min-width: 0;
     font-weight: 740;
     color: var(--text);
+    overflow-wrap:anywhere;
   }
   .cmdk-item .s{
     font-size: 12px;
     color: var(--muted);
-    margin-top: 3px;
+    margin-top: 0;
+    overflow-wrap:anywhere;
   }
   .cmdk-item .k{
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     color: var(--muted);
     font-size: 12px;
     white-space: nowrap;
+    text-align:right;
+    flex: 0 0 auto;
   }
   .cmdk-item.active{
     border-color: rgba(var(--accent-rgb), 0.70);

@@ -1866,6 +1866,391 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_unified_search_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("initial UI", () =>
+    evaluate(`
+      (() => document.readyState === 'complete'
+        && !!document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]')
+        && !!document.getElementById('btnCommand'))()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const doc = (typeof globalThis.__scalpel_exportNotesState === 'function')
+        ? globalThis.__scalpel_exportNotesState()
+        : null;
+      if (!doc) return false;
+      doc.notes = [
+        {
+          id: 'note-search-1',
+          text: 'Weekly review note',
+          bucket_day_key: '2026-01-01',
+          start_min: 720,
+          end_min: 750,
+          repeat_dows: [],
+          pinned: false,
+          archived: false,
+          scenario: '',
+          style: {},
+          created_ms: 1,
+          modified_ms: 1,
+        },
+        {
+          id: 'note-search-timew',
+          text: '[timew] Deep work • #focus',
+          bucket_day_key: '2026-01-01',
+          start_min: 780,
+          end_min: 840,
+          repeat_dows: [],
+          pinned: false,
+          archived: false,
+          scenario: 'timew',
+          style: { color: 'c8' },
+          created_ms: 2,
+          modified_ms: 2,
+        },
+      ];
+      globalThis.__scalpel_importNotesState(doc, { persist: true, render: true });
+      try { setActiveDay(2, true); } catch (_) {}
+      rerenderAll({ mode: 'full', immediate: true });
+      return true;
+    })()
+  `);
+
+  const runSearch = async (query) => {
+    await evaluate(`
+      (() => {
+        const btn = document.getElementById('btnCommand');
+        if (btn) btn.click();
+        const input = document.getElementById('commandQ');
+        if (!input) return false;
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.value = ${JSON.stringify(String(query || ''))};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })()
+    `);
+    await waitFor(`search results for ${query}`, () =>
+      evaluate(`
+        (() => {
+          const modal = document.getElementById('commandModal');
+          const first = document.querySelector('#commandList .cmdk-item');
+          return !!(modal && modal.style.display === 'flex' && first);
+        })()
+      `)
+    );
+  };
+
+  await runSearch("task editor");
+
+  await waitFor("task search row", () =>
+    evaluate(`
+      (() => {
+        const first = document.querySelector('#commandList .cmdk-item');
+        return !!(
+          first &&
+          first.dataset.kind === 'task' &&
+          first.textContent.includes('Editor task')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const first = document.querySelector('#commandList .cmdk-item');
+      if (first) first.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("task modal opened from search", () =>
+    evaluate(`
+      (() => {
+        const modal = document.getElementById('taskEditModal');
+        const title = document.getElementById('taskEditTitle');
+        return !!(
+          modal && modal.style.display === 'flex' &&
+          title && title.textContent.includes('12345678')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const proj = document.querySelector('#taskEditGrid [data-field-key="project"]');
+      if (proj) proj.value = 'ops';
+      const save = document.getElementById('taskEditSave');
+      if (save) save.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("queued modify from task search", () =>
+    evaluate(`
+      (() => {
+        const commands = String((document.getElementById('commands') || {}).textContent || '');
+        return !!(
+          commands.includes('task 12345678 modify') &&
+          commands.includes('project:ops')
+        );
+      })()
+    `)
+  );
+
+  await runSearch("note weekly");
+
+  await waitFor("note search row", () =>
+    evaluate(`
+      (() => {
+        const first = document.querySelector('#commandList .cmdk-item');
+        return !!(
+          first &&
+          first.dataset.kind === 'note' &&
+          first.textContent.includes('Weekly review note')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const first = document.querySelector('#commandList .cmdk-item');
+      if (first) first.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("note modal opened from search", () =>
+    evaluate(`
+      (() => {
+        const modal = document.getElementById('noteModal');
+        const text = document.getElementById('noteText');
+        return !!(
+          modal && modal.style.display === 'flex' &&
+          text && text.value === 'Weekly review note'
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const close = document.getElementById('noteClose');
+      if (close) close.click();
+      return true;
+    })()
+  `);
+
+  await runSearch("timew focus");
+
+  await waitFor("timew search row", () =>
+    evaluate(`
+      (() => {
+        const first = document.querySelector('#commandList .cmdk-item');
+        return !!(
+          first &&
+          first.dataset.kind === 'timew' &&
+          first.textContent.includes('Deep work')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const first = document.querySelector('#commandList .cmdk-item');
+      if (first) first.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("timew note opened from search", () =>
+    evaluate(`
+      (() => {
+        const modal = document.getElementById('noteModal');
+        const text = document.getElementById('noteText');
+        return !!(
+          modal && modal.style.display === 'flex' &&
+          text && text.value.includes('[timew]')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const close = document.getElementById('noteClose');
+      if (close) close.click();
+      return true;
+    })()
+  `);
+
+  await runSearch("queued project:ops");
+
+  await waitFor("queued search row", () =>
+    evaluate(`
+      (() => {
+        const first = document.querySelector('#commandList .cmdk-item');
+        return !!(
+          first &&
+          first.dataset.kind === 'queued' &&
+          first.textContent.includes('task 12345678 modify') &&
+          first.textContent.includes('project:ops')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const first = document.querySelector('#commandList .cmdk-item');
+      if (first) first.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("queued result opened output", () =>
+    evaluate(`
+      (() => {
+        const output = document.querySelector('.rsec[data-rsec="output"]');
+        const summary = String((document.getElementById('selSummary') || {}).textContent || '');
+        return !!(
+          output && output.classList.contains('open') &&
+          summary.includes('1')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      try { setActiveDay(2, true); } catch (_) {}
+      return true;
+    })()
+  `);
+
+  await runSearch("day 2026-01-01");
+
+  await waitFor("day search row", () =>
+    evaluate(`
+      (() => {
+        const first = document.querySelector('#commandList .cmdk-item');
+        return !!(
+          first &&
+          first.dataset.kind === 'day' &&
+          first.textContent.includes('2026-01-01')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const first = document.querySelector('#commandList .cmdk-item');
+      if (first) first.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("day search changed active day", () =>
+    evaluate(`
+      (() => {
+        const hdr = document.querySelector('.day-h[data-day-index="0"]');
+        return !!(hdr && hdr.classList.contains('active-day'));
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 @dataclass
 class _TaskEditorServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
@@ -2113,6 +2498,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_undo_redo_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_unified_search_covers_runtime_entities(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _TaskEditorServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_unified_search_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",

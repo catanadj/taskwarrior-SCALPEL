@@ -64,7 +64,7 @@ MARKUP = r"""<header>
             <button id="btnNauticalPreview" class="small toggle btn-soft" data-ico="NA" role="menuitem" title="Toggle future Nautical instances">Nautical: Off</button>
             <button id="btnClearSel" class="btn-soft" data-ico="CL" data-key="Esc" role="menuitem">Clear selection</button>
             <button id="btnReset" class="danger" data-ico="RS" role="menuitem">Reset view plan</button>
-            <button id="btnCommand" class="small btn-soft" data-ico="KC" data-key="Ctrl/Cmd+K" role="menuitem" title="Quick commands (Ctrl/Cmd+K)">Quick commands</button>
+            <button id="btnCommand" class="small btn-soft" data-ico="KC" data-key="Ctrl/Cmd+K" role="menuitem" title="Search and commands (Ctrl/Cmd+K)">Search</button>
             <button id="btnDensity" class="small toggle btn-soft" data-ico="DN" data-key="Ctrl+Shift+M" role="menuitem" title="Toggle compact density (Ctrl+Shift+M)">Density: Comfort</button>
           </div>
         </div>

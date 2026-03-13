@@ -59,7 +59,7 @@ Important:
 - Live apply flow with preview, per-command selection, and explicit confirmation
 - Live planning warnings for overlaps, out-of-hours tasks, and overbooked days
 - Export/import plan JSON (`scalpel.plan.v1`)
-- Notes panel and quick command palette (`Ctrl/Cmd+K`)
+- Notes panel and unified search / command center (`Ctrl/Cmd+K`) across tasks, notes, days, queued changes, imported intervals, and commands
 - Goal/project/tag color mapping and theme customization
 - Optional AI scheduling modal (works with the plan-result flow)
 

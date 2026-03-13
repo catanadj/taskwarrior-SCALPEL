@@ -12,7 +12,7 @@ MARKUP = r"""<div id="marquee"></div>
     </div>
     <div class="mb">
       <div class="hint">
-        Fast path: <b>Ctrl/Cmd+K</b> opens quick commands. <b>?</b> opens this help.
+        Fast path: <b>Ctrl/Cmd+K</b> opens unified search. <b>?</b> opens this help.
       </div>
 
       <div class="helpgrid">
@@ -32,7 +32,7 @@ MARKUP = r"""<div id="marquee"></div>
         </div>
         <div class="hsec">
           <div class="sh">App controls</div>
-          <div class="hkrow"><span class="hk">Ctrl/Cmd+K</span><span class="hv">Quick commands</span></div>
+          <div class="hkrow"><span class="hk">Ctrl/Cmd+K</span><span class="hv">Unified search + commands</span></div>
           <div class="hkrow"><span class="hk">Ctrl+Shift+N</span><span class="hv">Toggle notes panel</span></div>
           <div class="hkrow"><span class="hk">Ctrl+Shift+M</span><span class="hv">Toggle compact density</span></div>
           <div class="hkrow"><span class="hk">Ctrl+Shift+T</span><span class="hv">Open theme manager</span></div>
@@ -42,7 +42,7 @@ MARKUP = r"""<div id="marquee"></div>
       </div>
     </div>
     <div class="mf">
-      <button class="small btn-primary" id="helpOpenCommands" data-ico="KC">Open quick commands</button>
+      <button class="small btn-primary" id="helpOpenCommands" data-ico="KC">Open search</button>
     </div>
   </div>
 </div>
@@ -51,21 +51,21 @@ MARKUP = r"""<div id="marquee"></div>
   <div class="modal command-modal">
     <div class="mh">
       <div class="cmdk-head">
-        <div class="t">Quick commands</div>
-        <div class="cmdk-legend" aria-label="Common quick command codes">
+        <div class="t">Search + commands</div>
+        <div class="cmdk-legend" aria-label="Unified search categories and command codes">
+          <span class="cmdk-chip"><span class="k">Task</span>Edit / jump</span>
+          <span class="cmdk-chip"><span class="k">Note</span>Open note</span>
+          <span class="cmdk-chip"><span class="k">Day</span>Jump day</span>
           <span class="cmdk-chip"><span class="k">CP</span>Copy</span>
-          <span class="cmdk-chip"><span class="k">DN</span>Density</span>
-          <span class="cmdk-chip"><span class="k">TH</span>Theme</span>
-          <span class="cmdk-chip"><span class="k">HP</span>Help</span>
         </div>
       </div>
       <button class="small btn-soft" id="commandClose">Close</button>
     </div>
     <div class="mb">
-      <input class="search" id="commandQ" placeholder="Type to filter commands..." />
+      <input class="search" id="commandQ" placeholder="Search tasks, notes, days, queued changes, or commands..." />
       <div class="hint">
-        Enter runs highlighted command. Use <b>Up/Down</b> to change selection.
-        With an empty filter, type label codes (for example <b>CP</b>, <b>DN</b>) to jump/run.
+        Enter runs the highlighted result. Use <b>Up/Down</b> to change selection.
+        With an empty filter, type command codes (for example <b>CP</b>, <b>DN</b>) to jump/run commands instantly.
       </div>
       <div id="commandList" class="cmdk-list"></div>
     </div>

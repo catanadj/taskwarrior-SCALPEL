@@ -406,7 +406,7 @@ JS_PART = r'''// Controls / rerender
   })();
   globalThis.__scalpel_setLeftSectionOpen = (name, open) => setLeftSectionOpen(String(name || ""), !!open, true);
 
-  // Help + quick commands (lightweight command palette)
+  // Help + unified search / command center
   const elBtnHelp = document.getElementById("btnHelp");
   const elBtnCommand = document.getElementById("btnCommand");
   const elBtnRefresh = document.getElementById("btnRefresh");
@@ -548,6 +548,7 @@ JS_PART = r'''// Controls / rerender
 
   const quickCommands = [
     {
+      id: "focus-filter",
       label: "Focus filter",
       hint: "Jump cursor to backlog filter input",
       keys: "/",
@@ -555,6 +556,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { elQ.focus(); elQ.select(); } catch (_) {} },
     },
     {
+      id: "add-tasks",
       label: "Add tasks",
       hint: "Open add-tasks modal",
       keys: "A",
@@ -562,6 +564,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { if (typeof openAddModal === "function") openAddModal(); } catch (_) {} },
     },
     {
+      id: "jump-today",
       label: "Jump to today",
       hint: "Set view window start to today",
       keys: "Today",
@@ -569,6 +572,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { if (elVwToday) elVwToday.click(); } catch (_) {} },
     },
     {
+      id: "clear-selection",
       label: "Clear selection",
       hint: "Drop selected tasks",
       keys: "Esc",
@@ -579,6 +583,7 @@ JS_PART = r'''// Controls / rerender
       },
     },
     {
+      id: "copy-commands",
       label: "Copy commands",
       hint: "Copy command output to clipboard",
       keys: "Ctrl/Cmd+C",
@@ -586,6 +591,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { const b = document.getElementById("btnCopy"); if (b) b.click(); } catch (_) {} },
     },
     {
+      id: "toggle-notes",
       label: "Toggle notes",
       hint: "Show or hide notes panel",
       keys: "Ctrl+Shift+N",
@@ -598,6 +604,7 @@ JS_PART = r'''// Controls / rerender
       },
     },
     {
+      id: "toggle-panels",
       label: "Toggle panels",
       hint: "Collapse or expand side panels",
       keys: "Layout",
@@ -605,6 +612,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { const b = document.getElementById("btnTogglePanels"); if (b) b.click(); } catch (_) {} },
     },
     {
+      id: "reset-local-view",
       label: "Reset local view",
       hint: "Clear local plan edits and queued actions",
       keys: "Reset",
@@ -612,6 +620,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { const b = document.getElementById("btnReset"); if (b) b.click(); } catch (_) {} },
     },
     {
+      id: "toggle-density",
       label: "Toggle density",
       hint: "Switch comfort/compact spacing",
       keys: "Ctrl+Shift+M",
@@ -625,6 +634,7 @@ JS_PART = r'''// Controls / rerender
       },
     },
     {
+      id: "theme-manager",
       label: "Theme manager",
       hint: "Open theme manager modal",
       keys: "Ctrl+Shift+T",
@@ -632,6 +642,7 @@ JS_PART = r'''// Controls / rerender
       run: () => { try { if (typeof openThemeModal === "function") openThemeModal(); } catch (_) {} },
     },
     {
+      id: "open-help",
       label: "Open help",
       hint: "Show shortcut reference",
       keys: "?",
@@ -646,17 +657,330 @@ JS_PART = r'''// Controls / rerender
   let quickCodeBuffer = "";
   let quickCodeTimer = null;
 
-  function _quickFilter(){
-    const qRaw = String((elCommandQ && elCommandQ.value) || "").trim().toLowerCase();
-    const q = qRaw.replace(/\s+/g, " ");
+  function _commandSearchNorm(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function _commandItemCodeText(cmd) {
+    const codes = Array.isArray(cmd && cmd.codes) ? cmd.codes.filter(Boolean) : [];
+    return `${String((cmd && cmd.keys) || "").trim()}${codes.length ? ` · ${codes.map(v => String(v).toUpperCase()).join("/")}` : ""}`.trim();
+  }
+
+  function _commandSearchResultChip(kind) {
+    const k = String(kind || "").trim().toLowerCase();
+    if (k === "task") return "Task";
+    if (k === "note") return "Note";
+    if (k === "timew") return "Timew";
+    if (k === "day") return "Day";
+    if (k === "queued") return "Queued";
+    return "Cmd";
+  }
+
+  function _commandSearchResultClass(kind) {
+    return `kind-${String(kind || "command").trim().toLowerCase()}`;
+  }
+
+  function _commandSearchTerms() {
+    const qRaw = String((elCommandQ && elCommandQ.value) || "").trim();
+    const q = _commandSearchNorm(qRaw);
     const terms = q ? q.split(" ").filter(Boolean) : [];
-    quickVisible = [];
-    for (let i = 0; i < quickCommands.length; i++) {
-      const c = quickCommands[i];
-      const codes = Array.isArray(c.codes) ? c.codes : [];
-      const blob = `${c.label} ${c.hint} ${c.keys} ${codes.join(" ")}`.toLowerCase();
-      if (!terms.length || terms.every((term) => blob.includes(term))) quickVisible.push(i);
+    return { qRaw, q, terms };
+  }
+
+  function _commandTodayYmd() {
+    try { return ymdFromMs(Date.now()); } catch (_) { return ""; }
+  }
+
+  function _commandDayLabel(dayMs) {
+    const dt = new Date(Number(dayMs) || 0);
+    const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()] || "Day";
+    return `${wd} ${ymdFromMs(dayMs)}`;
+  }
+
+  function _commandDaySummary(di, ymd, noteCount) {
+    const taskCount = Array.isArray(lastDayVis) && Array.isArray(lastDayVis[di]) ? lastDayVis[di].length : 0;
+    const bits = [];
+    bits.push(`${taskCount} planned`);
+    if (noteCount) bits.push(`${noteCount} note${noteCount === 1 ? "" : "s"}`);
+    if (di === activeDayIndex) bits.push("active");
+    if (ymd === _commandTodayYmd()) bits.push("today");
+    return bits.join(" • ");
+  }
+
+  function _commandTaskTimeLabel(uuid) {
+    try {
+      const eff = effectiveInterval(uuid);
+      if (eff && Number.isFinite(eff.startMs) && Number.isFinite(eff.dueMs)) {
+        return `${ymdFromMs(eff.startMs)} ${_hmFromMin(minuteOfDayFromMs(eff.startMs))}-${_hmFromMin(minuteOfDayFromMs(eff.dueMs))}`;
+      }
+    } catch (_) {}
+    return "backlog";
+  }
+
+  function _commandTaskProjectLabel(task) {
+    const proj = String((task && task.project) || "").trim();
+    return proj ? `project:${proj}` : "no project";
+  }
+
+  function _commandTaskTagsLabel(task) {
+    const tags = Array.isArray(task && task.tags) ? task.tags.map(v => String(v || "").trim()).filter(Boolean) : [];
+    return tags.length ? tags.map(tag => `#${tag}`).join(" ") : "no tags";
+  }
+
+  function _commandNoteSummary(note) {
+    if (!note) return "";
+    const bits = [];
+    if (Array.isArray(note.repeat_dows) && note.repeat_dows.length) {
+      bits.push(`recurring ${fmtRepeatDows(note.repeat_dows)}`);
+      if (note.start_min == null || note.end_min == null) bits.push("all-day");
+      else bits.push(`${_hmFromMin(note.start_min)}-${_hmFromMin(note.end_min)}`);
+    } else if (note.bucket_day_key) {
+      bits.push(String(note.bucket_day_key));
+      if (note.start_min == null || note.end_min == null) bits.push("all-day");
+      else bits.push(`${_hmFromMin(note.start_min)}-${_hmFromMin(note.end_min || note.start_min)}`);
+    } else {
+      bits.push("unplaced");
     }
+    if (note.pinned) bits.push("pinned");
+    if (note.archived) bits.push("archived");
+    return bits.join(" • ");
+  }
+
+  function _commandQueuedTargetUuid(line) {
+    const raw = String(line || "").trim();
+    if (!raw) return null;
+    const m = raw.match(/^task\s+([0-9a-f]{8})\b/i);
+    if (!m) return null;
+    const ident = String(m[1] || "").toLowerCase();
+    for (const task of (DATA.tasks || [])) {
+      const uuid = String((task && task.uuid) || "").trim();
+      if (uuid && uuid.toLowerCase().startsWith(ident)) return uuid;
+    }
+    return null;
+  }
+
+  function _jumpToTaskFromSearch(uuid) {
+    const u = String(uuid || "").trim();
+    if (!u) return;
+    try { setActiveDayFromUuid(u); } catch (_) {}
+    try { setSelectionOnly(u); } catch (_) {}
+    try {
+      const eff = effectiveInterval(u);
+      if (eff && Number.isFinite(eff.startMs)) {
+        const di = dayIndexFromMs(eff.startMs);
+        const minute = minuteOfDayFromMs(eff.startMs);
+        if (di != null && Number.isFinite(minute) && typeof window.__scalpel_jump === "function") {
+          window.__scalpel_jump(di, minute);
+        }
+      }
+    } catch (_) {}
+    try { rerenderAll({ mode: "selection", immediate: true }); } catch (_) {}
+  }
+
+  function _openQueuedSearchResult(entry) {
+    const e = entry || {};
+    const line = String(e.line || "");
+    const targetUuid = _commandQueuedTargetUuid(line);
+    try {
+      if (typeof globalThis.__scalpel_openCommandSection === "function") {
+        globalThis.__scalpel_openCommandSection("output");
+      }
+    } catch (_) {}
+    if (targetUuid) _jumpToTaskFromSearch(targetUuid);
+    try {
+      const card = document.querySelector(".card.commands");
+      if (card && typeof card.scrollIntoView === "function") {
+        card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    } catch (_) {}
+    if (elStatus) {
+      elStatus.textContent = targetUuid
+        ? `Queued change ready for ${String(targetUuid).slice(0, 8)}.`
+        : "Queued change ready in Commands.";
+    }
+  }
+
+  function _buildCommandSearchItems() {
+    return quickCommands.map((cmd, idx) => ({
+      kind: "command",
+      itemId: String(cmd.id || `cmd-${idx}`),
+      commandId: String(cmd.id || `cmd-${idx}`),
+      label: cmd.label,
+      hint: cmd.hint,
+      aux: _commandItemCodeText(cmd),
+      search: _commandSearchNorm(`command ${cmd.label} ${cmd.hint} ${cmd.keys} ${(Array.isArray(cmd.codes) ? cmd.codes.join(" ") : "")}`),
+      codes: Array.isArray(cmd.codes) ? cmd.codes.slice() : [],
+      defaultVisible: true,
+      defaultRank: 2000 - idx,
+      run: cmd.run,
+    }));
+  }
+
+  function _buildDaySearchItems() {
+    const todayYmd = _commandTodayYmd();
+    const notes = (typeof listNotesSorted === "function") ? listNotesSorted() : [];
+    const noteCounts = new Map();
+    for (const note of notes) {
+      const ymd = String((note && note.bucket_day_key) || "").trim();
+      if (!ymd) continue;
+      noteCounts.set(ymd, (noteCounts.get(ymd) || 0) + 1);
+    }
+    const out = [];
+    for (let i = 0; i < DAYS; i++) {
+      const dayMs = Array.isArray(dayStarts) && Number.isFinite(dayStarts[i]) ? dayStarts[i] : (VIEW_START_MS + i * 86400000);
+      const ymd = ymdFromMs(dayMs);
+      const label = _commandDayLabel(dayMs);
+      const aliases = [];
+      if (ymd === todayYmd) aliases.push("today");
+      if (i === activeDayIndex) aliases.push("active");
+      const noteCount = Number(noteCounts.get(ymd) || 0);
+      out.push({
+        kind: "day",
+        itemId: `day:${i}:${ymd}`,
+        label,
+        hint: _commandDaySummary(i, ymd, noteCount),
+        aux: `#${i + 1}`,
+        search: _commandSearchNorm(`day ${label} ${ymd} ${aliases.join(" ")} ${_commandDaySummary(i, ymd, noteCount)}`),
+        defaultVisible: (i === activeDayIndex) || i < Math.min(3, DAYS),
+        defaultRank: 1200 - i,
+        boost: (i === activeDayIndex) ? 12 : 0,
+        run: () => {
+          try { setActiveDay(i, true); } catch (_) {}
+          try { if (typeof window.__scalpel_jump === "function") window.__scalpel_jump(i, WORK_START); } catch (_) {}
+          try { rerenderAll({ mode: "selection", immediate: true }); } catch (_) {}
+        },
+      });
+    }
+    return out;
+  }
+
+  function _buildTaskSearchItems() {
+    const out = [];
+    for (const task of (DATA.tasks || [])) {
+      if (!task || !task.uuid || task.nautical_preview) continue;
+      const ident = String(task.uuid || "").slice(0, 8);
+      const proj = _commandTaskProjectLabel(task);
+      const tags = _commandTaskTagsLabel(task);
+      const status = String(task.status || "pending");
+      const timeLabel = _commandTaskTimeLabel(task.uuid);
+      const localLabel = task.local ? "local draft" : "task";
+      out.push({
+        kind: "task",
+        itemId: `task:${task.uuid}`,
+        label: String(task.description || ident || "Task"),
+        hint: `${localLabel} ${ident} • ${proj} • ${timeLabel}`,
+        aux: tags,
+        search: _commandSearchNorm(`task ${localLabel} ${ident} ${task.uuid} ${task.description || ""} ${proj} ${tags} ${status} ${timeLabel}`),
+        boost: task.local ? 2 : 0,
+        run: async () => {
+          _jumpToTaskFromSearch(task.uuid);
+          try { await __openTaskEditModal(task.uuid); } catch (_) {}
+        },
+      });
+    }
+    return out;
+  }
+
+  function _buildNoteSearchItems() {
+    const out = [];
+    const notes = (typeof listNotesSorted === "function") ? listNotesSorted() : [];
+    for (const note of notes) {
+      if (!note) continue;
+      const isTimew = !!(typeof _isTimewNote === "function" && _isTimewNote(note));
+      const summary = _commandNoteSummary(note);
+      out.push({
+        kind: isTimew ? "timew" : "note",
+        itemId: `${isTimew ? "timew" : "note"}:${String(note.id || "")}`,
+        label: String(note.text || "(empty note)"),
+        hint: summary || (isTimew ? "imported interval" : "note"),
+        aux: isTimew ? "imported interval" : "notes",
+        search: _commandSearchNorm(`${isTimew ? "timew imported interval" : "note"} ${note.text || ""} ${summary} ${note.bucket_day_key || ""}`),
+        run: () => {
+          try { setNotesVisible(true, true); } catch (_) {}
+          try {
+            if (note.bucket_day_key) {
+              const di = dayIndexFromYmd(note.bucket_day_key);
+              if (di != null) {
+                setActiveDay(di, true);
+                if (typeof window.__scalpel_jump === "function") {
+                  const minute = Number.isFinite(note.start_min) ? note.start_min : WORK_START;
+                  window.__scalpel_jump(di, minute);
+                }
+              }
+            }
+          } catch (_) {}
+          try { openNoteEditor(note.id); } catch (_) {}
+        },
+      });
+    }
+    return out;
+  }
+
+  function _buildQueuedSearchItems() {
+    const out = [];
+    const entries = (typeof buildApplyCommandEntries === "function") ? buildApplyCommandEntries() : [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i] || {};
+      const kind = String(entry.kind || "queued");
+      const line = String(entry.line || "").trim();
+      if (!line) continue;
+      const targetUuid = _commandQueuedTargetUuid(line);
+      out.push({
+        kind: "queued",
+        itemId: `queued:${i}`,
+        label: line,
+        hint: `queued ${kind} #${i + 1}${targetUuid ? ` • ${String(targetUuid).slice(0, 8)}` : ""}`,
+        aux: kind,
+        search: _commandSearchNorm(`queued change ${kind} command ${line} ${targetUuid || ""}`),
+        run: () => _openQueuedSearchResult(entry),
+      });
+    }
+    return out;
+  }
+
+  function _scoreCommandSearchItem(item, q, terms) {
+    if (!item) return -1;
+    const label = _commandSearchNorm(item.label);
+    const hint = _commandSearchNorm(item.hint);
+    const aux = _commandSearchNorm(item.aux);
+    const search = _commandSearchNorm(item.search || `${item.label} ${item.hint} ${item.aux}`);
+    if (!terms.length) return item.defaultVisible ? (Number(item.defaultRank) || 0) : -1;
+    if (!terms.every((term) => search.includes(term))) return -1;
+    let score = 0;
+    if (label === q) score += 180;
+    else if (label.startsWith(q)) score += 130;
+    else if (search.startsWith(q)) score += 95;
+    else if (search.includes(q)) score += 72;
+    for (const term of terms) {
+      if (label.includes(term)) score += 12;
+      else if (hint.includes(term)) score += 7;
+      else if (aux.includes(term)) score += 5;
+    }
+    return score + (Number(item.boost) || 0);
+  }
+
+  function _buildUnifiedSearchItems() {
+    return []
+      .concat(_buildCommandSearchItems())
+      .concat(_buildTaskSearchItems())
+      .concat(_buildNoteSearchItems())
+      .concat(_buildDaySearchItems())
+      .concat(_buildQueuedSearchItems());
+  }
+
+  function _quickFilter(){
+    const { q, terms } = _commandSearchTerms();
+    const scored = [];
+    for (const item of _buildUnifiedSearchItems()) {
+      const score = _scoreCommandSearchItem(item, q, terms);
+      if (score < 0) continue;
+      scored.push({ item, score });
+    }
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.item.label || "").localeCompare(String(b.item.label || ""));
+    });
+    quickVisible = scored.slice(0, 60).map(x => x.item);
     if (!quickVisible.length) quickActive = -1;
     else quickActive = clamp(quickActive, 0, quickVisible.length - 1);
   }
@@ -668,21 +992,27 @@ JS_PART = r'''// Controls / rerender
     if (!quickVisible.length) {
       const empty = document.createElement("div");
       empty.className = "cmdk-empty";
-      empty.textContent = "No matching commands.";
+      empty.textContent = "No matching search results.";
       elCommandList.appendChild(empty);
       return;
     }
 
     for (let i = 0; i < quickVisible.length; i++) {
-      const cmd = quickCommands[quickVisible[i]];
+      const item = quickVisible[i];
       const row = document.createElement("button");
       row.type = "button";
       row.className = "cmdk-item";
       if (i === quickActive) row.classList.add("active");
       row.dataset.visIndex = String(i);
-      const codes = Array.isArray(cmd.codes) ? cmd.codes.filter(Boolean) : [];
-      const keyText = `${cmd.keys}${codes.length ? ` · ${codes.map(v => String(v).toUpperCase()).join("/")}` : ""}`;
-      row.innerHTML = `<div class="l">${escapeHtml(cmd.label)}<div class="s">${escapeHtml(cmd.hint)}</div></div><div class="k">${escapeHtml(keyText)}</div>`;
+      row.dataset.kind = String((item && item.kind) || "command");
+      row.dataset.itemId = String((item && item.itemId) || `result-${i}`);
+      row.innerHTML =
+        `<div class="cmdk-main">`
+        + `<div class="cmdk-top"><span class="cmdk-kind ${escapeAttr(_commandSearchResultClass(item.kind))}">${escapeHtml(_commandSearchResultChip(item.kind))}</span>`
+        + `<span class="l">${escapeHtml(item.label)}</span></div>`
+        + `<div class="s">${escapeHtml(String(item.hint || ""))}</div>`
+        + `</div>`
+        + `<div class="k">${escapeHtml(String(item.aux || ""))}</div>`;
       row.addEventListener("click", () => runQuickCommand(i));
       elCommandList.appendChild(row);
     }
@@ -708,10 +1038,9 @@ JS_PART = r'''// Controls / rerender
     const p = String(prefix || "").trim().toUpperCase();
     if (!p) return [];
     const out = [];
-    for (let i = 0; i < quickCommands.length; i++) {
-      const cmd = quickCommands[i];
+    for (const cmd of quickCommands) {
       const codes = Array.isArray(cmd.codes) ? cmd.codes : [];
-      if (codes.some((c) => String(c || "").toUpperCase().startsWith(p))) out.push(i);
+      if (codes.some((c) => String(c || "").toUpperCase().startsWith(p))) out.push(String(cmd.id || ""));
     }
     return out;
   }
@@ -719,16 +1048,16 @@ JS_PART = r'''// Controls / rerender
     const p = String(code || "").trim().toUpperCase();
     if (!p) return [];
     const out = [];
-    for (let i = 0; i < quickCommands.length; i++) {
-      const cmd = quickCommands[i];
+    for (const cmd of quickCommands) {
       const codes = Array.isArray(cmd.codes) ? cmd.codes : [];
-      if (codes.some((c) => String(c || "").toUpperCase() === p)) out.push(i);
+      if (codes.some((c) => String(c || "").toUpperCase() === p)) out.push(String(cmd.id || ""));
     }
     return out;
   }
-  function _quickFocusByCommandIndex(cmdIndex){
-    if (!Number.isInteger(cmdIndex) || cmdIndex < 0) return;
-    const visIndex = quickVisible.indexOf(cmdIndex);
+  function _quickFocusByCommandId(commandId){
+    const id = String(commandId || "").trim();
+    if (!id) return;
+    const visIndex = quickVisible.findIndex(item => String((item && item.commandId) || "") === id);
     if (visIndex < 0) return;
     quickActive = visIndex;
     _quickRender();
@@ -740,10 +1069,13 @@ JS_PART = r'''// Controls / rerender
 
   function runQuickCommand(visIndex){
     if (!Number.isInteger(visIndex) || visIndex < 0 || visIndex >= quickVisible.length) return;
-    const cmd = quickCommands[quickVisible[visIndex]];
-    if (!cmd || typeof cmd.run !== "function") return;
+    const item = quickVisible[visIndex];
+    if (!item || typeof item.run !== "function") return;
     closeCommandModal();
-    try { cmd.run(); } catch (_) {}
+    try {
+      const out = item.run();
+      if (out && typeof out.then === "function") out.catch(() => {});
+    } catch (_) {}
   }
 
   function openCommandModal(seed){
@@ -847,10 +1179,10 @@ JS_PART = r'''// Controls / rerender
               ev.preventDefault();
               quickCodeBuffer = next;
               _quickCodeArmTimer();
-              _quickFocusByCommandIndex(matches[0]);
+              _quickFocusByCommandId(matches[0]);
               const exact = _quickCodeExacts(quickCodeBuffer);
               if (exact.length === 1) {
-                const visIndex = quickVisible.indexOf(exact[0]);
+                const visIndex = quickVisible.findIndex(item => String((item && item.commandId) || "") === exact[0]);
                 _quickCodeReset();
                 if (visIndex >= 0) runQuickCommand(visIndex);
               } else {
@@ -872,7 +1204,7 @@ JS_PART = r'''// Controls / rerender
               return;
             }
             _quickCodeArmTimer();
-            _quickFocusByCommandIndex(matches[0]);
+            _quickFocusByCommandId(matches[0]);
             showToast(`Code: ${quickCodeBuffer}`, { durationMs: 800 });
             return;
           }

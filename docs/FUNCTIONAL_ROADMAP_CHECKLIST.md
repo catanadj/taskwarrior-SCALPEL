@@ -18,7 +18,7 @@ Last updated: 2026-03-11
 
 - [ ] Add scenario/branch planning for alternate versions of the same plan.
 - [ ] Add recurring planning templates for repeated blocks and task structures.
-- [ ] Add a unified search/command center across tasks, notes, days, queued changes, and imported intervals.
+- [x] Add a unified search/command center across tasks, notes, days, queued changes, and imported intervals.
 
 ## Batch 4: Operational Polish
 
@@ -36,7 +36,7 @@ Last updated: 2026-03-11
 - [ ] 6. Dependencies/blockers
 - [ ] 7. Scenario planning
 - [ ] 8. Recurring templates
-- [ ] 9. Unified search
+- [x] 9. Unified search
 - [ ] 10. Execution/focus mode
 - [ ] 11. Bulk edit
 - [ ] 12. ICS interoperability
