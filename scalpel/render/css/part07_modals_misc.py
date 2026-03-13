@@ -692,6 +692,93 @@ CSS_PART = r'''  .modal {
   color: rgba(154,166,178,0.98);
 }
 
+.execbox{
+  border: 1px solid rgba(154,166,178,0.25);
+  border-radius: 14px;
+  padding: 8px 10px;
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.06), rgba(255,255,255,0.01)),
+    rgba(255,255,255,0.03);
+  margin-bottom: 10px;
+}
+.exh{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+.exh small{
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(154,166,178,0.98);
+  border: 1px solid rgba(154,166,178,0.22);
+  background: rgba(255,255,255,0.03);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.exb{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.exec-main{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.exec-main .title{
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.exec-main .sub{
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(154,166,178,0.98);
+}
+.exec-badges{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.exec-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(154,166,178,0.24);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.exec-badge.live{
+  border-color: rgba(var(--accent-rgb), 0.44);
+  background: rgba(var(--accent-rgb), 0.13);
+  color: var(--text);
+}
+.exec-badge.warn{
+  border-color: rgba(var(--warn-rgb), 0.42);
+  background: rgba(var(--warn-rgb), 0.12);
+  color: rgba(var(--warn-rgb), 0.98);
+}
+.exec-ops{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.exec-ops .small{
+  padding: 5px 10px;
+}
+
 /* Note + Theme modals */
 .notegrid, .notegrid2{
   display:grid;

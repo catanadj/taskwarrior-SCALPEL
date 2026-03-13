@@ -51,6 +51,17 @@
     for (const u of selected) __selectedVisualUuids.add(u);
   }
 
+  function syncExecutionVisuals() {
+    try {
+      for (const [uuid, evNode] of __eventNodeByUuid.entries()) {
+        if (evNode) evNode.classList.toggle("execution-active-task", __isExecutionActiveTask(uuid));
+      }
+      for (const [uuid, rowNode] of __backlogRowByUuid.entries()) {
+        if (rowNode) rowNode.classList.toggle("execution-active-task", __isExecutionActiveTask(uuid));
+      }
+    } catch (_) {}
+  }
+
   function __isNauticalPreviewSelected(uuid) {
     return __nauticalSelectedPreviewUuids.has(String(uuid || ""));
   }
@@ -138,6 +149,18 @@
   function __taskIdentifierForCommand(task) {
     if (!task) return "";
     return String((task.uuid || "").slice(0, 8));
+  }
+
+  function __isExecutionActiveTask(uuid) {
+    try {
+      return !!(
+        uuid &&
+        typeof globalThis.__scalpel_getExecutionSession === "function" &&
+        ((globalThis.__scalpel_getExecutionSession() || {}).uuid === String(uuid))
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   function __taskFieldValue(value) {
@@ -1104,6 +1127,7 @@
       + (qk ? (` queued-${qk}`) : "")
       + (isPreview ? " nautical-preview" : "")
       + (previewPicked ? " nautical-picked" : "")
+      + (__isExecutionActiveTask(uuid) ? " execution-active-task" : "")
       + (isDimmedTask(t) ? " dimmed" : "");
     row.dataset.hintKind = hintKind;
     row.dataset.uuid = uuid;
@@ -1524,6 +1548,7 @@
       + (qk ? (` queued-${qk}`) : "")
       + (isPreview ? " nautical-preview" : "")
       + (previewPicked ? " nautical-picked" : "")
+      + (__isExecutionActiveTask(ev.uuid) ? " execution-active-task" : "")
       + (isDimmedTask(t) ? " dimmed" : "");
     if (warnKinds && warnKinds.has("overlap")) cls += " warn-overlap";
 

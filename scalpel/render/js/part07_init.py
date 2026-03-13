@@ -23,6 +23,7 @@ JS_PART = r'''// Controls / rerender
     renderDayBalance(activeDayIndex, dayVis);
     renderCommands();
     updateSelectionMeta();
+    try { renderExecutionSession(); } catch (_) {}
     try { updatePendingMeta(); } catch (_) {}
     try { if (typeof renderNotesPanel === "function") renderNotesPanel(); } catch (e) { /* ignore */ }
     // keep now line fresh
@@ -32,7 +33,9 @@ JS_PART = r'''// Controls / rerender
 
   function rerenderSelectionOnly() {
     try { if (typeof syncSelectionVisuals === "function") syncSelectionVisuals(); } catch (_) {}
+    try { if (typeof syncExecutionVisuals === "function") syncExecutionVisuals(); } catch (_) {}
     updateSelectionMeta();
+    try { renderExecutionSession(); } catch (_) {}
     try { updatePendingMeta(); } catch (_) {}
     try { if (lastDayVis) renderDayBalance(activeDayIndex, lastDayVis); } catch (_) {}
   }
@@ -179,7 +182,7 @@ JS_PART = r'''// Controls / rerender
 
   // Commands panel sections (accordion)
   const CMD_SECTIONS_KEY = `${viewKey}:cmdSections`;
-  const CMD_SECTION_DEFAULTS = { actions: false, arrange: false, ai: false, output: false };
+  const CMD_SECTION_DEFAULTS = { actions: false, arrange: false, execution: false, ai: false, output: false };
   const CMD_SECTION_ANIM_MS = 170;
   let cmdSectionState = loadJson(CMD_SECTIONS_KEY, CMD_SECTION_DEFAULTS);
   if (!cmdSectionState || typeof cmdSectionState !== "object") cmdSectionState = { ...CMD_SECTION_DEFAULTS };
@@ -589,6 +592,30 @@ JS_PART = r'''// Controls / rerender
       keys: "Ctrl/Cmd+C",
       codes: ["CP"],
       run: () => { try { const b = document.getElementById("btnCopy"); if (b) b.click(); } catch (_) {} },
+    },
+    {
+      id: "start-focus-selected",
+      label: "Start selected focus session",
+      hint: "Start execution mode for the lead selected task",
+      keys: "Focus",
+      codes: ["FS"],
+      run: () => { try { if (typeof startExecutionSessionFromSelection === "function") startExecutionSessionFromSelection(); } catch (_) {} },
+    },
+    {
+      id: "start-focus-next",
+      label: "Start next-up focus session",
+      hint: "Start execution mode from the Next up task",
+      keys: "Next up",
+      codes: ["FN"],
+      run: () => { try { if (typeof startExecutionSessionFromNextUp === "function") startExecutionSessionFromNextUp(); } catch (_) {} },
+    },
+    {
+      id: "stop-focus-session",
+      label: "Stop focus session",
+      hint: "Clear the active execution session",
+      keys: "Stop",
+      codes: ["SX"],
+      run: () => { try { if (typeof stopExecutionSession === "function") stopExecutionSession(); } catch (_) {} },
     },
     {
       id: "toggle-notes",
@@ -1514,6 +1541,229 @@ JS_PART = r'''// Controls / rerender
   function hasLocalPaletteEdits(){
     try { return !!(colorMap && Object.keys(colorMap).length); } catch (_) { return false; }
   }
+
+  const EXEC_SESSION_KEY = "scalpel.execution.session";
+  const elExecBox = document.getElementById("execBox");
+  const elExecMeta = document.getElementById("execMeta");
+  const elExecBody = document.getElementById("execBody");
+  const elExecHint = document.getElementById("execHint");
+  const elBtnExecStartSel = document.getElementById("btnExecStartSel");
+  const elBtnExecStartNext = document.getElementById("btnExecStartNext");
+  const elBtnExecJump = document.getElementById("btnExecJump");
+  const elBtnExecTimew = document.getElementById("btnExecTimew");
+  const elBtnExecStop = document.getElementById("btnExecStop");
+
+  function loadExecutionSession(){
+    const raw = loadJson(EXEC_SESSION_KEY, null);
+    if (!raw || typeof raw !== "object") return null;
+    const uuid = String(raw.uuid || "").trim();
+    const startedMs = Number(raw.started_ms);
+    const dayYmd = String(raw.day_ymd || "").trim();
+    if (!uuid || !Number.isFinite(startedMs) || startedMs <= 0) return null;
+    return {
+      uuid,
+      started_ms: startedMs,
+      day_ymd: /^\d{4}-\d{2}-\d{2}$/.test(dayYmd) ? dayYmd : "",
+    };
+  }
+  let executionSession = loadExecutionSession();
+
+  function saveExecutionSession(){
+    try {
+      if (!executionSession) {
+        if (typeof globalThis.__scalpel_storeDel === "function") globalThis.__scalpel_storeDel(EXEC_SESSION_KEY);
+        return;
+      }
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") globalThis.__scalpel_storeSetJSON(EXEC_SESSION_KEY, executionSession);
+    } catch (_) {}
+  }
+
+  function getExecutionSession(){
+    return executionSession ? { ...executionSession } : null;
+  }
+  globalThis.__scalpel_getExecutionSession = getExecutionSession;
+
+  function executionSessionTask(){
+    const sess = executionSession;
+    if (!sess || !sess.uuid) return null;
+    return tasksByUuid.get(sess.uuid) || null;
+  }
+
+  function executionSessionEffective(){
+    const sess = executionSession;
+    if (!sess || !sess.uuid) return null;
+    try { return effectiveInterval(sess.uuid); } catch (_) { return null; }
+  }
+
+  function executionSessionDayYmd(){
+    const sess = executionSession;
+    if (!sess) return "";
+    if (sess.day_ymd) return sess.day_ymd;
+    const eff = executionSessionEffective();
+    if (eff && Number.isFinite(eff.startMs)) return ymdFromMs(eff.startMs);
+    return "";
+  }
+
+  function executionSessionTargetUuidFromSelection(){
+    if (selectionLead && tasksByUuid.has(selectionLead)) {
+      const lead = tasksByUuid.get(selectionLead);
+      if (lead && !lead.nautical_preview) return selectionLead;
+    }
+    for (const uuid of selected) {
+      const t = tasksByUuid.get(uuid);
+      if (t && !t.nautical_preview) return uuid;
+    }
+    return "";
+  }
+
+  function executionNextUpUuid(){
+    try {
+      const cand = chooseNextUpCandidate(Date.now());
+      return cand && cand.uuid ? String(cand.uuid) : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function startExecutionSession(uuid, sourceLabel){
+    const u = String(uuid || "").trim();
+    if (!u) {
+      if (elStatus) elStatus.textContent = "Pick a task first to start execution mode.";
+      return false;
+    }
+    const t = tasksByUuid.get(u);
+    if (!t || t.nautical_preview) {
+      if (elStatus) elStatus.textContent = "Execution mode requires a real task in the current view.";
+      return false;
+    }
+    const eff = (() => { try { return effectiveInterval(u); } catch (_) { return null; } })();
+    const dayYmd = (eff && Number.isFinite(eff.startMs)) ? ymdFromMs(eff.startMs) : (Number.isInteger(activeDayIndex) ? ymdFromMs(dayStarts[activeDayIndex]) : ymdFromMs(Date.now()));
+    executionSession = {
+      uuid: u,
+      started_ms: Date.now(),
+      day_ymd: dayYmd,
+    };
+    saveExecutionSession();
+    try { setSelectionOnly(u); } catch (_) {}
+    try { setActiveDayFromUuid(u); } catch (_) {}
+    try { if (typeof globalThis.__scalpel_openCommandSection === "function") globalThis.__scalpel_openCommandSection("execution"); } catch (_) {}
+    rerenderAll({ mode: "selection", immediate: true });
+    if (elStatus) {
+      const desc = String((t && t.description) || u.slice(0, 8));
+      elStatus.textContent = `Started focus session from ${String(sourceLabel || "task")}: ${desc}.`;
+    }
+    return true;
+  }
+
+  function startExecutionSessionFromSelection(){
+    return startExecutionSession(executionSessionTargetUuidFromSelection(), "selection");
+  }
+
+  function startExecutionSessionFromNextUp(){
+    return startExecutionSession(executionNextUpUuid(), "Next up");
+  }
+
+  function stopExecutionSession(){
+    if (!executionSession) {
+      if (elStatus) elStatus.textContent = "No active focus session.";
+      return false;
+    }
+    const prev = executionSessionTask();
+    executionSession = null;
+    saveExecutionSession();
+    rerenderAll({ mode: "selection", immediate: true });
+    if (elStatus) {
+      elStatus.textContent = prev
+        ? `Stopped focus session for ${String(prev.description || "").trim() || String((prev.uuid || "")).slice(0, 8)}.`
+        : "Stopped focus session.";
+    }
+    return true;
+  }
+
+  function jumpToExecutionSession(){
+    const t = executionSessionTask();
+    if (!t || !t.uuid) {
+      if (elStatus) elStatus.textContent = "Active focus task is not available in this view.";
+      return false;
+    }
+    try { setSelectionOnly(t.uuid); } catch (_) {}
+    try { setActiveDayFromUuid(t.uuid); } catch (_) {}
+    try { focusTask(t.uuid); } catch (_) {}
+    rerenderAll({ mode: "selection", immediate: true });
+    return true;
+  }
+
+  function importExecutionSessionTimew(){
+    const dayYmd = executionSessionDayYmd() || (Number.isInteger(activeDayIndex) && activeDayIndex >= 0 && activeDayIndex < DAYS ? ymdFromMs(dayStarts[activeDayIndex]) : "");
+    if (!dayYmd) {
+      if (elStatus) elStatus.textContent = "No execution day available for Timewarrior import.";
+      return false;
+    }
+    const di = (typeof __visibleDayIndexFromYmd === "function") ? __visibleDayIndexFromYmd(dayYmd) : null;
+    try { if (typeof __showTimewIntervalsForYmd === "function") __showTimewIntervalsForYmd(dayYmd, di); } catch (_) {}
+    return true;
+  }
+
+  function renderExecutionSession(){
+    if (!elExecBody || !elExecMeta || !elExecHint) return;
+    const sess = executionSession;
+    const task = executionSessionTask();
+    const eff = executionSessionEffective();
+    const active = !!(sess && task && task.uuid);
+    document.body.classList.toggle("execution-mode-active", active);
+
+    if (!active) {
+      elExecMeta.textContent = "Idle";
+      elExecBody.innerHTML = `<div class="hint">Start a focus session from the current selection or Next up.</div>`;
+      elExecHint.textContent = "Execution mode keeps one active task in focus and lets you pull Timewarrior intervals for its day.";
+      return;
+    }
+
+    const nowMs = Date.now();
+    const elapsedMin = Math.max(0, Math.round((nowMs - Number(sess.started_ms || nowMs)) / 60000));
+    const startLabel = elapsedMin <= 0 ? "Started just now" : `Started ${fmtDuration(elapsedMin)} ago`;
+    const whenLine = (eff && Number.isFinite(eff.startMs) && Number.isFinite(eff.dueMs))
+      ? `${ymdFromMs(eff.startMs)} • ${_hmFromMin(minuteOfDayFromMs(eff.startMs))}-${_hmFromMin(minuteOfDayFromMs(eff.dueMs))}`
+      : "No planned interval in view";
+    const remainingMin = (eff && Number.isFinite(eff.dueMs)) ? Math.round((eff.dueMs - nowMs) / 60000) : null;
+    const remainLabel = (remainingMin == null)
+      ? "No remaining estimate"
+      : (remainingMin >= 0 ? `${fmtDuration(remainingMin)} left` : `${fmtDuration(Math.abs(remainingMin))} overdue`);
+    const dayYmd = executionSessionDayYmd();
+    const notes = (typeof listNotesSorted === "function") ? listNotesSorted() : [];
+    let timewCount = 0;
+    for (const note of notes) {
+      if (!note) continue;
+      if (String(note.bucket_day_key || "") !== dayYmd) continue;
+      if (typeof _isTimewNote === "function" && _isTimewNote(note)) timewCount += 1;
+    }
+
+    elExecMeta.textContent = remainingMin != null && remainingMin < 0 ? "Overtime" : "Live";
+    elExecBody.innerHTML = `
+      <div class="exec-main">
+        <div class="nutxt">
+          <div class="title">${escapeHtml(String(task.description || "(missing task)"))}</div>
+          <div class="sub">${escapeHtml(String((task.uuid || "")).slice(0, 8))} • ${escapeHtml(whenLine)}</div>
+        </div>
+      </div>
+      <div class="exec-badges">
+        <span class="exec-badge live">${escapeHtml(startLabel)}</span>
+        <span class="exec-badge ${remainingMin != null && remainingMin < 0 ? "warn" : ""}">${escapeHtml(remainLabel)}</span>
+        <span class="exec-badge">${escapeHtml(dayYmd || "today")}</span>
+        <span class="exec-badge">${timewCount} timew note${timewCount === 1 ? "" : "s"}</span>
+      </div>
+    `;
+    elExecHint.textContent = timewCount
+      ? `Timewarrior notes already loaded for ${dayYmd}.`
+      : `Import Timewarrior intervals for ${dayYmd || "the session day"} to compare plan vs execution.`;
+  }
+
+  globalThis.__scalpel_startExecutionSession = startExecutionSession;
+  globalThis.__scalpel_startExecutionSessionFromSelection = startExecutionSessionFromSelection;
+  globalThis.__scalpel_startExecutionSessionFromNextUp = startExecutionSessionFromNextUp;
+  globalThis.__scalpel_jumpToExecutionSession = jumpToExecutionSession;
+  globalThis.__scalpel_importExecutionSessionTimew = importExecutionSessionTimew;
+  globalThis.__scalpel_stopExecutionSession = stopExecutionSession;
   const HISTORY_LIMIT = 48;
   let undoStack = [];
   let redoStack = [];
@@ -1711,6 +1961,13 @@ JS_PART = r'''// Controls / rerender
 
     el.classList.remove("ready", "focus");
 
+    if (executionSessionTask()) {
+      const task = executionSessionTask();
+      const dayYmd = executionSessionDayYmd();
+      el.classList.add("focus");
+      el.textContent = `Focus session active: ${String((task && task.description) || "").trim() || String((task && task.uuid) || "").slice(0, 8)} • ${dayYmd || "session day"} • import Timewarrior or jump back in.`;
+      return;
+    }
     if (total > 0) {
       el.classList.add("ready");
       el.textContent = `Ready: ${total} command${total === 1 ? "" : "s"} pending. Apply live, copy commands, or export plan.`;
@@ -1743,6 +2000,11 @@ JS_PART = r'''// Controls / rerender
     const nEdits = countPlanOverrides();
     const nQueued = countPendingActions() + countLocalAdds();
     const nActiveDay = countActiveDayScheduled();
+    const execTask = executionSessionTask();
+    const execDay = executionSessionDayYmd();
+    const canHttp = /^https?:$/i.test(String(location.protocol || ""));
+    const canStartSelection = !!executionSessionTargetUuidFromSelection();
+    const canStartNext = !!executionNextUpUuid();
 
     _setDisabledState(_actionBtn("actDone"), nAny < 1, "Select at least one task.", "Queue complete for selected tasks.");
     _setDisabledState(_actionBtn("actDelete"), nAny < 1, "Select at least one task.", "Queue delete for selected tasks.");
@@ -1760,6 +2022,11 @@ JS_PART = r'''// Controls / rerender
       !/^https?:$/i.test(String(location.protocol || "")) ? "Direct apply requires live mode." : "No commands to apply.",
       "Apply selected command output in live mode."
     );
+    _setDisabledState(_actionBtn("btnExecStartSel"), !canStartSelection, "Select a task first.", "Start execution mode from the lead selected task.");
+    _setDisabledState(_actionBtn("btnExecStartNext"), !canStartNext, "No scheduled Next up task in view.", "Start execution mode from Next up.");
+    _setDisabledState(_actionBtn("btnExecJump"), !execTask, "No active focus session.", "Jump to the active execution task.");
+    _setDisabledState(_actionBtn("btnExecTimew"), !canHttp || !execDay, !canHttp ? "Timewarrior import requires live mode." : "No active session day available.", "Import Timewarrior intervals for the session day.");
+    _setDisabledState(_actionBtn("btnExecStop"), !execTask, "No active focus session.", "Stop the active execution session.");
     updateCommandGuide();
     updateHistoryButtonStates();
   }
@@ -1890,6 +2157,32 @@ JS_PART = r'''// Controls / rerender
     rerenderAll({ mode: "selection", immediate: true });
   });
 
+  if (elBtnExecStartSel) {
+    elBtnExecStartSel.addEventListener("click", () => {
+      if (!startExecutionSessionFromSelection() && elStatus) elStatus.textContent = "Select a task first to start execution mode.";
+    });
+  }
+  if (elBtnExecStartNext) {
+    elBtnExecStartNext.addEventListener("click", () => {
+      if (!startExecutionSessionFromNextUp() && elStatus) elStatus.textContent = "No scheduled Next up task is available.";
+    });
+  }
+  if (elBtnExecJump) {
+    elBtnExecJump.addEventListener("click", () => {
+      if (!jumpToExecutionSession() && elStatus) elStatus.textContent = "Active focus task is not available in this view.";
+    });
+  }
+  if (elBtnExecTimew) {
+    elBtnExecTimew.addEventListener("click", () => {
+      if (!importExecutionSessionTimew() && elStatus) elStatus.textContent = "No execution day available for Timewarrior import.";
+    });
+  }
+  if (elBtnExecStop) {
+    elBtnExecStop.addEventListener("click", () => {
+      if (!stopExecutionSession() && elStatus) elStatus.textContent = "No active focus session.";
+    });
+  }
+
   const btnUndo = document.getElementById("btnUndo");
   if (btnUndo) {
     btnUndo.addEventListener("click", () => {
@@ -1929,10 +2222,14 @@ JS_PART = r'''// Controls / rerender
   setInterval(() => {
     try { renderNowLine(); } catch (_) {}
     try { renderNextUp(); } catch (e) { console.error("NextUp render failed", e); }
+    try { renderExecutionSession(); } catch (_) {}
   }, 60000);
 
   // Initial render
   rerenderAll({ mode: "full", immediate: true });
+  if (executionSessionTask()) {
+    try { if (typeof globalThis.__scalpel_openCommandSection === "function") globalThis.__scalpel_openCommandSection("execution"); } catch (_) {}
+  }
 
 })();
 '''

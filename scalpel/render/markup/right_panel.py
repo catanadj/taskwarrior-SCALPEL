@@ -76,6 +76,31 @@ MARKUP = r"""<section class="card commands">
         </div>
       </div>
 
+      <div class="rsec" data-rsec="execution">
+        <button class="rsec-h" type="button" data-rsec-toggle="execution" aria-expanded="false" aria-controls="rsecExecutionBody">
+          <span class="rsec-t">Execution</span>
+          <span class="rsec-s">Current session and Timewarrior</span>
+          <span class="rsec-chev" aria-hidden="true">▸</span>
+        </button>
+        <div class="rsec-b" id="rsecExecutionBody" hidden>
+          <div class="execbox" id="execBox">
+            <div class="exh">
+              <div>Focus session</div>
+              <small id="execMeta"></small>
+            </div>
+            <div class="exb" id="execBody"><div class="hint">Start a focus session from the current selection or Next up.</div></div>
+          </div>
+          <div class="ops">
+            <button class="small btn-primary" id="btnExecStartSel" data-ico="FS" onclick="window.__scalpel_startExecutionSessionFromSelection && window.__scalpel_startExecutionSessionFromSelection()">Start selected</button>
+            <button class="small btn-soft" id="btnExecStartNext" data-ico="FN" onclick="window.__scalpel_startExecutionSessionFromNextUp && window.__scalpel_startExecutionSessionFromNextUp()">Start next up</button>
+            <button class="small btn-soft" id="btnExecJump" data-ico="JP" onclick="window.__scalpel_jumpToExecutionSession && window.__scalpel_jumpToExecutionSession()">Jump to active</button>
+            <button class="small btn-soft" id="btnExecTimew" data-ico="TW" onclick="window.__scalpel_importExecutionSessionTimew && window.__scalpel_importExecutionSessionTimew()">Import Timewarrior</button>
+            <button class="small danger" id="btnExecStop" data-ico="ST" onclick="window.__scalpel_stopExecutionSession && window.__scalpel_stopExecutionSession()">Stop session</button>
+          </div>
+          <div class="hint" id="execHint">Execution mode keeps one active task in focus and lets you pull Timewarrior intervals for its day.</div>
+        </div>
+      </div>
+
       <div class="rsec" data-rsec="ai">
         <button class="rsec-h" type="button" data-rsec-toggle="ai" aria-expanded="false" aria-controls="rsecAiBody">
           <span class="rsec-t">AI and Plan</span>

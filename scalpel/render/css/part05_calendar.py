@@ -196,6 +196,9 @@ CSS_PART = r'''  .cal-wrap {
   .day-col.weekend.active-day{
     background-color: rgba(var(--accent-rgb), 0.10);
   }
+  body.execution-mode-active .day-col:not(.active-day){
+    background-color: rgba(255,255,255,0.008);
+  }
 
   .day-col .drop-hint {
     position: absolute;
@@ -1113,6 +1116,27 @@ CSS_PART = r'''  .cal-wrap {
   .conf-item.issue-out-hours .top .range,
   .conf-item.issue-overload .top .range {
     color: rgba(var(--warn-rgb), 0.98);
+  }
+
+  .evt.execution-active-task{
+    box-shadow:
+      0 0 0 2px rgba(var(--accent-rgb), 0.62),
+      0 16px 26px rgba(0,0,0,0.24);
+    filter: saturate(1.08) brightness(1.04);
+    z-index: 3;
+  }
+  .item.execution-active-task{
+    border-color: rgba(var(--accent-rgb), 0.48);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.18) inset;
+    background:
+      linear-gradient(180deg, rgba(var(--accent-rgb), 0.10), rgba(255,255,255,0.02)),
+      var(--surface-pop);
+  }
+  body.execution-mode-active .evt:not(.execution-active-task):not(.selected){
+    opacity: 0.78;
+  }
+  body.execution-mode-active .item:not(.execution-active-task):not(.selected){
+    opacity: 0.84;
   }
 
   /* Add tasks modal */

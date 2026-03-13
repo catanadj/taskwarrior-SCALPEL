@@ -2251,6 +2251,235 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_execution_focus_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+
+  await waitFor("task event", () =>
+    evaluate(`
+      (() => document.readyState === 'complete'
+        && !!document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]')
+        && !!document.getElementById('btnExecStartSel'))()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const evt = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+      if (evt) evt.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("task selected for execution", () =>
+    evaluate(`
+      (() => {
+        const evt = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+        const sel = String((document.getElementById('selMeta') || {}).textContent || '');
+        return !!(evt && evt.classList.contains('selected') && sel.includes('1'));
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const sec = document.querySelector('.rsec[data-rsec="execution"] [data-rsec-toggle="execution"]');
+      if (sec) sec.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("execution section open", () =>
+    evaluate(`
+      (() => {
+        const sec = document.querySelector('.rsec[data-rsec="execution"]');
+        const btn = document.getElementById('btnExecStartSel');
+        return !!(sec && sec.classList.contains('open') && btn && !btn.disabled);
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnExecStartSel');
+      if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("execution session started", () =>
+    evaluate(`
+      (() => {
+        const body = String((document.getElementById('execBody') || {}).textContent || '');
+        const evt = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+        const sess = (typeof globalThis.__scalpel_getExecutionSession === 'function')
+          ? globalThis.__scalpel_getExecutionSession()
+          : null;
+        return !!(
+          sess && sess.uuid === '12345678-1111-2222-3333-abcdefabcdef' &&
+          document.body.classList.contains('execution-mode-active') &&
+          body.includes('Editor task') &&
+          body.includes('2026-01-01') &&
+          evt && evt.classList.contains('execution-active-task')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`(() => { location.reload(); return true; })()`);
+
+  await waitFor("execution session persisted after reload", () =>
+    evaluate(`
+      (() => {
+        const body = String((document.getElementById('execBody') || {}).textContent || '');
+        const evt = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+        const sec = document.querySelector('.rsec[data-rsec="execution"]');
+        return !!(
+          document.readyState === 'complete' &&
+          document.body.classList.contains('execution-mode-active') &&
+          body.includes('Editor task') &&
+          evt && evt.classList.contains('execution-active-task') &&
+          sec && sec.classList.contains('open')
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnExecTimew');
+      if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("execution mode imported timew", () =>
+    evaluate(`
+      (() => {
+        const status = String((document.getElementById('status') || {}).textContent || '');
+        const doc = (typeof globalThis.__scalpel_exportNotesState === 'function')
+          ? globalThis.__scalpel_exportNotesState()
+          : null;
+        const notes = doc && Array.isArray(doc.notes) ? doc.notes : [];
+        return !!(
+          status.includes('Timewarrior notes updated for 2026-01-01') &&
+          notes.some(n => n && n.scenario === 'timew' && String(n.text || '').includes('Deep work'))
+        );
+      })()
+    `)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnExecStop');
+      if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()
+  `);
+
+  await waitFor("execution session stopped", () =>
+    evaluate(`
+      (() => {
+        const meta = String((document.getElementById('execMeta') || {}).textContent || '');
+        const body = String((document.getElementById('execBody') || {}).textContent || '');
+        const evt = document.querySelector('.evt[data-uuid="12345678-1111-2222-3333-abcdefabcdef"]');
+        const sess = (typeof globalThis.__scalpel_getExecutionSession === 'function')
+          ? globalThis.__scalpel_getExecutionSession()
+          : null;
+        return !!(
+          !sess &&
+          !document.body.classList.contains('execution-mode-active') &&
+          meta.includes('Idle') &&
+          body.includes('Start a focus session') &&
+          evt && !evt.classList.contains('execution-active-task')
+        );
+      })()
+    `)
+  );
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 @dataclass
 class _TaskEditorServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
@@ -2516,6 +2745,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_unified_search_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_execution_focus_mode_persists_and_imports_timew(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _TaskEditorServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_execution_focus_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",

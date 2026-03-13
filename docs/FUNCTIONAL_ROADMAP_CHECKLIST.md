@@ -22,7 +22,7 @@ Last updated: 2026-03-11
 
 ## Batch 4: Operational Polish
 
-- [ ] Add an execution/focus mode tied to the current session and Timewarrior-oriented workflow.
+- [x] Add an execution/focus mode tied to the current session and Timewarrior-oriented workflow.
 - [ ] Add bulk-edit workflows for multi-select changes across common task fields and UDAs.
 - [ ] Add calendar interoperability, starting with ICS import/export.
 
@@ -37,6 +37,6 @@ Last updated: 2026-03-11
 - [ ] 7. Scenario planning
 - [ ] 8. Recurring templates
 - [x] 9. Unified search
-- [ ] 10. Execution/focus mode
+- [x] 10. Execution/focus mode
 - [ ] 11. Bulk edit
 - [ ] 12. ICS interoperability
