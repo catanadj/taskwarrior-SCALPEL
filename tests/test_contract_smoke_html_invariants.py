@@ -38,6 +38,8 @@ class TestSmokeHtmlInvariantsContract(unittest.TestCase):
             self.assertIn("<!doctype html>", html.lower())
             self.assertIn("<title>SCALPEL</title>", html)
             self.assertIn('meta charset="utf-8"', html.lower())
+            self.assertIn('rel="icon"', html)
+            self.assertIn('type="image/svg+xml"', html)
 
             # No template markers
             for marker in ("__DATA_JSON__", "__CSS_BLOCK__", "__JS_BLOCK__", "__BODY_MARKUP__"):

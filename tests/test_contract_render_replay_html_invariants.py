@@ -48,6 +48,8 @@ class TestRenderReplayHtmlInvariantsContract(unittest.TestCase):
         self.assertTrue(html.lstrip().lower().startswith("<!doctype html>"), "Missing <!doctype html>.")
         self.assertIn("<html", html.lower())
         self.assertIn("</html>", html.lower())
+        self.assertIn('rel="icon"', html)
+        self.assertIn('type="image/svg+xml"', html)
 
         # Template placeholders must never leak.
         for ph in ("__CSS_BLOCK__", "__JS_BLOCK__", "__BODY_MARKUP__", "__DATA_JSON__"):
