@@ -61,34 +61,21 @@ def _load_nautical_core(*, enabled: bool) -> Any | None:
     if not enabled:
         return None
 
-    try:
-        return importlib.import_module("nautical_core")
-    except Exception:
-        pass
+    candidates: list[tuple[str, Path]] = []
+    for base in (Path.home() / ".task", Path.home() / ".task" / "hooks"):
+        candidates.append(("package", base / "nautical_core" / "__init__.py"))
+        candidates.append(("module", base / "nautical_core.py"))
 
-    candidates = [Path.home() / ".task", Path.home() / ".task" / "hooks"]
-    for base in candidates:
-        pyfile = base / "nautical_core.py"
-        if pyfile.is_file():
-            eprint(f"[scalpel] INFO: loading nautical_core from {pyfile}")
-            try:
-                spec = importlib.util.spec_from_file_location("nautical_core", str(pyfile))
-                if spec and spec.loader:
-                    mod = importlib.util.module_from_spec(spec)
-                    sys.modules["nautical_core"] = mod
-                    spec.loader.exec_module(mod)
-                    return mod
-            except Exception as ex:
-                sys.modules.pop("nautical_core", None)
-                eprint(f"[scalpel] WARN: failed loading nautical_core from {pyfile}: {ex}")
-        pkg = base / "nautical_core" / "__init__.py"
-        if pkg.is_file():
-            eprint(f"[scalpel] INFO: loading nautical_core package from {pkg.parent}")
+    for kind, path in candidates:
+        if not path.is_file():
+            continue
+        if kind == "package":
+            eprint(f"[scalpel] INFO: loading nautical_core package from {path.parent}")
             try:
                 spec = importlib.util.spec_from_file_location(
                     "nautical_core",
-                    str(pkg),
-                    submodule_search_locations=[str(pkg.parent)],
+                    str(path),
+                    submodule_search_locations=[str(path.parent)],
                 )
                 if spec and spec.loader:
                     mod = importlib.util.module_from_spec(spec)
@@ -97,7 +84,24 @@ def _load_nautical_core(*, enabled: bool) -> Any | None:
                     return mod
             except Exception as ex:
                 sys.modules.pop("nautical_core", None)
-                eprint(f"[scalpel] WARN: failed loading nautical_core package from {pkg.parent}: {ex}")
+                eprint(f"[scalpel] WARN: failed loading nautical_core package from {path.parent}: {ex}")
+            continue
+        eprint(f"[scalpel] INFO: loading nautical_core from {path}")
+        try:
+            spec = importlib.util.spec_from_file_location("nautical_core", str(path))
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                sys.modules["nautical_core"] = mod
+                spec.loader.exec_module(mod)
+                return mod
+        except Exception as ex:
+            sys.modules.pop("nautical_core", None)
+            eprint(f"[scalpel] WARN: failed loading nautical_core from {path}: {ex}")
+
+    try:
+        return importlib.import_module("nautical_core")
+    except Exception:
+        pass
     return None
 
 

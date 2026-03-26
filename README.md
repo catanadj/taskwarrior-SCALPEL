@@ -332,7 +332,7 @@ Nautical preview task expansion is enabled by default.
 - Disable per run: `scalpel --no-nautical-hooks`
 - Control default via env: `SCALPEL_ENABLE_NAUTICAL_HOOKS=0|1`
 
-When enabled, SCALPEL attempts to load `nautical_core` (including from `~/.task` / `~/.task/hooks` if present) and generate anchor/CP preview tasks.
+When enabled, SCALPEL first checks for a `nautical_core` package in `~/.task/nautical_core/` and `~/.task/hooks/nautical_core/`, then falls back to legacy single-file artefacts and normal Python imports before generating anchor/CP preview tasks.
 
 </details>
 
