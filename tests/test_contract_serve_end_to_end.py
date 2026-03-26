@@ -159,6 +159,8 @@ class TestServeEndToEndContract(unittest.TestCase):
                     self.assertIn("Set-Cookie", str(resp.headers))
                     self.assertIn("__scalpel_kvGet", html)
                     self.assertIn("/client-state", html)
+                    self.assertIn("navigator.sendBeacon", html)
+                    self.assertIn("pagehide", html)
 
                 with _request_json(opener, harness.base_url + "/payload") as resp:
                     payload = json.loads(resp.read().decode("utf-8"))
