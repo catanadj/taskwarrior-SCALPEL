@@ -23,7 +23,9 @@ class TestPublicApiLockContract(unittest.TestCase):
 
         for name in api.__all__:
             self.assertTrue(hasattr(scalpel, name), f"scalpel package does not re-export: {name}")
-            self.assertIs(getattr(scalpel, name), getattr(api, name), f"scalpel.{name} must be same object as scalpel.api.{name}")
+            self.assertIs(
+                getattr(scalpel, name), getattr(api, name), f"scalpel.{name} must be same object as scalpel.api.{name}"
+            )
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ This module compiles a v2 JSON object into an AiPlanResult.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from .interface import AiPlanResult, PlanOverride
 

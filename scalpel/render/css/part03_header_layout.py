@@ -1,7 +1,7 @@
 # scalpel/render/css/part03_header_layout.py
 from __future__ import annotations
 
-CSS_PART = r'''  header {
+CSS_PART = r"""  header {
     position: sticky;
     top: 0;
     z-index: 80;
@@ -382,4 +382,4 @@ CSS_PART = r'''  header {
       gap: 10px;
     }
   }
-'''
+"""

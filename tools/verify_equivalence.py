@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 import re
@@ -9,8 +10,6 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Dict, List, Tuple
-
-import datetime as dt
 
 DAY_MS = 86400000
 MIN_MS = 60000
@@ -85,12 +84,12 @@ def canonicalize_payload(p: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-
 def payload_fingerprint(p: Dict[str, Any]) -> Tuple[int, int, List[str]]:
     cfg = p.get("cfg") if isinstance(p.get("cfg"), dict) else {}
     tasks = p.get("tasks") if isinstance(p.get("tasks"), list) else []
     keys = sorted(list(cfg.keys())) if isinstance(cfg, dict) else []
     return (len(tasks), len(keys), keys)
+
 
 def fail(msg: str) -> None:
     raise ValueError(msg)
@@ -108,21 +107,32 @@ def require_keys(name: str, d: Dict[str, Any], keys: List[str]) -> None:
 
 
 def check_cfg_invariants(cfg: Dict[str, Any]) -> None:
-    require_keys("cfg", cfg, [
+    require_keys(
+        "cfg",
+        cfg,
+        [
+            "days",
+            "work_start_min",
+            "work_end_min",
+            "snap_min",
+            "default_duration_min",
+            "max_infer_duration_min",
+            "px_per_min",
+            "view_start_ms",
+            "view_key",
+        ],
+    )
+
+    # Type checks
+    for k in [
         "days",
         "work_start_min",
         "work_end_min",
         "snap_min",
         "default_duration_min",
         "max_infer_duration_min",
-        "px_per_min",
         "view_start_ms",
-        "view_key",
-    ])
-
-    # Type checks
-    for k in ["days", "work_start_min", "work_end_min", "snap_min",
-              "default_duration_min", "max_infer_duration_min", "view_start_ms"]:
+    ]:
         if not isinstance(cfg.get(k), int):
             fail(f"cfg.{k}: expected int, got {type(cfg.get(k)).__name__}")
 
@@ -150,8 +160,16 @@ def check_cfg_invariants(cfg: Dict[str, Any]) -> None:
 def check_task_invariants(tasks: List[Dict[str, Any]]) -> None:
     # Required keys used by UI
     required = [
-        "uuid", "id", "description", "project", "tags",
-        "priority", "urgency", "scheduled_ms", "due_ms", "duration"
+        "uuid",
+        "id",
+        "description",
+        "project",
+        "tags",
+        "priority",
+        "urgency",
+        "scheduled_ms",
+        "due_ms",
+        "duration",
     ]
     seen = set()
     for i, t in enumerate(tasks):
@@ -235,8 +253,6 @@ def check_task_invariants(tasks: List[Dict[str, Any]]) -> None:
                     fail(f"{name}: end_calc_ms != due_ms (expected due-dominant end)")
 
 
-
-
 def check_goals_invariants(goals: Any) -> None:
     # goals may be None if missing file
     if goals is None:
@@ -285,7 +301,7 @@ def check_payload_invariants(payload: Dict[str, Any]) -> None:
     require_type("payload.tasks", tasks, list)
 
     check_cfg_invariants(cfg)
-    check_cfg_time_sanity(cfg)          # <-- add
+    check_cfg_time_sanity(cfg)  # <-- add
     check_task_invariants(tasks)
     check_task_time_sanity(tasks, cfg)  # <-- add
     check_goals_invariants(goals)
@@ -321,10 +337,7 @@ def check_cfg_time_sanity(cfg: Dict[str, Any]) -> None:
 
     # Allow up to 2 minutes drift (extra safety)
     if not (dloc.hour == 0 and dloc.minute in (0, 1) and dloc.second == 0):
-        fail(
-            "cfg.view_start_ms: expected near local midnight; "
-            f"got local time {dloc.strftime('%Y-%m-%d %H:%M:%S %z')}"
-        )
+        fail(f"cfg.view_start_ms: expected near local midnight; got local time {dloc.strftime('%Y-%m-%d %H:%M:%S %z')}")
 
 
 def check_task_time_sanity(tasks: List[Dict[str, Any]], cfg: Dict[str, Any]) -> None:
@@ -358,14 +371,13 @@ def check_task_time_sanity(tasks: List[Dict[str, Any]], cfg: Dict[str, Any]) -> 
         # both missing is fine (backlog)
 
 
-
 def stable_json(p: Dict[str, Any]) -> str:
     return json.dumps(p, ensure_ascii=False, sort_keys=True, indent=2)
 
 
 def first_diff(a: Any, b: Any, path: str = "") -> str | None:
     # Minimal “where did it diverge?” helper
-    if type(a) != type(b):
+    if type(a) is not type(b):
         return f"{path}: type differs: {type(a).__name__} vs {type(b).__name__}"
     if isinstance(a, dict):
         ak = set(a.keys())
@@ -382,7 +394,7 @@ def first_diff(a: Any, b: Any, path: str = "") -> str | None:
     if isinstance(a, list):
         if len(a) != len(b):
             return f"{path}: list length differs: {len(a)} vs {len(b)}"
-        for i, (x, y) in enumerate(zip(a, b)):
+        for i, (x, y) in enumerate(zip(a, b, strict=True)):
             d = first_diff(x, y, f"{path}[{i}]")
             if d:
                 return d
@@ -397,8 +409,12 @@ def main() -> None:
         description="Generate split + monolith HTML, extract embedded payload JSON, canonicalize, and compare."
     )
     ap.add_argument("--new", required=True, help="Path to the NEW (split) generator script, e.g. scalpel_run.py")
-    ap.add_argument("--old", required=True, help="Path to the OLD (monolith) generator script, e.g. scalpel_monolith.py")
-    ap.add_argument("--args", default="", help="Args passed to both scripts (string, e.g. \"--days 7 --filter status:pending\")")
+    ap.add_argument(
+        "--old", required=True, help="Path to the OLD (monolith) generator script, e.g. scalpel_monolith.py"
+    )
+    ap.add_argument(
+        "--args", default="", help='Args passed to both scripts (string, e.g. "--days 7 --filter status:pending")'
+    )
     ap.add_argument("--keep", action="store_true", help="Keep generated HTML files (prints their paths).")
     ap.add_argument("--python", default=sys.executable, help="Python executable to use (default: current).")
     ns = ap.parse_args()
@@ -428,7 +444,6 @@ def main() -> None:
             check_payload_invariants(p_old)
         except Exception as ex:
             raise SystemExit(f"OLD payload invariant failure: {ex}")
-
 
         fp_new = payload_fingerprint(p_new)
         fp_old = payload_fingerprint(p_old)

@@ -47,8 +47,7 @@ class TestQueryPerfBudgetContract(unittest.TestCase):
         self.assertLessEqual(
             elapsed_ms,
             budget_ms,
-            f"Query perf budget exceeded: {elapsed_ms:.2f} ms > {budget_ms:.2f} ms "
-            f"(loops={loops}, n_tasks=20000)",
+            f"Query perf budget exceeded: {elapsed_ms:.2f} ms > {budget_ms:.2f} ms (loops={loops}, n_tasks=20000)",
         )
 
 

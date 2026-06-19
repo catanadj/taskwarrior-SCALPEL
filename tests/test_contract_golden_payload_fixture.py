@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = REPO_ROOT / 'tests/fixtures/golden_payload_v1.json'
+FIXTURE = REPO_ROOT / "tests/fixtures/golden_payload_v1.json"
+
 
 class TestGoldenPayloadFixtureContract(unittest.TestCase):
     def test_fixture_exists(self) -> None:
@@ -47,6 +48,7 @@ class TestGoldenPayloadFixtureContract(unittest.TestCase):
             subprocess.run(cmd_r, cwd=str(REPO_ROOT), env=env, check=True)
             txt = out_html.read_text(encoding="utf-8")
             self.assertIn("SMOKE: Planned task", txt)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

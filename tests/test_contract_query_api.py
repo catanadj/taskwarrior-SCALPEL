@@ -8,14 +8,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class TestQueryApiContract(unittest.TestCase):
     def test_query_helpers_work_on_golden_payload(self) -> None:
-        from scalpel.api import load_payload_from_json
         from scalpel.api import (
             iter_tasks,
+            load_payload_from_json,
             task_by_uuid,
-            tasks_by_status,
-            tasks_by_project,
-            tasks_by_tag,
             tasks_by_day,
+            tasks_by_project,
+            tasks_by_status,
+            tasks_by_tag,
         )
 
         fixture = REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json"

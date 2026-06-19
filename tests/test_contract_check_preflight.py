@@ -40,9 +40,7 @@ class TestCheckPreflightContract(unittest.TestCase):
             return 0
 
         with patch.object(check, "_call", side_effect=fake_call):
-            rc = check.main(
-                ["--out", out, "--skip-validate", "--skip-doctor", "--skip-smoke"]
-            )
+            rc = check.main(["--out", out, "--skip-validate", "--skip-doctor", "--skip-smoke"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
@@ -100,4 +98,3 @@ class TestWrapperContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

@@ -13,8 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from scalpel.interval import infer_interval_ms
-from scalpel.util.tz import normalize_tz_name, midnight_epoch_ms, resolve_tz
-
+from scalpel.util.tz import midnight_epoch_ms, normalize_tz_name, resolve_tz
 
 MIN_MS = 60_000
 

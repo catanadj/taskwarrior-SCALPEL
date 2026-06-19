@@ -6,7 +6,6 @@ import os
 from typing import Any, cast
 
 from scalpel.model import CalendarConfig, Payload, Task
-
 from scalpel.util.tz import (
     day_key_from_ms,
     is_midnight_ms,
@@ -159,7 +158,7 @@ def build_indices_v1(tasks: list[Task]) -> dict[str, Any]:
         if pr:
             by_project.setdefault(str(pr), []).append(i)
 
-        for tag in (t.get("tags") or []):
+        for tag in t.get("tags") or []:
             by_tag.setdefault(str(tag), []).append(i)
 
         dk = t.get("day_key")

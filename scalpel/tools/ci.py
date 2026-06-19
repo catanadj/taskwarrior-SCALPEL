@@ -157,7 +157,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             msg = "[scalpel-ci] WARN: ruff not found; skipping lint"
             if require_tooling:
-                print("[scalpel-ci] FAIL: ruff is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
+                print(
+                    "[scalpel-ci] FAIL: ruff is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'"
+                )
                 return 2
             issues.append(ToolIssue("warning", "ruff not found; skipping lint"))
             print(msg)
@@ -167,7 +169,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             steps.append(("mypy strict allowlist", [sys.executable, "-m", "mypy", "--config-file", "pyproject.toml"]))
         else:
             if require_tooling:
-                print("[scalpel-ci] FAIL: mypy is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'")
+                print(
+                    "[scalpel-ci] FAIL: mypy is required in CI/strict mode. Install dev deps: pip install -e '.[dev]'"
+                )
                 return 2
             issues.append(ToolIssue("warning", "mypy not found; skipping typecheck"))
             print("[scalpel-ci] WARN: mypy not found; skipping typecheck")

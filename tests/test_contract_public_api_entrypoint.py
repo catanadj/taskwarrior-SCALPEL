@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 class TestPublicApiEntrypointContract(unittest.TestCase):
     def test_import_and_load_golden_payload(self) -> None:
         import scalpel
-        from scalpel import normalize_payload, load_payload_from_json
+        from scalpel import load_payload_from_json, normalize_payload
 
         fixture = REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json"
         self.assertTrue(fixture.exists(), f"missing fixture: {fixture}")

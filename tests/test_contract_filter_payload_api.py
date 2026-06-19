@@ -1,4 +1,3 @@
-import json
 import unittest
 from pathlib import Path
 
@@ -7,8 +6,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class TestFilterPayloadApiContract(unittest.TestCase):
     def test_filter_payload_filters_and_remaps_indices(self) -> None:
-        from scalpel.api import filter_payload
-        from scalpel.api import load_payload_from_json  # existing public helper
+        from scalpel.api import (
+            filter_payload,
+            load_payload_from_json,  # existing public helper
+        )
 
         payload = load_payload_from_json(REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json")
         tasks = payload.get("tasks") or []
@@ -50,24 +51,21 @@ class TestFilterPayloadApiContract(unittest.TestCase):
             self.assertEqual(out.get("meta"), payload.get("meta"))
 
     def test_filter_payload_empty_query_is_noop(self) -> None:
-        from scalpel.api import filter_payload
-        from scalpel.api import load_payload_from_json
+        from scalpel.api import filter_payload, load_payload_from_json
 
         payload = load_payload_from_json(REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json")
         out = filter_payload(payload, "")
         self.assertEqual(len(out.get("tasks") or []), len(payload.get("tasks") or []))
 
     def test_filter_payload_none_query_is_noop(self) -> None:
-        from scalpel.api import filter_payload
-        from scalpel.api import load_payload_from_json
+        from scalpel.api import filter_payload, load_payload_from_json
 
         payload = load_payload_from_json(REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json")
         out = filter_payload(payload, None)
         self.assertEqual(len(out.get("tasks") or []), len(payload.get("tasks") or []))
 
     def test_filter_payload_keep_meta_false_drops_meta(self) -> None:
-        from scalpel.api import filter_payload
-        from scalpel.api import load_payload_from_json
+        from scalpel.api import filter_payload, load_payload_from_json
 
         payload = load_payload_from_json(REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json")
         self.assertIn("meta", payload)

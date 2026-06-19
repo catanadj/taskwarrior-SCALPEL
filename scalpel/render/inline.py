@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+
 from .template import HTML_TEMPLATE
 
 try:

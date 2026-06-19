@@ -28,4 +28,3 @@ def pick_target_schema(payload: Dict[str, Any], requested: Optional[int]) -> int
         raise ValueError(f"--schema {req} unsupported (latest={LATEST_SCHEMA_VERSION})")
 
     return max(cur_i, req)
-

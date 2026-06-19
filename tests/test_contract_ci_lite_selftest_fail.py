@@ -4,7 +4,6 @@ import subprocess
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CI_LITE = REPO_ROOT / "scripts" / "scalpel_ci_lite.sh"
 LOG_DIR = REPO_ROOT / "build" / "ci-lite"
@@ -25,7 +24,9 @@ class TestCILiteSelftestFailContract(unittest.TestCase):
         ]
         p = subprocess.run(cmd, cwd=str(REPO_ROOT), text=True, capture_output=True)
 
-        self.assertEqual(p.returncode, 99, f"Expected exit 99, got {p.returncode}\nSTDERR:\n{p.stderr}\nSTDOUT:\n{p.stdout}")
+        self.assertEqual(
+            p.returncode, 99, f"Expected exit 99, got {p.returncode}\nSTDERR:\n{p.stderr}\nSTDOUT:\n{p.stdout}"
+        )
 
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         self.assertIn("FAILED step: clean", combined)
@@ -42,4 +43,3 @@ class TestCILiteSelftestFailContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

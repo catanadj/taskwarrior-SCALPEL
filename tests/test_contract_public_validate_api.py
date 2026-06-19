@@ -1,21 +1,22 @@
+import datetime as dt
 import json
 import os
 import subprocess
 import unittest
-import datetime as dt
 from pathlib import Path
 from unittest.mock import patch
 
 from scalpel.payload import build_payload
 from scalpel.schema_v1 import apply_schema_v1
-from scalpel.validate import assert_valid_payload
-from scalpel.validate import validate_payload
+from scalpel.validate import assert_valid_payload, validate_payload
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "payload_v1_min.json"
 
+
 def _py() -> str:
     return os.environ.get("PYTHON", "python3")
+
 
 class TestPublicValidateApiContract(unittest.TestCase):
     def test_library_and_tool_agree_on_fixture(self) -> None:
@@ -71,8 +72,9 @@ class TestPublicValidateApiContract(unittest.TestCase):
         assert_valid_payload(payload)
 
     def test_build_payload_output_validates(self) -> None:
-        with patch("scalpel.payload.run_task_export", return_value=[]), patch(
-            "scalpel.payload._load_nautical_core", return_value=None
+        with (
+            patch("scalpel.payload.run_task_export", return_value=[]),
+            patch("scalpel.payload._load_nautical_core", return_value=None),
         ):
             payload = build_payload(
                 filter_str="status:pending",
@@ -90,6 +92,7 @@ class TestPublicValidateApiContract(unittest.TestCase):
             )
         self.assertEqual(validate_payload(payload), [])
         assert_valid_payload(payload)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

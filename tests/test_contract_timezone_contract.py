@@ -59,7 +59,7 @@ class TestTimezoneContract(unittest.TestCase):
             ],
         }
 
-        code = r'''
+        code = r"""
 import json, os, time
 from scalpel.schema import upgrade_payload
 p = json.loads(os.environ["PAYLOAD_JSON"])
@@ -74,7 +74,7 @@ res = {
   "by_day_keys": sorted((out.get("indices") or {}).get("by_day", {}).keys()),
 }
 print(json.dumps(res, sort_keys=True))
-'''
+"""
 
         env_base = {"PAYLOAD_JSON": json.dumps(payload)}
 

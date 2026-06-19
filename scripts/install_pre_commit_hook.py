@@ -7,8 +7,7 @@ import stat
 from datetime import datetime
 from pathlib import Path
 
-
-HOOK_BODY = '''#!/usr/bin/env bash
+HOOK_BODY = """#!/usr/bin/env bash
 set -euo pipefail
 
 # SCALPEL pre-commit gate (contracts)
@@ -46,7 +45,7 @@ fi
 PY="${PYTHON:-python3}"
 echo "[pre-commit] scalpel contracts: python -m unittest discover -s tests -p 'test_contract_*.py'"
 "$PY" -m unittest discover -s tests -p "test_contract_*.py"
-'''
+"""
 
 
 def _git_root() -> Path | None:

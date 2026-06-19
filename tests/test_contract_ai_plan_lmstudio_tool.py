@@ -1,11 +1,10 @@
 import json
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
 from unittest import mock
 
 from scalpel.tools import ai_plan_lmstudio
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "planner_core_fixture.json"
@@ -46,9 +45,7 @@ class TestAiPlanLmStudioToolContract(unittest.TestCase):
                 "notes": [],
                 "model_id": "stub",
             }
-            fake_resp = _FakeResponse(
-                {"choices": [{"message": {"content": json.dumps(plan_obj)}}]}
-            )
+            fake_resp = _FakeResponse({"choices": [{"message": {"content": json.dumps(plan_obj)}}]})
 
             with mock.patch("scalpel.tools.ai_plan_lmstudio.request.urlopen", return_value=fake_resp):
                 rc = ai_plan_lmstudio.main(

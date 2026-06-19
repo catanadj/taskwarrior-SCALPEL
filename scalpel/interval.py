@@ -9,12 +9,12 @@ MIN_MS = 60_000
 
 @dataclass(frozen=True)
 class IntervalComputed:
-    start_ms: int          # computed scheduled (for placement/commands)
-    end_ms: int            # due
-    duration_min: int      # effective duration used
+    start_ms: int  # computed scheduled (for placement/commands)
+    end_ms: int  # due
+    duration_min: int  # effective duration used
 
-    duration_src: str      # "duration_min" | "infer_due_minus_scheduled" | "default"
-    placement_src: str     # "due_minus_duration" (for now)
+    duration_src: str  # "duration_min" | "infer_due_minus_scheduled" | "default"
+    placement_src: str  # "due_minus_duration" (for now)
 
     ok: bool = True
     warning: Optional[str] = None
@@ -99,4 +99,3 @@ def infer_interval_ms(
         ok=ok,
         warning=warn,
     )
-

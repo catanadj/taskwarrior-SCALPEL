@@ -16,9 +16,11 @@ if str(REPO_ROOT) not in sys.path:
 
 from scalpel.bench import make_large_payload_v1
 
+
 def _die(msg: str, rc: int = 2) -> int:
     print(f"[scalpel-fixtures] ERROR: {msg}", file=sys.stderr)
     return rc
+
 
 def _read_json(p: Path) -> Dict[str, Any]:
     obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
@@ -26,8 +28,11 @@ def _read_json(p: Path) -> Dict[str, Any]:
         raise ValueError(f"payload must be dict; got {type(obj).__name__}")
     return obj
 
+
 def main(argv: List[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="scalpel-fixtures-generate-large", description="Generate deterministic large schema v1 payload fixture.")
+    ap = argparse.ArgumentParser(
+        prog="scalpel-fixtures-generate-large", description="Generate deterministic large schema v1 payload fixture."
+    )
     ap.add_argument("--base", default="tests/fixtures/golden_payload_v1.json", help="Base fixture JSON path")
     ap.add_argument("--out", default="tests/fixtures/golden_payload_large_v1.json", help="Output fixture JSON path")
     ap.add_argument("--n", type=int, default=1000, help="Number of tasks to generate")
@@ -49,6 +54,7 @@ def main(argv: List[str] | None = None) -> int:
     outp.write_text(json.dumps(out_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"[scalpel-fixtures] OK: wrote: {outp} (n={ns.n}, seed={ns.seed})")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

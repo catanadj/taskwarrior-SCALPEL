@@ -27,8 +27,11 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
+  "bandit>=1.7",
+  "coverage[toml]>=7.6",
   "ruff>=0.6",
   "mypy>=1.11",
+  "pip-audit>=2.7",
 ]
 release = [
   "build>=1.2",
@@ -53,6 +56,7 @@ scalpel-apply-plan-result = "scalpel.tools.apply_plan_result:main"
 scalpel-ai-plan-stub = "scalpel.tools.ai_plan_stub:main"
 scalpel-validate-plan-result = "scalpel.tools.validate_plan_result:main"
 scalpel-ai-plan-lmstudio = "scalpel.tools.ai_plan_lmstudio:main"
+scalpel-check-frontend = "scalpel.tools.check_frontend:main"
 
 [tool.setuptools]
 include-package-data = true
@@ -67,6 +71,7 @@ scalpel = [
   "render/*.html",
   "render/*.patch",
   "render/*.md",
+  "render/css/*.css",
   "render/js/*.js",
 ]
 
@@ -74,11 +79,14 @@ scalpel = [
 line-length = 120
 target-version = "py311"
 
-# Start with a conservative ruleset to minimize churn.
 [tool.ruff.lint]
-select = ["F", "E9", "W6"]
-# Keep unused-import noise low during pre-release; enforce later if desired.
-ignore = ["F401"]
+select = ["B", "E4", "E7", "E9", "F", "I", "W"]
+# Existing exception translation is intentional but does not yet consistently
+# preserve the original exception as a cause.
+ignore = ["B904"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/scalpel_fixtures_generate_large_payload_v1.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -88,14 +96,22 @@ explicit_package_bases = true
 follow_imports = "skip"
 files = [
   "scalpel/ai/apply.py",
+  "scalpel/ai/interface.py",
+  "scalpel/ai/io.py",
+  "scalpel/ai/plan_io.py",
   "scalpel/api.py",
+  "scalpel/bench.py",
   "scalpel/cli.py",
   "scalpel/html_extract.py",
+  "scalpel/interval.py",
   "scalpel/model.py",
+  "scalpel/normalize.py",
   "scalpel/payload.py",
   "scalpel/planner.py",
   "scalpel/process.py",
   "scalpel/query_lang.py",
+  "scalpel/query.py",
+  "scalpel/schema_contracts/v1.py",
   "scalpel/schema_v1.py",
   "scalpel/serve.py",
   "scalpel/serve_apply.py",
@@ -112,3 +128,15 @@ files = [
   "scalpel/tools/gen_fixtures.py",
   "scalpel/tools/result.py",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["scalpel"]
+
+[tool.coverage.report]
+fail_under = 35
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = ["build", "tests"]

@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 
 import json
@@ -68,7 +66,7 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
         gid = str(g.get("id") or "").strip()
         if not gid:
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-            gid = slug or f"goal-{len(out)+1}"
+            gid = slug or f"goal-{len(out) + 1}"
         color = _normalize_css_color(g.get("color") or "")
         if not color:
             continue
@@ -86,19 +84,11 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
                 "name": name,
                 "color": color,
                 "projects": [
-                    str(x).strip()
-                    for x in (projects if isinstance(projects, list) else [])
-                    if str(x).strip()
+                    str(x).strip() for x in (projects if isinstance(projects, list) else []) if str(x).strip()
                 ],
-                "tags": [
-                    str(x).strip()
-                    for x in (tags_any if isinstance(tags_any, list) else [])
-                    if str(x).strip()
-                ],
+                "tags": [str(x).strip() for x in (tags_any if isinstance(tags_any, list) else []) if str(x).strip()],
                 "tags_all": [
-                    str(x).strip()
-                    for x in (tags_all if isinstance(tags_all, list) else [])
-                    if str(x).strip()
+                    str(x).strip() for x in (tags_all if isinstance(tags_all, list) else []) if str(x).strip()
                 ],
                 "mode": mode,
             }

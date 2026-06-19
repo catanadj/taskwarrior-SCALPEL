@@ -10,9 +10,9 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from scalpel.query_lang import Query, QueryError
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import validate_payload
-from scalpel.query_lang import Query, QueryError
 
 
 def _die(msg: str, rc: int = 2) -> int:
@@ -86,8 +86,12 @@ def _scale_payload_tasks(payload: Dict[str, Any], n: int, seed: int, schema: int
 
 def main(argv: List[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="scalpel-bench", description="Micro-benchmark SCALPEL core operations.")
-    ap.add_argument("--in", dest="in_json", default="tests/fixtures/golden_payload_v1.json", help="Base payload JSON path")
-    ap.add_argument("--n", type=int, default=250, help="Number of tasks to benchmark against (scaled from base fixture)")
+    ap.add_argument(
+        "--in", dest="in_json", default="tests/fixtures/golden_payload_v1.json", help="Base payload JSON path"
+    )
+    ap.add_argument(
+        "--n", type=int, default=250, help="Number of tasks to benchmark against (scaled from base fixture)"
+    )
     ap.add_argument("--seed", type=int, default=1, help="RNG seed for task scaling")
     ap.add_argument("--repeats", type=int, default=1, help="Measurement repeats (min/avg/max over repeats)")
     ap.add_argument("--warmup", type=int, default=0, help="Warmup runs per step before measuring")
@@ -102,7 +106,7 @@ def main(argv: List[str] | None = None) -> int:
     ns = ap.parse_args(argv)
     # SCALPEL_SCHEMA_SELECT_4_1
     # Schema selection: default to latest; never downgrade input.
-    _req_schema = getattr(ns, 'schema', None)
+    _req_schema = getattr(ns, "schema", None)
     try:
         _req_schema_i = int(_req_schema) if _req_schema is not None else int(LATEST_SCHEMA_VERSION)
     except Exception:
@@ -112,7 +116,6 @@ def main(argv: List[str] | None = None) -> int:
     if _req_schema_i > int(LATEST_SCHEMA_VERSION):
         # Keep error text consistent across tools.
         raise SystemExit(f"--schema {_req_schema_i} unsupported (latest={LATEST_SCHEMA_VERSION})")
-    
 
     base_path = Path(ns.in_json)
     if not base_path.exists():
@@ -127,10 +130,14 @@ def main(argv: List[str] | None = None) -> int:
     if req_schema > int(LATEST_SCHEMA_VERSION):
         return _die(f"--schema {req_schema} is unsupported (latest={{LATEST_SCHEMA_VERSION}})")
 
-    schema = _target_schema_for_payload(base_payload, int(ns.schema) if ns.schema is not None else int(LATEST_SCHEMA_VERSION))
+    schema = _target_schema_for_payload(
+        base_payload, int(ns.schema) if ns.schema is not None else int(LATEST_SCHEMA_VERSION)
+    )
     payload = _scale_payload_tasks(base_payload, int(ns.n), int(ns.seed), schema)
 
-    print(f"[scalpel-bench] base={base_path} n={ns.n} seed={ns.seed} repeats={ns.repeats} warmup={ns.warmup} schema={schema}")
+    print(
+        f"[scalpel-bench] base={base_path} n={ns.n} seed={ns.seed} repeats={ns.repeats} warmup={ns.warmup} schema={schema}"
+    )
 
     def _normalize() -> None:
         _ = upgrade_payload(payload, target_version=schema)  # type: ignore[arg-type]

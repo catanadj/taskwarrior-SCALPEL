@@ -8,6 +8,4 @@ from .css.part04_panels_palette import CSS_PART as CSS_04
 from .css.part05_calendar import CSS_PART as CSS_05
 from .css.part07_modals_misc import CSS_PART as CSS_06
 
-CSS_BLOCK = "\n".join([
-  CSS_01, CSS_02, CSS_03, CSS_04, CSS_05, CSS_06
-])
+CSS_BLOCK = "\n".join([CSS_01, CSS_02, CSS_03, CSS_04, CSS_05, CSS_06])

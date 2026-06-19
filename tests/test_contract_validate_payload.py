@@ -18,7 +18,16 @@ class TestValidatePayloadToolContract(unittest.TestCase):
             out_html = td / "smoke.html"
             out_json = td / "payload.json"
 
-            cmd = [PY, "-m", "scalpel.tools.smoke_build", "--out", str(out_html), "--strict", "--out-json", str(out_json)]
+            cmd = [
+                PY,
+                "-m",
+                "scalpel.tools.smoke_build",
+                "--out",
+                str(out_html),
+                "--strict",
+                "--out-json",
+                str(out_json),
+            ]
             p = self._run(cmd)
             self.assertEqual(p.returncode, 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}")
 
@@ -32,7 +41,9 @@ class TestValidatePayloadToolContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
             bad = td / "bad.json"
-            bad.write_text('{"schema_version":1,"generated_at":"x","cfg":{},"tasks":[],"indices":{}}\n', encoding="utf-8")
+            bad.write_text(
+                '{"schema_version":1,"generated_at":"x","cfg":{},"tasks":[],"indices":{}}\n', encoding="utf-8"
+            )
 
             cmd = [PY, "-m", "scalpel.tools.validate_payload", "--in", str(bad)]
             p = self._run(cmd)

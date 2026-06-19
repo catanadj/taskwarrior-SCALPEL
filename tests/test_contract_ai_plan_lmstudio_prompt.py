@@ -4,7 +4,6 @@ from pathlib import Path
 
 from scalpel.tools.ai_plan_lmstudio import _build_prompt
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "planner_core_fixture.json"
 

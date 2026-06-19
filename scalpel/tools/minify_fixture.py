@@ -216,7 +216,9 @@ def main(argv: List[str] | None = None) -> int:
 
     ap.add_argument("--manifest", default=None, help="Optional manifest JSON path to upsert into")
     ap.add_argument("--name", default=None, help="Fixture name for manifest upsert")
-    ap.add_argument("--update-manifest", action="store_true", help="Write/update manifest (requires --manifest and --name)")
+    ap.add_argument(
+        "--update-manifest", action="store_true", help="Write/update manifest (requires --manifest and --name)"
+    )
 
     ns = ap.parse_args(argv)
 

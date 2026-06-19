@@ -11,18 +11,19 @@ Usage:
   PYTHONPATH=/path/to/repo python -m scalpel.tools.smoke_build --out build/scalpel_smoke.html
 """
 
-import sys
-sys.dont_write_bytecode = True
 import argparse
-import os
 import datetime as dt
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
-from scalpel.render.inline import build_html
-from scalpel.schema import upgrade_payload, LATEST_SCHEMA_VERSION
+
 from scalpel.render.template import HTML_TEMPLATE
-from scalpel.util.tz import normalize_tz_name, resolve_tz, midnight_epoch_ms, today_date
+from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
+from scalpel.util.tz import midnight_epoch_ms, normalize_tz_name, resolve_tz, today_date
+
+sys.dont_write_bytecode = True
 
 MARKER = "__DATA_JSON__"
 
@@ -30,6 +31,7 @@ MARKER = "__DATA_JSON__"
 def _die(msg: str, rc: int = 2) -> int:
     print(f"[scalpel-smoke-build] ERROR: {msg}", file=sys.stderr)
     return rc
+
 
 def _embed_payload_html(payload: dict, *, pretty: bool) -> str:
     n = HTML_TEMPLATE.count(MARKER)
@@ -85,7 +87,9 @@ def _synthetic_tasks(view_start_ms: int) -> list[dict[str, Any]]:
     ]
 
 
-def _make_cfg(*, view_key: str, view_start_ms: int, days: int, px_per_min: int, work: str, snap: int, default_duration_min: int) -> dict[str, Any]:
+def _make_cfg(
+    *, view_key: str, view_start_ms: int, days: int, px_per_min: int, work: str, snap: int, default_duration_min: int
+) -> dict[str, Any]:
     # work is "HH:MM-HH:MM"
     try:
         a, b = work.split("-", 1)
@@ -216,10 +220,12 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
         if m:
             y, mo, d, hh, mm, sec = map(int, m.groups())
             from datetime import datetime, timezone
+
             return datetime(y, mo, d, hh, mm, sec, tzinfo=timezone.utc)
         # ISO-ish with Z
         try:
             from datetime import datetime, timezone
+
             iso = ss.replace("Z", "+00:00") if ss.endswith("Z") else ss
             dt = datetime.fromisoformat(iso)
             if dt.tzinfo is None:
@@ -228,17 +234,16 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
         except Exception:
             return None
 
-
     def _dt_to_iso_z(dt):
         if dt is None:
             return None
         try:
             from datetime import timezone
+
             dt = dt.astimezone(timezone.utc)
             return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         except Exception:
             return None
-
 
     def _ms(dt):
         if dt is None:
@@ -247,7 +252,6 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
             return int(dt.timestamp() * 1000)
         except Exception:
             return None
-
 
     def _normalize_tags(v):
         if v is None:
@@ -263,7 +267,6 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
                 return [x.strip() for x in vv.split(",") if x.strip()]
             return [x for x in vv.split() if x]
         return [str(v)]
-
 
     def _normalize_task_v1(t: dict) -> dict:
         """Return a normalized task dict suitable for UI consumption."""
@@ -325,7 +328,6 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
         )
         return out
 
-
     def _build_indices_v1(tasks: list[dict]) -> dict:
         by_uuid: dict[str, int] = {}
         by_status: dict[str, list[int]] = {}
@@ -348,7 +350,7 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
             if pr:
                 by_project.setdefault(str(pr), []).append(i)
 
-            for tag in (t.get("tags") or []):
+            for tag in t.get("tags") or []:
                 by_tag.setdefault(str(tag), []).append(i)
 
             dk = t.get("day_key")
@@ -362,7 +364,6 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
             "by_tag": by_tag,
             "by_day": by_day,
         }
-
 
     def _apply_schema_v1(payload: dict) -> dict:
         """Idempotently upgrade payload to schema v1 (versioned, normalized, indexed)."""
@@ -385,7 +386,10 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
 
         out["indices"] = _build_indices_v1(tasks_n)
         return out
+
     # === /SCALPEL SCHEMA V1 HELPERS ===
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="scalpel-smoke-build")
     p.add_argument("--out", required=True, help="Output HTML path")
@@ -403,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Enable strict smoke gating (stronger HTML invariants).",
     )
-# SCALPEL_SMOKE_SCHEMA_V2: allow emitting schema v1 or v2 (default v1)
+    # SCALPEL_SMOKE_SCHEMA_V2: allow emitting schema v1 or v2 (default v1)
     p.add_argument(
         "--schema",
         type=int,
@@ -425,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     # SCALPEL_SCHEMA_SELECT_4_1
     # Schema selection: default to latest; never downgrade input.
-    _req_schema = getattr(args, 'schema', None)
+    _req_schema = getattr(args, "schema", None)
     try:
         _req_schema_i = int(_req_schema) if _req_schema is not None else int(LATEST_SCHEMA_VERSION)
     except Exception:
@@ -435,7 +439,6 @@ def main(argv: list[str] | None = None) -> int:
     if _req_schema_i > int(LATEST_SCHEMA_VERSION):
         # Keep error text consistent across tools.
         raise SystemExit(f"--schema {_req_schema_i} unsupported (latest={LATEST_SCHEMA_VERSION})")
-    
 
     if args.start:
         try:
@@ -445,20 +448,18 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"Invalid --start '{args.start}'. Expected YYYY-MM-DD") from e
     else:
         # Default: today in --tz (not process-local).
-        tz_name = normalize_tz_name(getattr(args, 'tz', os.getenv('SCALPEL_TZ', 'local')))
+        tz_name = normalize_tz_name(getattr(args, "tz", os.getenv("SCALPEL_TZ", "local")))
         try:
             start_date = today_date(resolve_tz(tz_name))
         except ValueError as e:
             raise SystemExit(f"Invalid --tz value: {e}")
-    tz_name = normalize_tz_name(getattr(args, 'tz', os.getenv('SCALPEL_TZ', 'local')))
-    display_tz = normalize_tz_name(getattr(args, 'display_tz', os.getenv('SCALPEL_DISPLAY_TZ', 'local')))
+    tz_name = normalize_tz_name(getattr(args, "tz", os.getenv("SCALPEL_TZ", "local")))
+    display_tz = normalize_tz_name(getattr(args, "display_tz", os.getenv("SCALPEL_DISPLAY_TZ", "local")))
     try:
         resolve_tz(tz_name)
         resolve_tz(display_tz)
     except ValueError as e:
         raise SystemExit(f"Invalid timezone value: {e}")
-
-
 
     view_start_ms = _midnight_ms(start_date, tz_name)
 
@@ -494,12 +495,15 @@ def main(argv: list[str] | None = None) -> int:
     payload = upgrade_payload(payload, target_version=schema_req)  # type: ignore[arg-type]
 
     # Canonical JSON blob used BOTH for --out-json and HTML embedding
-    payload_json = json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-        indent=2 if bool(getattr(args, "pretty", False)) else None,
-    ) + "\n"
+    payload_json = (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2 if bool(getattr(args, "pretty", False)) else None,
+        )
+        + "\n"
+    )
 
     if getattr(args, "out_json", None):
         outp = Path(args.out_json)
@@ -521,7 +525,6 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"[scalpel] smoke html: {out_html}")
     return 0
-
 
 
 if __name__ == "__main__":

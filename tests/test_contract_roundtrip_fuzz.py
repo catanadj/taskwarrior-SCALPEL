@@ -1,4 +1,3 @@
-\
 from __future__ import annotations
 
 import json
@@ -107,8 +106,9 @@ class TestRoundTripHtmlExtractionFuzzContract(unittest.TestCase):
                 if mode == "tw-data":
                     html = _mutate_tw_data_script_tag(base_html, rng)
                     # random whitespace around script body
-                    html = re.sub(r"(?is)(<script[^>]*\\bid=[\"']tw-data[\"'][^>]*>)(\\s*)",
-                                 r"\\1\\n\\n", html, count=1)
+                    html = re.sub(
+                        r"(?is)(<script[^>]*\\bid=[\"']tw-data[\"'][^>]*>)(\\s*)", r"\\1\\n\\n", html, count=1
+                    )
                 else:
                     html = _wrap_as_data_assignment(payload, rng)
 

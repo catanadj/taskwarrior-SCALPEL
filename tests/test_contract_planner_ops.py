@@ -1,5 +1,5 @@
-import unittest
 import datetime as dt
+import unittest
 
 from scalpel.planner import (
     op_align_ends,

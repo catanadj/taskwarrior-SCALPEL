@@ -771,7 +771,9 @@ def serve(
     if cfg.required_token is None:
         serve_url = _format_http_url(str(actual_host), int(actual_port), "/")
     else:
-        serve_url = _format_http_url(str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}")
+        serve_url = _format_http_url(
+            str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}"
+        )
     print(serve_url)
 
     if not getattr(args, "no_open", False) and browser_open is not None:

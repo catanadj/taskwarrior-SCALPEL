@@ -1,7 +1,7 @@
 # scalpel/render/js/part08_notes.py
 from __future__ import annotations
 
-JS_PART = r'''// Sticky notes (local planning overlays)
+JS_PART = r"""// Sticky notes (local planning overlays)
   // ---------------------------------------------
   // Persistence policy:
   // - Global store (survives regenerated HTML / view_key changes)
@@ -1610,4 +1610,4 @@ function _pulseEl(el){
   initNotesUI();
 
   // ---------------------------------------------
-'''
+"""

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 import sys
@@ -10,12 +11,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
 
-import datetime as dt
-
 from scalpel.ai import load_plan_overrides, validate_plan_result
 from scalpel.ai.slots import build_candidate_slots
-from scalpel.util.tz import normalize_tz_name, resolve_tz
 from scalpel.schema import upgrade_payload
+from scalpel.util.tz import normalize_tz_name, resolve_tz
 
 
 def _die(msg: str, rc: int = 2) -> int:
@@ -240,7 +239,7 @@ def _normalize_plan_overrides(plan_obj: Dict[str, Any], snap_min: int) -> None:
     overrides = plan_obj.get("overrides")
     if not isinstance(overrides, dict):
         return
-    for uuid, raw in list(overrides.items()):
+    for _uuid, raw in list(overrides.items()):
         if not isinstance(raw, dict):
             continue
         start_ms = raw.get("start_ms")

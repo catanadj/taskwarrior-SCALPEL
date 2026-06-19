@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -90,7 +89,9 @@ class DdminCfg:
     max_tests: int
 
 
-def ddmin_tasks(base_payload: Dict[str, Any], tasks: List[Dict[str, Any]], *, cfg: DdminCfg, schema: int) -> List[Dict[str, Any]]:
+def ddmin_tasks(
+    base_payload: Dict[str, Any], tasks: List[Dict[str, Any]], *, cfg: DdminCfg, schema: int
+) -> List[Dict[str, Any]]:
     # Classic ddmin over list elements.
     cur = list(tasks)
     if not cur:
@@ -160,10 +161,17 @@ def ddmin_tasks(base_payload: Dict[str, Any], tasks: List[Dict[str, Any]], *, cf
 
 
 def main(argv: List[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="scalpel-ddmin-shrink", description="Delta-debug shrink a payload to a minimal task set that preserves a failure.")
+    ap = argparse.ArgumentParser(
+        prog="scalpel-ddmin-shrink",
+        description="Delta-debug shrink a payload to a minimal task set that preserves a failure.",
+    )
     ap.add_argument("--in", dest="in_json", required=True, help="Input payload JSON")
     ap.add_argument("--out", required=True, help="Output minimized payload JSON")
-    ap.add_argument("--cmd", required=True, help="Command to run; must fail (non-zero) to be considered reproducing. Use {in} placeholder.")
+    ap.add_argument(
+        "--cmd",
+        required=True,
+        help="Command to run; must fail (non-zero) to be considered reproducing. Use {in} placeholder.",
+    )
     ap.add_argument("--timeout", type=int, default=20, help="Timeout (seconds) per test run")
     ap.add_argument("--max-tests", type=int, default=200, help="Maximum number of test invocations")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print output")
@@ -173,11 +181,11 @@ def main(argv: List[str] | None = None) -> int:
         default=LATEST_SCHEMA_VERSION,
         help="Target schema version (default: latest supported; never downgrades input).",
     )
-    
+
     ns = ap.parse_args(argv)
     # SCALPEL_SCHEMA_SELECT_4_1
     # Schema selection: default to latest; never downgrade input.
-    _req_schema = getattr(ns, 'schema', None)
+    _req_schema = getattr(ns, "schema", None)
     try:
         _req_schema_i = int(_req_schema) if _req_schema is not None else int(LATEST_SCHEMA_VERSION)
     except Exception:
@@ -187,7 +195,6 @@ def main(argv: List[str] | None = None) -> int:
     if _req_schema_i > int(LATEST_SCHEMA_VERSION):
         # Keep error text consistent across tools.
         raise SystemExit(f"--schema {_req_schema_i} unsupported (latest={LATEST_SCHEMA_VERSION})")
-    
 
     inp = Path(ns.in_json)
     if not inp.exists():

@@ -114,7 +114,9 @@ def main(argv: List[str] | None = None) -> int:
     if ns.overrides_out:
         out_path = Path(ns.overrides_out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {k: {"start_ms": v.start_ms, "due_ms": v.due_ms, "duration_min": v.duration_min} for k, v in merged.items()}
+        data = {
+            k: {"start_ms": v.start_ms, "due_ms": v.due_ms, "duration_min": v.duration_min} for k, v in merged.items()
+        }
         out_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     if ns.out:

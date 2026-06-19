@@ -33,17 +33,17 @@ STREAM_TIMEOUT = 0.2
 
 # Allowed command-line arguments (for security)
 ALLOWED_ARG_PREFIXES = {
-    '--print-payload',
-    '--filter',
-    '--project',
-    '--tag',
-    '--tags',
-    '--dry-run',
-    '--help',
-    '--version',
-    '--limit',
-    '--sort',
-    '--debug',
+    "--print-payload",
+    "--filter",
+    "--project",
+    "--tag",
+    "--tags",
+    "--dry-run",
+    "--help",
+    "--version",
+    "--limit",
+    "--sort",
+    "--debug",
 }
 
 # Session storage
@@ -51,25 +51,21 @@ SESSIONS: Dict[str, Dict[str, Any]] = {}
 SESSIONS_LOCK = threading.Lock()
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 
 
 def _validate_args(args: List[str]) -> tuple[bool, Optional[str]]:
     """Validate command-line arguments for security."""
     for arg in args:
-        if arg.startswith('--'):
+        if arg.startswith("--"):
             # Extract the base argument (before '=')
-            base_arg = arg.split('=')[0]
+            base_arg = arg.split("=")[0]
             if base_arg not in ALLOWED_ARG_PREFIXES:
                 return False, f"Argument not allowed: {base_arg}"
-        elif arg.startswith('-'):
+        elif arg.startswith("-"):
             # Single dash arguments (like -h) - be more restrictive
-            if arg not in ['-h', '-v']:
+            if arg not in ["-h", "-v"]:
                 return False, f"Short argument not allowed: {arg}"
         # Non-flag arguments are generally okay (values for flags)
     return True, None
@@ -88,12 +84,7 @@ def _json_response(handler: BaseHTTPRequestHandler, payload: Dict[str, Any], sta
 
 def _error_response(handler: BaseHTTPRequestHandler, message: str, code: str, status: int) -> None:
     """Send standardized error response."""
-    _json_response(handler, {
-        "error": {
-            "message": message,
-            "code": code
-        }
-    }, status)
+    _json_response(handler, {"error": {"message": message, "code": code}}, status)
 
 
 def _selection_summary_from_payload(payload_text: str) -> str:
@@ -105,15 +96,15 @@ def _selection_summary_from_payload(payload_text: str) -> str:
     except Exception as e:
         logger.warning(f"Failed to parse payload for summary: {e}")
         return ""
-    
+
     tasks = obj.get("tasks")
     if not isinstance(tasks, list):
         return ""
-    
+
     total = len(tasks)
     by_project: Dict[str, int] = {}
     by_tag: Dict[str, int] = {}
-    
+
     for t in tasks:
         if not isinstance(t, dict):
             continue
@@ -124,13 +115,11 @@ def _selection_summary_from_payload(payload_text: str) -> str:
             tag_s = str(tag).strip()
             if tag_s:
                 by_tag[tag_s] = by_tag.get(tag_s, 0) + 1
-    
+
     top_projects = ", ".join(
         f"{k}:{v}" for k, v in sorted(by_project.items(), key=lambda x: -x[1])[:MAX_PROJECTS_IN_SUMMARY]
     )
-    top_tags = ", ".join(
-        f"{k}:{v}" for k, v in sorted(by_tag.items(), key=lambda x: -x[1])[:MAX_PROJECTS_IN_SUMMARY]
-    )
+    top_tags = ", ".join(f"{k}:{v}" for k, v in sorted(by_tag.items(), key=lambda x: -x[1])[:MAX_PROJECTS_IN_SUMMARY])
     return f"total: {total}\nprojects: {top_projects or 'n/a'}\ntags: {top_tags or 'n/a'}"
 
 
@@ -140,9 +129,9 @@ def _start_process(args: List[str]) -> str:
     cmd = ["python3", "-u", "-m", "scalpel.tools.ai_plan_tasks"] + args
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    
+
     logger.info(f"Starting session {session_id[:8]} with args: {args}")
-    
+
     try:
         proc = subprocess.Popen(
             cmd,
@@ -157,7 +146,7 @@ def _start_process(args: List[str]) -> str:
     except Exception as e:
         logger.error(f"Failed to start process: {e}")
         raise
-    
+
     q: "queue.Queue[str]" = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 
     def _reader(stream, prefix: str) -> None:
@@ -179,13 +168,8 @@ def _start_process(args: List[str]) -> str:
     threading.Thread(target=_reader, args=(proc.stderr, "[stderr] "), daemon=True).start()
 
     with SESSIONS_LOCK:
-        SESSIONS[session_id] = {
-            "proc": proc,
-            "queue": q,
-            "cmd": cmd,
-            "created": time.time()
-        }
-    
+        SESSIONS[session_id] = {"proc": proc, "queue": q, "cmd": cmd, "created": time.time()}
+
     return session_id
 
 
@@ -217,17 +201,17 @@ def _cleanup_stale_sessions() -> None:
         now = time.time()
         stale = []
         for sid, sess in SESSIONS.items():
-            age = now - sess.get('created', now)
-            proc = sess.get('proc')
+            age = now - sess.get("created", now)
+            proc = sess.get("proc")
             # Clean up if timed out or process is dead
             if age > SESSION_TIMEOUT or (proc and proc.poll() is not None):
                 stale.append(sid)
-        
+
         for sid in stale:
             logger.info(f"Cleaning up stale session {sid[:8]}")
             sess = SESSIONS.pop(sid, None)
             if sess:
-                proc = sess.get('proc')
+                proc = sess.get("proc")
                 if proc and proc.poll() is None:
                     proc.terminate()
 
@@ -237,7 +221,7 @@ def _shutdown_handler(signum, frame) -> None:
     logger.info("Received shutdown signal, cleaning up...")
     with SESSIONS_LOCK:
         for sid, sess in list(SESSIONS.items()):
-            proc = sess.get('proc')
+            proc = sess.get("proc")
             if proc and proc.poll() is None:
                 logger.info(f"Terminating session {sid[:8]}")
                 proc.terminate()
@@ -257,12 +241,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path == "/run":
             length = int(self.headers.get("Content-Length", "0"))
-            
+
             # Check payload size
             if length > MAX_PAYLOAD_SIZE:
                 _error_response(self, "Payload too large", "PAYLOAD_TOO_LARGE", 413)
                 return
-            
+
             raw = self.rfile.read(length).decode("utf-8", errors="replace")
             try:
                 body = json.loads(raw)
@@ -294,11 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 payload_cmd = ["python3", "-u", "-m", "scalpel.tools.ai_plan_tasks"] + args + ["--print-payload"]
                 payload = subprocess.check_output(
-                    payload_cmd,
-                    cwd=str(ROOT),
-                    text=True,
-                    stderr=subprocess.STDOUT,
-                    timeout=10
+                    payload_cmd, cwd=str(ROOT), text=True, stderr=subprocess.STDOUT, timeout=10
                 )
             except subprocess.CalledProcessError as e:
                 logger.error(f"Payload command failed: {e.output}")
@@ -332,11 +312,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/input":
             length = int(self.headers.get("Content-Length", "0"))
-            
+
             if length > MAX_PAYLOAD_SIZE:
                 _error_response(self, "Payload too large", "PAYLOAD_TOO_LARGE", 413)
                 return
-            
+
             raw = self.rfile.read(length).decode("utf-8", errors="replace")
             try:
                 body = json.loads(raw)
@@ -344,19 +324,19 @@ class Handler(BaseHTTPRequestHandler):
                 logger.warning(f"Invalid JSON in /input: {e}")
                 _error_response(self, "Invalid JSON", "INVALID_JSON", 400)
                 return
-            
+
             session_id = body.get("session_id")
             text = body.get("text", "")
-            
+
             if not isinstance(session_id, str) or not session_id:
                 _error_response(self, "Missing session_id", "MISSING_SESSION_ID", 400)
                 return
-            
+
             sess = _get_session(session_id)
             if not sess:
                 _error_response(self, "Unknown session_id", "UNKNOWN_SESSION", 404)
                 return
-            
+
             proc = sess.get("proc")
             if proc and proc.stdin and proc.poll() is None:
                 try:
@@ -369,17 +349,17 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 _error_response(self, "Process not running", "PROCESS_NOT_RUNNING", 400)
                 return
-            
+
             _json_response(self, {"ok": True}, status=200)
             return
 
         if self.path == "/stop":
             length = int(self.headers.get("Content-Length", "0"))
-            
+
             if length > MAX_PAYLOAD_SIZE:
                 _error_response(self, "Payload too large", "PAYLOAD_TOO_LARGE", 413)
                 return
-            
+
             raw = self.rfile.read(length).decode("utf-8", errors="replace")
             try:
                 body = json.loads(raw)
@@ -387,17 +367,17 @@ class Handler(BaseHTTPRequestHandler):
                 logger.warning(f"Invalid JSON in /stop: {e}")
                 _error_response(self, "Invalid JSON", "INVALID_JSON", 400)
                 return
-            
+
             session_id = body.get("session_id")
             if not isinstance(session_id, str) or not session_id:
                 _error_response(self, "Missing session_id", "MISSING_SESSION_ID", 400)
                 return
-            
+
             sess = _get_session(session_id)
             if not sess:
                 _error_response(self, "Unknown session_id", "UNKNOWN_SESSION", 404)
                 return
-            
+
             _cleanup_session(session_id)
             _json_response(self, {"ok": True}, status=200)
             return
@@ -408,7 +388,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.path.startswith("/stream"):
             _error_response(self, "Not found", "NOT_FOUND", 404)
             return
-        
+
         query = self.path.split("?", 1)[-1] if "?" in self.path else ""
         params = {}
         for part in query.split("&"):
@@ -417,12 +397,12 @@ class Handler(BaseHTTPRequestHandler):
             if "=" in part:
                 k, v = part.split("=", 1)
                 params[k] = v
-        
+
         session_id = params.get("id")
         if not session_id:
             _error_response(self, "Missing id parameter", "MISSING_ID", 400)
             return
-        
+
         sess = _get_session(session_id)
         if not sess:
             _error_response(self, "Unknown session_id", "UNKNOWN_SESSION", 404)
@@ -436,7 +416,7 @@ class Handler(BaseHTTPRequestHandler):
 
         q: "queue.Queue[str]" = sess["queue"]
         proc = sess["proc"]
-        
+
         try:
             while True:
                 try:
@@ -450,7 +430,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     logger.error(f"Stream error for session {session_id[:8]}: {e}")
                     break
-            
+
             self.wfile.write(b"event: done\ndata: done\n\n")
             self.wfile.flush()
         except Exception as e:
@@ -477,16 +457,16 @@ def main() -> None:
     # Setup signal handlers
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
-    
+
     # Start cleanup thread
     cleanup_thread = threading.Thread(target=_cleanup_loop, daemon=True)
     cleanup_thread.start()
-    
+
     # Start server
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     logger.info(f"Server listening on http://{HOST}:{PORT}")
     logger.info(f"Resource limits: max_sessions={MAX_SESSIONS}, session_timeout={SESSION_TIMEOUT}s")
-    
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:

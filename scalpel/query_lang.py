@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import re
 import shlex
-from functools import lru_cache
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Pattern
 
 from scalpel.model import Payload, Task
@@ -143,23 +143,23 @@ class Query:
 
             # UUID
             if tok.startswith("uuid:"):
-                add_csv(uuids, tok[len("uuid:"):])
+                add_csv(uuids, tok[len("uuid:") :])
                 continue
             if tok.startswith("uuid="):
-                add_csv(uuids, tok[len("uuid="):])
+                add_csv(uuids, tok[len("uuid=") :])
                 continue
 
             # project / status
             if tok.startswith("project:"):
-                add_csv(projects, tok[len("project:"):])
+                add_csv(projects, tok[len("project:") :])
                 continue
             if tok.startswith("status:"):
-                add_csv(statuses, tok[len("status:"):])
+                add_csv(statuses, tok[len("status:") :])
                 continue
 
             # by_day (optional)
             if tok.startswith("day:"):
-                add_csv(days, tok[len("day:"):])
+                add_csv(days, tok[len("day:") :])
                 continue
 
             # tag include/exclude
@@ -171,19 +171,19 @@ class Query:
                 rest = tok[1:]
                 # accept "-tag:blocked" too, but TW commonly uses "-blocked"
                 if rest.startswith("tag:"):
-                    rest = rest[len("tag:"):]
+                    rest = rest[len("tag:") :]
                 add_csv(tags_not, rest)
                 continue
 
             if tok.startswith("tag:"):
-                add_csv(tags_all, tok[len("tag:"):])
+                add_csv(tags_all, tok[len("tag:") :])
                 continue
 
             # Description regex include/exclude
             # Support: desc~PAT, description~PAT, desc!~PAT, description!~PAT
             if tok.startswith("desc!~") or tok.startswith("description!~"):
                 prefix = "desc!~" if tok.startswith("desc!~") else "description!~"
-                pat = tok[len(prefix):]
+                pat = tok[len(prefix) :]
                 pat = cls._strip_outer_quotes_raw(pat)
                 if not pat:
                     raise QueryError(f"{prefix} requires a regex pattern")
@@ -192,7 +192,7 @@ class Query:
 
             if tok.startswith("desc~") or tok.startswith("description~"):
                 prefix = "desc~" if tok.startswith("desc~") else "description~"
-                pat = tok[len(prefix):]
+                pat = tok[len(prefix) :]
                 pat = cls._strip_outer_quotes_raw(pat)
                 if not pat:
                     raise QueryError(f"{prefix} requires a regex pattern")
@@ -202,7 +202,7 @@ class Query:
             # Explicit substring form (optional): desc:foo / description:foo
             if tok.startswith("desc:") or tok.startswith("description:"):
                 prefix = "desc:" if tok.startswith("desc:") else "description:"
-                sub = tok[len(prefix):]
+                sub = tok[len(prefix) :]
                 sub = cls._strip_outer_quotes_raw(sub)
                 if sub:
                     desc_sub_all.append(sub)

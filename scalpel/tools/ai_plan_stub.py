@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-from scalpel.ai import AiPlanResult, PlanOverride
+from scalpel.ai import AiPlanResult
 from scalpel.planner import (
     apply_overrides,
     op_align_ends,
@@ -119,6 +119,7 @@ def main(argv: List[str] | None = None) -> int:
 
     out_path = Path(ns.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
     def _base36(n: int) -> str:
         alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
         if n == 0:

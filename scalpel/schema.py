@@ -11,6 +11,7 @@ LATEST_SCHEMA_VERSION = 2
 
 # --- Schema appliers ----------------------------------------------------------
 
+
 def apply_schema_v1(payload: Any) -> Any:
     """Upgrade payload to schema v1.
 
@@ -68,6 +69,7 @@ def apply_schema_v2(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 # --- Validators (library-facing convenience) ---------------------------------
 
+
 def validate_schema_v1(payload: Dict[str, Any], *, label: str) -> List[str]:
     from scalpel.schema_contracts.v1 import validate_payload_v1
 
@@ -83,6 +85,7 @@ def validate_schema_v2(payload: Dict[str, Any], *, label: str) -> List[str]:
 
 
 # --- Upgrader ----------------------------------------------------------------
+
 
 def _coerce_version(v: Any) -> int:
     return int(v) if isinstance(v, int) else 0
@@ -118,11 +121,7 @@ def _has_v2_envelope(payload: Dict[str, Any]) -> bool:
     schema = meta.get("schema")
     if not isinstance(schema, dict):
         return False
-    return (
-        payload.get("schema_version") == 2
-        and schema.get("name") == SCHEMA_NAME_V2
-        and schema.get("version") == 2
-    )
+    return payload.get("schema_version") == 2 and schema.get("name") == SCHEMA_NAME_V2 and schema.get("version") == 2
 
 
 def upgrade_payload(payload: Any, target_version: Optional[int] = None) -> Any:

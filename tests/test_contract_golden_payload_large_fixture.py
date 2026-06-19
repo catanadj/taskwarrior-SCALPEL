@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import subprocess
 import tempfile
 import unittest
@@ -11,8 +10,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests/fixtures/golden_payload_large_v1.json"
 GEN = REPO_ROOT / "scripts/scalpel_fixtures_generate_large_payload_v1.py"
 
+
 def _sha256(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
 
 class TestGoldenLargePayloadFixtureContract(unittest.TestCase):
     def test_fixture_exists(self):
@@ -37,6 +38,7 @@ class TestGoldenLargePayloadFixtureContract(unittest.TestCase):
         p = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         self.assertEqual(p.returncode, 0, combined)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

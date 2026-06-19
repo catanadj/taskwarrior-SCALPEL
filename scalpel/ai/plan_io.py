@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple, cast
 
 from .interface import AiPlanResult, PlanOverride
 from .plan_contract import validate_plan_result
@@ -31,7 +31,7 @@ def load_plan_result(path: Path) -> AiPlanResult:
     schema = obj.get("schema")
     if schema == "scalpel.plan.v2":
         # Compile op-based plan into the stable AiPlanResult shape.
-        return compile_plan_v2(obj)
+        return cast(AiPlanResult, compile_plan_v2(obj))
 
     overrides_raw = obj.get("overrides") or {}
     if not isinstance(overrides_raw, dict):
@@ -52,9 +52,7 @@ def load_plan_result(path: Path) -> AiPlanResult:
     added_tasks = obj.get("added_tasks") or []
     if not isinstance(added_tasks, list):
         raise ValueError("plan result added_tasks must be a list")
-    added_tuple: Tuple[Dict[str, Any], ...] = tuple(
-        t for t in added_tasks if isinstance(t, dict)
-    )
+    added_tuple: Tuple[Dict[str, Any], ...] = tuple(t for t in added_tasks if isinstance(t, dict))
 
     task_updates = obj.get("task_updates") or {}
     if not isinstance(task_updates, dict):

@@ -1,6 +1,6 @@
 import subprocess
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = REPO_ROOT / "scripts" / "install_pre_commit_hook.py"

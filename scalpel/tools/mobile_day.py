@@ -16,12 +16,23 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
         description="Generate a compact 3-day calendar (yesterday/today/tomorrow) with a 1-day view window."
     )
-    ap.add_argument("--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)")
+    ap.add_argument(
+        "--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)"
+    )
     ap.add_argument("--workhours", default="06:00-23:00", help="Work hours window, e.g. 06:00-23:00")
     ap.add_argument("--snap", type=int, default=10, help="Snap minutes for drag/resize (default: 10)")
-    ap.add_argument("--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)")
-    ap.add_argument("--max-infer-duration", type=int, default=480, help="Max minutes to infer duration from due-scheduled (default: 480)")
-    ap.add_argument("--px-per-min", type=float, default=2.0, help="Initial vertical scale in pixels per minute (default: 2.0)")
+    ap.add_argument(
+        "--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)"
+    )
+    ap.add_argument(
+        "--max-infer-duration",
+        type=int,
+        default=480,
+        help="Max minutes to infer duration from due-scheduled (default: 480)",
+    )
+    ap.add_argument(
+        "--px-per-min", type=float, default=2.0, help="Initial vertical scale in pixels per minute (default: 2.0)"
+    )
     ap.add_argument(
         "--tz",
         default=os.getenv("SCALPEL_TZ", "local"),
@@ -35,8 +46,11 @@ def main(argv: list[str] | None = None) -> None:
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ap.add_argument("--out", default=os.path.join("build", "scalpel_mobile.html"), help="Output HTML path")
-    ap.add_argument("--goals", default=os.path.join(Path(script_dir).parent, "goals.json"),
-                    help="Goals config JSON (default: scalpel/goals.json). If missing, goals are disabled.")
+    ap.add_argument(
+        "--goals",
+        default=os.path.join(Path(script_dir).parent, "goals.json"),
+        help="Goals config JSON (default: scalpel/goals.json). If missing, goals are disabled.",
+    )
     ap.add_argument(
         "--no-nautical-hooks",
         action="store_true",

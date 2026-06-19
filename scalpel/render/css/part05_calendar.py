@@ -1,7 +1,7 @@
 # scalpel/render/css/part05_calendar.py
 from __future__ import annotations
 
-CSS_PART = r'''  .cal-wrap {
+CSS_PART = r"""  .cal-wrap {
     display: grid;
     grid-template-columns: 68px 1fr;
     min-height: 0;
@@ -1459,4 +1459,4 @@ body.theme-paper .note::after{
   .evt.dragging{ z-index: var(--task-drag-z, 50); }
   .note .nhdr, .note .nbody, .note .nrsz{ position: relative; z-index: 1; }
 
-'''
+"""

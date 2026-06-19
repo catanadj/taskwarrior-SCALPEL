@@ -7,6 +7,7 @@ from typing import Optional
 # Taskwarrior duration UDA typically stores ISO-8601: PT10M, PT1H30M, etc.
 _ISO_RE = re.compile(r"^P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)$", re.IGNORECASE)
 
+
 def parse_duration_to_minutes(s: str | None) -> Optional[int]:
     if not s:
         return None
@@ -28,4 +29,3 @@ def parse_duration_to_minutes(s: str | None) -> Optional[int]:
         total += 1
 
     return total if total > 0 else None
-

@@ -21,7 +21,17 @@ class TestFilterPayloadToolContract:
         assert isinstance(u, str) and u
 
         out_json = tmp_path / "filtered.json"
-        cmd = [sys.executable, "-m", "scalpel.tools.filter_payload", "--in", str(FIXTURE), "--q", f"uuid:{u}", "--out", str(out_json)]
+        cmd = [
+            sys.executable,
+            "-m",
+            "scalpel.tools.filter_payload",
+            "--in",
+            str(FIXTURE),
+            "--q",
+            f"uuid:{u}",
+            "--out",
+            str(out_json),
+        ]
         p = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         assert p.returncode == 0, combined

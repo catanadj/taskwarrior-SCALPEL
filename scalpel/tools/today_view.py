@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from scalpel.payload import build_payload
 from scalpel.util.timeparse import parse_workhours
-from scalpel.util.tz import normalize_tz_name, resolve_tz, today_date, day_key_from_ms, midnight_epoch_ms
+from scalpel.util.tz import day_key_from_ms, midnight_epoch_ms, normalize_tz_name, resolve_tz, today_date
 
 
 def _task_interval_ms(task: Dict[str, Any]) -> Optional[tuple[int, int]]:
@@ -175,7 +175,7 @@ def _day_payload(
         "day_start_ms": int(day_start_ms),
         "work_start_min": int(work_start),
         "work_end_min": int(work_end),
-        "workhours": f"{work_start//60:02d}:{work_start%60:02d}-{work_end//60:02d}:{work_end%60:02d}",
+        "workhours": f"{work_start // 60:02d}:{work_start % 60:02d}-{work_end // 60:02d}:{work_end % 60:02d}",
         "px_per_min": float(px_per_min),
         "filter_label": filter_label,
         "summary": {
@@ -203,11 +203,20 @@ def _inject_data(template: str, data: Dict[str, Any], title: str) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="Generate compact day-only HTML views for yesterday/today/tomorrow.")
-    ap.add_argument("--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)")
+    ap.add_argument(
+        "--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)"
+    )
     ap.add_argument("--workhours", default="06:00-23:00", help="Work hours window, e.g. 06:00-23:00")
     ap.add_argument("--snap", type=int, default=10, help="Snap minutes for drag/resize (default: 10)")
-    ap.add_argument("--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)")
-    ap.add_argument("--max-infer-duration", type=int, default=480, help="Max minutes to infer duration from due-scheduled (default: 480)")
+    ap.add_argument(
+        "--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)"
+    )
+    ap.add_argument(
+        "--max-infer-duration",
+        type=int,
+        default=480,
+        help="Max minutes to infer duration from due-scheduled (default: 480)",
+    )
     ap.add_argument("--px-per-min", type=float, default=1.5, help="Vertical scale in pixels per minute (default: 1.5)")
     ap.add_argument(
         "--tz",
@@ -261,9 +270,7 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     template_path = (
-        Path(args.template)
-        if args.template
-        else Path(__file__).resolve().parents[1] / "render" / "today_template.html"
+        Path(args.template) if args.template else Path(__file__).resolve().parents[1] / "render" / "today_template.html"
     )
     template = template_path.read_text(encoding="utf-8")
 

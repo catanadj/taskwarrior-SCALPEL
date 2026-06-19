@@ -32,7 +32,7 @@ def apply_plan_overrides(
     if not isinstance(payload, dict):
         raise TypeError(f"payload must be dict, got {type(payload).__name__}")
 
-    errs = validate_plan_overrides(payload, overrides)
+    errs = validate_plan_overrides(cast(dict[str, Any], payload), overrides)
     if errs:
         raise ValueError("Invalid plan overrides:\n" + "\n".join(f"  - {e}" for e in errs))
 

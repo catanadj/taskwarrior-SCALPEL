@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import glob
-import os
-import shutil
 import subprocess
 import unittest
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CI_LITE = REPO_ROOT / "scripts" / "scalpel_ci_lite.sh"
@@ -22,8 +18,8 @@ class TestCILiteLogContract(unittest.TestCase):
         self.assertIn("-m scalpel.tools.ci_lite", wrapper)
         self.assertIn('print(f"[ci-lite] log: {logfile}")', impl)
         self.assertIn('print("[ci-lite] === logs ===")', impl)
-        self.assertIn('PERF WARN', impl)
-        self.assertIn('PERF STRICT', impl)
+        self.assertIn("PERF WARN", impl)
+        self.assertIn("PERF STRICT", impl)
         self.assertIn("summary.tsv", impl)
 
     def test_clean_logs_flag_clears_log_dir(self) -> None:
@@ -67,9 +63,6 @@ class TestCILiteLogContract(unittest.TestCase):
         logs = list(LOG_DIR.glob("*_clean.log"))
         self.assertGreaterEqual(len(logs), 1, f"Expected at least one *_clean.log file in {LOG_DIR}")
 
-
-
-
     def test_print_logs_outputs_log_paths(self) -> None:
         # Run a fast single-step pipeline, request log printing, and assert output includes *_clean.log
         cmd = [
@@ -97,5 +90,7 @@ class TestCILiteLogContract(unittest.TestCase):
         self.assertRegex(combined, r"\[ci-lite\] dir: .+ \((exists|missing)\)")
         self.assertRegex(combined, r"\[ci-lite\] out: .+ \((exists|missing)\)")
         self.assertRegex(combined, r"\[ci-lite\] log: .*_clean\.log")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

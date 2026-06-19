@@ -1,7 +1,7 @@
 # scalpel/render/css/part04_panels_palette.py
 from __future__ import annotations
 
-CSS_PART = r'''
+CSS_PART = r"""
   .card {
     background:
       linear-gradient(165deg, rgba(255,255,255,0.025), rgba(255,255,255,0.00)),
@@ -519,4 +519,4 @@ CSS_PART = r'''
     font-variant-numeric: tabular-nums;
   }
 
-'''
+"""

@@ -5,7 +5,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "planner_core_fixture.json"
 
@@ -18,9 +17,7 @@ class TestApplyPlanResultToolContract(unittest.TestCase):
     def test_apply_plan_result_tool(self) -> None:
         payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
         plan = {
-            "overrides": {
-                "a": {"start_ms": 1577869200000, "due_ms": 1577872800000, "duration_min": 60}
-            },
+            "overrides": {"a": {"start_ms": 1577869200000, "due_ms": 1577872800000, "duration_min": 60}},
             "added_tasks": [{"uuid": "new-1", "description": "New", "status": "pending", "tags": []}],
             "task_updates": {"a": {"description": "Updated"}},
             "warnings": [],

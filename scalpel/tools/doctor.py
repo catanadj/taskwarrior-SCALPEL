@@ -4,12 +4,13 @@ import argparse
 import re
 import shutil
 import sys
-sys.dont_write_bytecode = True
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
 from ..process import run_command
 from .result import ToolIssue, ToolResult, result_from_issues
+
+sys.dont_write_bytecode = True
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -195,7 +196,10 @@ def _smoke_inline_build_issues(repo_root: Path) -> list[ToolIssue]:
         issues.append(ToolIssue("error", "HTML still contains __DATA_JSON__ placeholder (template injection failed)"))
     if '"cfg"' not in html or '"tasks"' not in html:
         issues.append(
-            ToolIssue("warning", 'HTML does not obviously contain "cfg"/"tasks" strings; template may have changed (verify manually)')
+            ToolIssue(
+                "warning",
+                'HTML does not obviously contain "cfg"/"tasks" strings; template may have changed (verify manually)',
+            )
         )
 
     return issues
@@ -209,7 +213,9 @@ def _build_result(root: Path, *, strict: bool, verbose_artifacts: bool) -> ToolR
 
 
 def main(argv: List[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="scalpel.tools.doctor", description="Repository hygiene & smoke checks for scalpel.")
+    ap = argparse.ArgumentParser(
+        prog="scalpel.tools.doctor", description="Repository hygiene & smoke checks for scalpel."
+    )
     ap.add_argument("--root", default="", help="Repo root (defaults to auto-detect from CWD).")
     ap.add_argument("--strict", action="store_true", help="Treat warnings as errors (exit code 2).")
     ap.add_argument("--verbose-artifacts", action="store_true", help="List every pycache/pyc/bak artifact.")
@@ -217,7 +223,10 @@ def main(argv: List[str] | None = None) -> int:
 
     root = Path(args.root).expanduser() if args.root else _find_repo_root(Path.cwd())
     if not root:
-        print("ERROR: Could not locate repo root (expected scalpel/__init__.py). Run with --root /path/to/repo", file=sys.stderr)
+        print(
+            "ERROR: Could not locate repo root (expected scalpel/__init__.py). Run with --root /path/to/repo",
+            file=sys.stderr,
+        )
         return 2
 
     sys.path.insert(0, str(root))

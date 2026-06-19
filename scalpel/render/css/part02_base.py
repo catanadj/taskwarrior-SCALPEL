@@ -1,7 +1,7 @@
 # scalpel/render/css/part02_base.py
 from __future__ import annotations
 
-CSS_PART = r'''  body {
+CSS_PART = r"""  body {
     margin: 0;
     min-height: 100vh;
     background:
@@ -356,4 +356,4 @@ CSS_PART = r'''  body {
       width: 100%;
     }
   }
-'''
+"""

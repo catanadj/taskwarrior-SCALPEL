@@ -1,7 +1,7 @@
 # scalpel/render/js/part01_core.py
 from __future__ import annotations
 
-JS_PART = r'''
+JS_PART = r"""
 (() => {
   "use strict";
 
@@ -21,7 +21,7 @@ try { if (typeof globalThis !== "undefined" && !globalThis.__scalpel_phase) glob
   } catch (_) {}
 
 
-  
+
 
   // Prefs wrappers (fallback)
   // Prevents blank UI if persist injection order changes.
@@ -880,4 +880,4 @@ startYmd: ymdFromMs(cfg.view_start_ms),
     if (changed) __scalpelInvalidateTimeCaches("effective");
   }
   loadEdits();
-'''
+"""

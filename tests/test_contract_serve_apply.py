@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from scalpel.process import CommandFailedError, CommandResult
 from scalpel import serve_apply
+from scalpel.process import CommandFailedError, CommandResult
 
 
 class TestServeApplyContract(unittest.TestCase):

@@ -6,8 +6,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
 from scalpel.schema import LATEST_SCHEMA_VERSION
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 class TestSmokeHtmlInvariantsContract(unittest.TestCase):
     def _build_smoke_strict(self, out_path: Path) -> None:
@@ -86,11 +89,10 @@ class TestSmokeHtmlInvariantsContract(unittest.TestCase):
             for k in ("cfg", "tasks", "meta"):
                 self.assertIn(k, payload)
 
-
             # Schema v1 contract
             self.assertIn("schema_version", payload)
             self.assertEqual(payload["schema_version"], LATEST_SCHEMA_VERSION)
-            
+
             self.assertIn("generated_at", payload)
 
             self.assertIn("indices", payload)
@@ -115,7 +117,10 @@ class TestSmokeHtmlInvariantsContract(unittest.TestCase):
             tasks = payload["tasks"]
             self.assertIsInstance(tasks, list)
             self.assertGreaterEqual(len(tasks), 2)
-            self.assertTrue(any("SMOKE: Planned task" in (t.get("description", "") if isinstance(t, dict) else "") for t in tasks))
+            self.assertTrue(
+                any("SMOKE: Planned task" in (t.get("description", "") if isinstance(t, dict) else "") for t in tasks)
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -6,13 +6,14 @@ from typing import Any, Dict, Optional
 
 from .model import TaskLite
 from .taskwarrior import parse_tw_utc_to_epoch_ms
-from .util.duration import parse_duration_to_minutes
 from .util.console import eprint
+from .util.duration import parse_duration_to_minutes
 
 
 def _obs_enabled() -> bool:
     v = (os.getenv("SCALPEL_OBS_LOG", "") or "").strip().lower()
     return v in {"1", "true", "yes", "on"}
+
 
 def normalize_task(t: Dict[str, Any]) -> Optional[TaskLite]:
     uuid = str(t.get("uuid") or "").strip()

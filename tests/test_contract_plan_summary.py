@@ -5,7 +5,6 @@ from pathlib import Path
 from scalpel.ai import PlanOverride
 from scalpel.planner import build_plan_summary
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "planner_core_fixture.json"
 

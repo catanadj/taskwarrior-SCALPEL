@@ -45,7 +45,20 @@ class TestDdminShrinkToolContract(unittest.TestCase):
             env["PYTHONPATH"] = str(REPO_ROOT)
 
             p = subprocess.run(
-                [sys.executable, "-m", "scalpel.tools.ddmin_shrink", "--in", str(FIXTURE), "--out", str(outp), "--cmd", cmd, "--max-tests", "200", "--pretty"],
+                [
+                    sys.executable,
+                    "-m",
+                    "scalpel.tools.ddmin_shrink",
+                    "--in",
+                    str(FIXTURE),
+                    "--out",
+                    str(outp),
+                    "--cmd",
+                    cmd,
+                    "--max-tests",
+                    "200",
+                    "--pretty",
+                ],
                 cwd=str(REPO_ROOT),
                 env=env,
                 capture_output=True,

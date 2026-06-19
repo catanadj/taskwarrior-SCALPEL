@@ -1,7 +1,7 @@
 # scalpel/render/js/part07_init.py
 from __future__ import annotations
 
-JS_PART = r'''// Controls / rerender
+JS_PART = r"""// Controls / rerender
   // -----------------------------
   function rerenderFull() {
     const { events, backlog, problems, allByDay } = classifyTasks(elQ.value);
@@ -2232,4 +2232,4 @@ JS_PART = r'''// Controls / rerender
   }
 
 })();
-'''
+"""

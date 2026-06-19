@@ -6,7 +6,6 @@ from pathlib import Path
 from scalpel.ai import PlanOverride, apply_plan_overrides
 from scalpel.util.tz import day_key_from_ms, resolve_tz
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json"
 

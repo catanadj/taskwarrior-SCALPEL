@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+
 class TestBenchToolContract(unittest.TestCase):
     def test_help_runs(self):
         cmd = ["python3", "-m", "scalpel.tools.bench", "--help"]
@@ -18,6 +19,7 @@ class TestBenchToolContract(unittest.TestCase):
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         self.assertEqual(p.returncode, 0, combined)
         self.assertIn("[scalpel-bench] base=", combined)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

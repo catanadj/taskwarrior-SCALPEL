@@ -11,6 +11,7 @@ from typing import Any, cast
 @dataclass
 class HtmlPayloadExtractError(RuntimeError):
     message: str
+
     def __str__(self) -> str:
         return self.message
 
@@ -45,7 +46,7 @@ def _extract_payload_json_from_data_assignment(html_text: str) -> dict[str, Any]
     import html as _html
     import re
 
-    m = re.search(r'\b(?:const|var)?\s*(?:window\.)?DATA\s*=\s*', html_text)
+    m = re.search(r"\b(?:const|var)?\s*(?:window\.)?DATA\s*=\s*", html_text)
     if not m:
         raise ValueError("Could not find DATA assignment in HTML.")
     i = m.end()
@@ -138,6 +139,7 @@ def extract_payload_json_from_html_text(html_text: str) -> dict[str, Any]:
     except Exception as e:
         # Keep legacy-ish wording to avoid fragile expectations elsewhere.
         raise HtmlPayloadExtractError("No <script type='application/json'> payload block found in HTML.") from e
+
 
 def extract_payload_json_from_html_file(path: str | Path) -> dict[str, Any]:
     p = Path(path)

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import datetime as dt
 import os
 import tempfile
 import unittest
-import datetime as dt
 from pathlib import Path
 from unittest.mock import patch
 
@@ -68,13 +68,75 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
                     raise AssertionError("generic import should not run before home package")
                 return real_import_module(name, package)
 
-            with patch("scalpel.payload.Path.home", return_value=home), patch(
-                "scalpel.payload.importlib.import_module", side_effect=fake_import_module
+            with (
+                patch("scalpel.payload.Path.home", return_value=home),
+                patch("scalpel.payload.importlib.import_module", side_effect=fake_import_module),
             ):
                 mod = payload_mod._load_nautical_core(enabled=True)
 
             self.assertIsNotNone(mod)
             self.assertEqual(getattr(mod, "SOURCE", None), "package")
+
+    def test_cp_previews_have_unique_uuids_with_multiple_same_day_spawns(self) -> None:
+        class FakeNautical:
+            @staticmethod
+            def parse_cp_duration(cp_str: str):
+                if cp_str != "PT2H":
+                    return None
+                return dt.timedelta(hours=2)
+
+            @staticmethod
+            def coerce_int(value, default: int):
+                try:
+                    return int(value)
+                except Exception:
+                    return default
+
+            @staticmethod
+            def parse_dt_any(_value: str):
+                return None
+
+        raw_tasks = [
+            {
+                "uuid": "u1",
+                "description": "Chain task",
+                "cp": "PT2H",
+                "chain": "on",
+                "chainMax": 4,
+                "link": 1,
+            }
+        ]
+        base_due = int(dt.datetime(2026, 1, 1, 8, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        base_tasks = [
+            {
+                "uuid": "u1",
+                "description": "Chain task",
+                "due_ms": base_due,
+                "scheduled_ms": None,
+                "duration_min": 30,
+            }
+        ]
+
+        with patch("scalpel.payload._load_nautical_core", return_value=FakeNautical()):
+            out = payload_mod._build_nautical_preview_tasks(
+                base_tasks=base_tasks,
+                raw_tasks=raw_tasks,
+                start_date=dt.date(2026, 1, 1),
+                days=2,
+                tz_name="UTC",
+                default_duration_min=30,
+                max_infer_duration_min=480,
+                nautical_hooks_enabled=True,
+            )
+
+        cp_previews = [t for t in out if t.get("nautical_kind") == "cp"]
+        self.assertEqual(len(cp_previews), 3)
+        self.assertEqual([t.get("nautical_link") for t in cp_previews], [2, 3, 4])
+        self.assertEqual(len({str(t.get("uuid")) for t in cp_previews}), 3)
+        self.assertEqual(
+            [int(t.get("due_ms")) for t in cp_previews],
+            sorted(int(t.get("due_ms")) for t in cp_previews),
+        )
 
     def test_preview_builder_skips_loader_when_raw_tasks_have_no_nautical_fields(self) -> None:
         raw_tasks = [{"uuid": "u1", "description": "Normal task"}]

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import datetime as dt
 import json
 import os
@@ -12,7 +13,6 @@ from typing import NoReturn
 
 from ..process import run_command
 from .result import ToolIssue, ToolResult, ToolStatus, ToolStepResult, step_status_for_returncode
-
 
 USAGE = """scalpel_ci_lite.sh - CI-lite runner for SCALPEL
 
@@ -541,7 +541,9 @@ def _resolve_steps(ctx: StepContext) -> list[tuple[str, list[str], dict[str, str
         if smoke_script.is_file() and os.access(smoke_script, os.X_OK):
             steps.append(("smoke(strict)", [str(smoke_script), opts.out, *opts.smoke_args], smoke_env))
         elif shutil.which("scalpel-smoke-build"):
-            steps.append(("smoke(strict)", ["scalpel-smoke-build", "--out", opts.out, "--strict", *opts.smoke_args], None))
+            steps.append(
+                ("smoke(strict)", ["scalpel-smoke-build", "--out", opts.out, "--strict", *opts.smoke_args], None)
+            )
         else:
             _die("No smoke runner found (expected ./scripts/scalpel_smoke_strict.sh or scalpel-smoke-build on PATH)")
 
@@ -554,7 +556,15 @@ def _resolve_steps(ctx: StepContext) -> list[tuple[str, list[str], dict[str, str
             steps.append(
                 (
                     "validate(payload)",
-                    [opts.py_exec, "-m", "scalpel.tools.validate_payload", "--from-html", opts.out, "--in", str(opts.json_out)],
+                    [
+                        opts.py_exec,
+                        "-m",
+                        "scalpel.tools.validate_payload",
+                        "--from-html",
+                        opts.out,
+                        "--in",
+                        str(opts.json_out),
+                    ],
                     _python_env(opts),
                 )
             )

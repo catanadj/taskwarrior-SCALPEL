@@ -6,7 +6,6 @@ import re
 import sys
 import unittest
 from pathlib import Path
-from scalpel.schema import LATEST_SCHEMA_VERSION
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -74,7 +73,16 @@ class TestRenderReplayHtmlInvariantsContract(unittest.TestCase):
         self.assertIn("SMOKE: Planned task", html, "Expected synthetic SMOKE task marker missing from replay HTML.")
 
         # Discoverability UX invariants: help + quick command entry points exist.
-        for id_ in ("btnCommand", "btnHelp", "pendingMeta", "cmdGuide", "toast", "helpModal", "commandModal", "commandQ"):
+        for id_ in (
+            "btnCommand",
+            "btnHelp",
+            "pendingMeta",
+            "cmdGuide",
+            "toast",
+            "helpModal",
+            "commandModal",
+            "commandQ",
+        ):
             n = html.count(f'id="{id_}"')
             self.assertEqual(n, 1, f"expected id={id_!r} once, found {n}")
 

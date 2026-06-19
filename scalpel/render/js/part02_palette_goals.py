@@ -1,7 +1,7 @@
 # scalpel/render/js/part02_palette_goals.py
 from __future__ import annotations
 
-JS_PART = r'''// Palette colors (projects/tags)
+JS_PART = r"""// Palette colors (projects/tags)
   // Persistence helpers (KV) + global focus key
   const FOCUS_GLOBAL_KEY = 'scalpel.focus.global';
 
@@ -1049,7 +1049,7 @@ function buildAddCommandForLocal(uuid, desc) {
     if (delBtn) delBtn.addEventListener("click", ()=>{ _deleteSelectedTheme(); });
   }
 
-  
+
   // Theme editor (palette UI)
   // -----------------------------
   const THEME_EDIT_CORE = [
@@ -1679,4 +1679,4 @@ function buildAddCommandForLocal(uuid, desc) {
   }
 
   // -----------------------------
-'''
+"""

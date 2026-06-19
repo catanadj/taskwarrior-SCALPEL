@@ -1,5 +1,7 @@
 import unittest
+
 from scalpel.schema import upgrade_payload
+
 
 class TestPayloadUpgradeContract(unittest.TestCase):
     def test_upgrade_legacy_payload_to_v1(self) -> None:
@@ -58,6 +60,7 @@ class TestPayloadUpgradeContract(unittest.TestCase):
         self.assertEqual(out.get("schema_version"), 2)
         self.assertIsInstance(out.get("generated_at"), str)
         self.assertTrue(bool(str(out.get("generated_at")).strip()))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

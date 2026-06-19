@@ -1,7 +1,7 @@
 # scalpel/render/js/part06_drag_resize.py
 from __future__ import annotations
 
-JS_PART = r'''// Drag / Resize engine
+JS_PART = r"""// Drag / Resize engine
   // -----------------------------
   function autoScrollDaysPane(x, y) {
     const pane = getDaysPane();
@@ -1006,7 +1006,7 @@ JS_PART = r'''// Drag / Resize engine
     elStatus.textContent = skippedLocal
       ? `Queued done for ${queued} task(s) (skipped ${skippedLocal} local placeholder(s)).`
       : `Queued done for ${queued} task(s).`;
-  
+
     rerenderAll();
   }
 
@@ -1385,4 +1385,4 @@ JS_PART = r'''// Drag / Resize engine
   })();
 
   // -----------------------------
-'''
+"""

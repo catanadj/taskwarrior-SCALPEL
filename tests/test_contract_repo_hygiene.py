@@ -7,7 +7,6 @@ from pathlib import Path
 
 from scalpel.tools import doctor
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

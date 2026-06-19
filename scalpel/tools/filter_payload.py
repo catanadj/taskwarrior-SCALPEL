@@ -24,9 +24,16 @@ def _read_json(p: Path) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="scalpel-filter-payload", description="Filter a SCALPEL payload using scalpel query language.")
+    ap = argparse.ArgumentParser(
+        prog="scalpel-filter-payload", description="Filter a SCALPEL payload using scalpel query language."
+    )
     ap.add_argument("--in", dest="in_json", default=None, help="Input payload JSON path")
-    ap.add_argument("--from-html", dest="from_html", default=None, help="Extract payload from HTML path (script#tw-data or DATA=...)")
+    ap.add_argument(
+        "--from-html",
+        dest="from_html",
+        default=None,
+        help="Extract payload from HTML path (script#tw-data or DATA=...)",
+    )
     ap.add_argument("--q", required=True, help="Query string (scalpel/query_lang)")
     ap.add_argument("--out", required=True, help="Output payload JSON path")
     ap.add_argument("--pretty", action="store_true", help="Pretty JSON output")

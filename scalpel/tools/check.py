@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import os
+from pathlib import Path
 
 from .result import ToolCliError
 
@@ -12,7 +12,6 @@ def _scalpel_env_flag(name: str) -> bool:
     """Return True if env var is set to a truthy value."""
     v = os.environ.get(name, "")
     return v.strip().lower() in ("1", "true", "yes", "y", "on")
-
 
 
 def _call(mod: str, argv: list[str]) -> int:
@@ -28,7 +27,9 @@ def _call(mod: str, argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="scalpel-check", description="Run optional preflight (doctor/smoke build) and validate.")
+    ap = argparse.ArgumentParser(
+        prog="scalpel-check", description="Run optional preflight (doctor/smoke build) and validate."
+    )
     ap.add_argument("--out", default="build/scalpel_smoke.html", help="Smoke HTML output path")
     ap.add_argument("--skip-validate", action="store_true", help="Skip smoke_validate")
     ap.add_argument("--skip-doctor", action="store_true", help="Skip doctor preflight")
@@ -40,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     skip_doctor = bool(getattr(ns, "skip_doctor", False)) or _scalpel_env_flag("SCALPEL_SKIP_DOCTOR")
-    skip_smoke  = bool(getattr(ns, "skip_smoke",  False)) or _scalpel_env_flag("SCALPEL_SKIP_SMOKE")
+    skip_smoke = bool(getattr(ns, "skip_smoke", False)) or _scalpel_env_flag("SCALPEL_SKIP_SMOKE")
     try:
         if not skip_doctor:
             rc = _call("doctor", [])

@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from scalpel.html_extract import extract_payload_json_from_html_file
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload

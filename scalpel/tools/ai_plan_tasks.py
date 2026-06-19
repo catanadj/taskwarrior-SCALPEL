@@ -372,12 +372,7 @@ def _selection_summary(tasks: List[Dict[str, Any]]) -> str:
     top_projects = ", ".join(f"{k}:{v}" for k, v in sorted(by_project.items(), key=lambda x: -x[1])[:5])
     top_tags = ", ".join(f"{k}:{v}" for k, v in sorted(by_tag.items(), key=lambda x: -x[1])[:5])
     statuses = ", ".join(f"{k}:{v}" for k, v in sorted(by_status.items(), key=lambda x: -x[1])[:5])
-    return (
-        f"total: {total}\n"
-        f"status: {statuses or 'n/a'}\n"
-        f"projects: {top_projects or 'n/a'}\n"
-        f"tags: {top_tags or 'n/a'}"
-    )
+    return f"total: {total}\nstatus: {statuses or 'n/a'}\nprojects: {top_projects or 'n/a'}\ntags: {top_tags or 'n/a'}"
 
 
 def _update_summary(summary: str, user_prompt: str, plan_obj: Dict[str, Any], max_len: int) -> str:
@@ -408,11 +403,7 @@ def _normalize_ops(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if kind == "update_task":
             patch = op.get("patch") if isinstance(op.get("patch"), dict) else None
             if not patch:
-                patch = {
-                    k: v
-                    for k, v in op.items()
-                    if k not in ("op", "uuid", "target", "temp_id")
-                }
+                patch = {k: v for k, v in op.items() if k not in ("op", "uuid", "target", "temp_id")}
             if not patch:
                 continue
             op = dict(op)
@@ -753,7 +744,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 ambiguities = plan_obj.get("ambiguities") if isinstance(plan_obj.get("ambiguities"), list) else []
                 suggestions = plan_obj.get("suggestions") if isinstance(plan_obj.get("suggestions"), list) else []
                 response = plan_obj.get("response") if isinstance(plan_obj.get("response"), str) else None
-                clar_qs = plan_obj.get("clarifying_questions") if isinstance(plan_obj.get("clarifying_questions"), list) else []
+                clar_qs = (
+                    plan_obj.get("clarifying_questions")
+                    if isinstance(plan_obj.get("clarifying_questions"), list)
+                    else []
+                )
                 confidence = plan_obj.get("confidence")
 
                 if warnings:

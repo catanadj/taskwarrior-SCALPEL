@@ -168,7 +168,9 @@ def normalize_payload(
     return out
 
 
-def load_payload_from_html(path: JsonPath, *, validate: bool = True, target_version: int | None = None) -> ScalpelPayload:
+def load_payload_from_html(
+    path: JsonPath, *, validate: bool = True, target_version: int | None = None
+) -> ScalpelPayload:
     """Extract payload JSON from HTML file and normalize."""
     p = Path(path)
     obj = extract_payload_json_from_html_file(p)

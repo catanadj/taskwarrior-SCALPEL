@@ -4,6 +4,7 @@ import copy
 from typing import Any, Dict, List
 from uuid import NAMESPACE_DNS, uuid5
 
+
 def _dt_to_ymd(s: Any) -> str | None:
     if not isinstance(s, str) or not s:
         return None
@@ -12,6 +13,7 @@ def _dt_to_ymd(s: Any) -> str | None:
     if len(s) >= 10 and s[4] == "-" and s[7] == "-":
         return s[:10]
     return None
+
 
 def build_indices_v1(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
     by_uuid: Dict[str, int] = {}
@@ -50,6 +52,7 @@ def build_indices_v1(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     return {"by_uuid": by_uuid, "by_status": by_status, "by_project": by_project, "by_tag": by_tag, "by_day": by_day}
 
+
 def make_large_payload_v1(base_payload: Dict[str, Any], *, n_tasks: int, seed: int = 1) -> Dict[str, Any]:
     if not isinstance(base_payload, dict):
         raise ValueError("base payload must be dict")
@@ -71,7 +74,7 @@ def make_large_payload_v1(base_payload: Dict[str, Any], *, n_tasks: int, seed: i
             src = {}
         t = copy.deepcopy(src)
 
-        base_uuid = str(t.get("uuid") or f"base-{i%src_n}")
+        base_uuid = str(t.get("uuid") or f"base-{i % src_n}")
         t["uuid"] = str(uuid5(NAMESPACE_DNS, f"scalpel.large.v1:{seed}:{i}:{base_uuid}"))
 
         if not isinstance(t.get("status"), str) or not t.get("status"):

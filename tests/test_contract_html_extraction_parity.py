@@ -9,8 +9,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 
+from scalpel.schema import upgrade_payload
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,54 +58,64 @@ class TestHtmlExtractionParityContract(unittest.TestCase):
 
             # 1) Generate smoke HTML + raw JSON (same run)
             cmd_smoke = [
-                sys.executable, "-m", "scalpel.tools.smoke_build",
-                "--out", str(smoke_html),
-                "--out-json", str(payload_json),
+                sys.executable,
+                "-m",
+                "scalpel.tools.smoke_build",
+                "--out",
+                str(smoke_html),
+                "--out-json",
+                str(payload_json),
                 "--strict",
-                "--start", "2020-01-01",
-                "--days", "7",
+                "--start",
+                "2020-01-01",
+                "--days",
+                "7",
             ]
             p = _run(cmd_smoke, cwd=REPO_ROOT, env=env)
-            self.assertEqual(
-                p.returncode, 0,
-                f"smoke_build failed\nstdout:\n{p.stdout}\nstderr:\n{p.stderr}"
-            )
+            self.assertEqual(p.returncode, 0, f"smoke_build failed\nstdout:\n{p.stdout}\nstderr:\n{p.stderr}")
 
             # 2) Render replay HTML from the produced payload.json
             cmd_replay = [
-                sys.executable, "-m", "scalpel.tools.render_payload",
-                "--in", str(payload_json),
-                "--out", str(replay_html),
+                sys.executable,
+                "-m",
+                "scalpel.tools.render_payload",
+                "--in",
+                str(payload_json),
+                "--out",
+                str(replay_html),
                 "--strict",
             ]
             p2 = _run(cmd_replay, cwd=REPO_ROOT, env=env)
-            self.assertEqual(
-                p2.returncode, 0,
-                f"render_payload failed\nstdout:\n{p2.stdout}\nstderr:\n{p2.stderr}"
-            )
+            self.assertEqual(p2.returncode, 0, f"render_payload failed\nstdout:\n{p2.stdout}\nstderr:\n{p2.stderr}")
 
             # 3) Validate tool must accept BOTH HTMLs + JSON
             # (If validate_payload internally compares, great; if not, we still compare ourselves below.)
             cmd_val_smoke = [
-                sys.executable, "-m", "scalpel.tools.validate_payload",
-                "--from-html", str(smoke_html),
-                "--in", str(payload_json),
+                sys.executable,
+                "-m",
+                "scalpel.tools.validate_payload",
+                "--from-html",
+                str(smoke_html),
+                "--in",
+                str(payload_json),
             ]
             pv1 = _run(cmd_val_smoke, cwd=REPO_ROOT, env=env)
             self.assertEqual(
-                pv1.returncode, 0,
-                f"validate_payload(smoke) failed\nstdout:\n{pv1.stdout}\nstderr:\n{pv1.stderr}"
+                pv1.returncode, 0, f"validate_payload(smoke) failed\nstdout:\n{pv1.stdout}\nstderr:\n{pv1.stderr}"
             )
 
             cmd_val_replay = [
-                sys.executable, "-m", "scalpel.tools.validate_payload",
-                "--from-html", str(replay_html),
-                "--in", str(payload_json),
+                sys.executable,
+                "-m",
+                "scalpel.tools.validate_payload",
+                "--from-html",
+                str(replay_html),
+                "--in",
+                str(payload_json),
             ]
             pv2 = _run(cmd_val_replay, cwd=REPO_ROOT, env=env)
             self.assertEqual(
-                pv2.returncode, 0,
-                f"validate_payload(replay) failed\nstdout:\n{pv2.stdout}\nstderr:\n{pv2.stderr}"
+                pv2.returncode, 0, f"validate_payload(replay) failed\nstdout:\n{pv2.stdout}\nstderr:\n{pv2.stderr}"
             )
 
             # 4) Parity: extracted payload from smoke HTML equals payload.json
@@ -115,6 +125,7 @@ class TestHtmlExtractionParityContract(unittest.TestCase):
             smoke_obj = _extract_embedded_json_from_html_text(smoke_html.read_text(encoding="utf-8"))
             replay_obj = _extract_embedded_json_from_html_text(replay_html.read_text(encoding="utf-8"))
             from scalpel.schema import LATEST_SCHEMA_VERSION
+
             self.assertEqual(smoke_obj, src, "Smoke HTML embedded payload != payload.json from same run.")
             expected = upgrade_payload(src, target_version=LATEST_SCHEMA_VERSION)
             self.assertEqual(replay_obj, expected, "Replay HTML embedded payload != upgraded payload.json input.")
@@ -125,6 +136,7 @@ class TestHtmlExtractionParityContract(unittest.TestCase):
             self.assertEqual(src.get("schema_version"), LATEST_SCHEMA_VERSION)
             self.assertEqual(smoke_obj.get("schema_version"), LATEST_SCHEMA_VERSION)
             self.assertEqual(replay_obj.get("schema_version"), LATEST_SCHEMA_VERSION)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import json
 import os
 import subprocess
 import sys
@@ -20,7 +19,7 @@ from .render.inline import build_html
 from .taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
 from .util.console import eprint
 from .util.timeparse import parse_date_yyyy_mm_dd, parse_workhours
-from .util.tz import resolve_tz, today_date, normalize_tz_name
+from .util.tz import normalize_tz_name, resolve_tz, today_date
 
 TaskExportLookupResult = serve_mod.TaskExportLookupResult
 TimewInterval = serve_mod.TimewInterval
@@ -28,17 +27,26 @@ TimewExportResult = serve_mod.TimewExportResult
 
 
 def _build_parser(default_out: str) -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(
-        description="Generate an interactive Taskwarrior calendar HTML (custom time-grid)."
+    ap = argparse.ArgumentParser(description="Generate an interactive Taskwarrior calendar HTML (custom time-grid).")
+    ap.add_argument(
+        "--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)"
     )
-    ap.add_argument("--filter", default="status:pending", help="Taskwarrior filter for export (default: status:pending)")
     ap.add_argument("--start", default=None, help="View start date YYYY-MM-DD (default: today in --tz)")
     ap.add_argument("--days", type=int, default=7, help="Number of days to show (default: 7)")
     ap.add_argument("--workhours", default="06:00-23:00", help="Work hours window, e.g. 06:00-23:00")
     ap.add_argument("--snap", type=int, default=10, help="Snap minutes for drag/resize (default: 10)")
-    ap.add_argument("--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)")
-    ap.add_argument("--max-infer-duration", type=int, default=480, help="Max minutes to infer duration from due-scheduled (default: 480)")
-    ap.add_argument("--px-per-min", type=float, default=2.0, help="Initial vertical scale in pixels per minute (default: 2.0)")
+    ap.add_argument(
+        "--default-duration", type=int, default=10, help="Default minutes when duration is missing (default: 10)"
+    )
+    ap.add_argument(
+        "--max-infer-duration",
+        type=int,
+        default=480,
+        help="Max minutes to infer duration from due-scheduled (default: 480)",
+    )
+    ap.add_argument(
+        "--px-per-min", type=float, default=2.0, help="Initial vertical scale in pixels per minute (default: 2.0)"
+    )
 
     ap.add_argument(
         "--tz",
@@ -210,6 +218,7 @@ def _counter_inc(counters: dict[str, Any], key: str, *, path: str | None = None)
 
 def _counter_snapshot(counters: dict[str, Any]) -> dict[str, Any]:
     return serve_mod._counter_snapshot(counters)
+
 
 def _run_timew_export_for_day(*, day_ymd: str, tz_name: str) -> TimewExportResult:
     return serve_data_mod.run_timew_export_for_day(

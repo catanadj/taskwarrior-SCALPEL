@@ -31,6 +31,7 @@ def _obs_enabled() -> bool:
     v = (os.getenv("SCALPEL_OBS_LOG", "") or "").strip().lower()
     return v in {"1", "true", "yes", "on"}
 
+
 def parse_tw_utc_to_epoch_ms(s: str) -> Optional[int]:
     if not s:
         return None
@@ -58,6 +59,7 @@ def parse_tw_utc_to_epoch_ms(s: str) -> Optional[int]:
         return int(aware.timestamp() * 1000)
     except Exception:
         return None
+
 
 def run_task_export(filter_str: str) -> list[RawTask]:
     cmd = ["task"]

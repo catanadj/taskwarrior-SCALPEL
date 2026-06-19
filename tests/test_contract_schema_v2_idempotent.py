@@ -4,8 +4,7 @@ import copy
 import json
 from pathlib import Path
 
-from scalpel.schema import upgrade_payload, LATEST_SCHEMA_VERSION
-
+from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "golden_payload_v2.json"
@@ -28,4 +27,3 @@ def test_upgrade_v2_is_strict_noop_and_non_mutating() -> None:
     # Must remain a no-op on repeated calls.
     out2 = upgrade_payload(out, target_version=LATEST_SCHEMA_VERSION)
     assert out2 == before
-

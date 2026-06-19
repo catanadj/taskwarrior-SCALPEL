@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 from .model import Task
 
 
@@ -24,8 +25,5 @@ def build_project_tag_tree(tasks: list[Task]) -> PaletteNode:
     """
 
 
-def resolve_task_color(task: Task,
-                       goal_color: str | None,
-                       overrides: dict[str, str]) -> str | None:
+def resolve_task_color(task: Task, goal_color: str | None, overrides: dict[str, str]) -> str | None:
     """Apply override precedence (tag override > project override > goal color)."""
-

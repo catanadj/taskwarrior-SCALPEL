@@ -72,7 +72,11 @@ def _validate_v2_ops(ops: Any, slot_catalog: Any, errs: List[str]) -> None:
                 errs.append("create_task must include non-empty temp_id")
             if not _is_nonempty_str(op.get("description")):
                 errs.append("create_task must include non-empty description")
-            if "duration_min" in op and op.get("duration_min") is not None and not isinstance(op.get("duration_min"), int):
+            if (
+                "duration_min" in op
+                and op.get("duration_min") is not None
+                and not isinstance(op.get("duration_min"), int)
+            ):
                 errs.append("create_task duration_min must be int when provided")
             if isinstance(op.get("duration_min"), int) and int(op.get("duration_min")) <= 0:
                 errs.append("create_task duration_min must be positive when provided")

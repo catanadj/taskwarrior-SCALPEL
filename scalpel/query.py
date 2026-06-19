@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """scalpel.query
 
 Schema-aware query helpers for SCALPEL payloads.
@@ -10,7 +8,9 @@ Design goals:
 - Be defensive: never crash the UI path due to a single bad index entry.
 """
 
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 JsonDict = Dict[str, Any]
 Task = Dict[str, Any]

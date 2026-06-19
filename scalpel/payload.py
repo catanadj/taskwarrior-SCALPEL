@@ -8,17 +8,17 @@ import sys
 from pathlib import Path
 from typing import Any, Optional, Sequence, cast
 
+from .ai import PlanOverride, apply_plan_overrides
 from .goals import load_goals_config
+from .interval import infer_interval_ms
 from .model import CalendarConfig, Payload, RawTask, Task
-from .taskwarrior import run_task_export, parse_tw_utc_to_epoch_ms
+from .normalize import normalize_task
+from .schema_v1 import apply_schema_v1
+from .taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
+from .util.console import eprint
 from .util.timeparse import midnight_epoch_ms
 from .util.tz import normalize_tz_name, resolve_tz
 from .util.viewkey import make_view_key
-from .normalize import normalize_task
-from .interval import infer_interval_ms
-from .schema_v1 import apply_schema_v1
-from .ai import PlanOverride, apply_plan_overrides
-from .util.console import eprint
 
 
 def _nautical_hooks_enabled(enabled: bool | None = None) -> bool:
@@ -234,7 +234,7 @@ def _build_nautical_preview_tasks(
     end_excl = start_date + dt.timedelta(days=max(1, int(days)))
     out: list[Task] = []
 
-    for task_out, raw in zip(base_tasks, raw_tasks):
+    for task_out, raw in zip(base_tasks, raw_tasks, strict=False):
         anchor_expr = str(raw.get("anchor") or "").strip()
 
         anchor_mode = str(raw.get("anchor_mode") or "").strip()
@@ -374,7 +374,7 @@ def _build_nautical_preview_tasks(
                     break
 
                 if due_local_date >= start_date:
-                    preview_uuid = f"nautical-cp-{source_uuid}-{due_local_date.isoformat()}"
+                    preview_uuid = f"nautical-cp-{source_uuid}-{due_local_date.isoformat()}-t{next_due_ms}-l{next_link}"
 
                     preview = cast(Task, dict(task_out))
                     preview.update(

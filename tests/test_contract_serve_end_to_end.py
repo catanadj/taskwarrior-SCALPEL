@@ -18,7 +18,9 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener
 from scalpel import serve
 
 
-def _request_json(opener: Any, url: str, *, method: str = "GET", body: object | None = None, headers: dict[str, str] | None = None):
+def _request_json(
+    opener: Any, url: str, *, method: str = "GET", body: object | None = None, headers: dict[str, str] | None = None
+):
     payload = None
     req_headers = {"Accept": "application/json"}
     if headers:

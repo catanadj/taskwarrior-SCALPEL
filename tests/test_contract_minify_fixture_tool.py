@@ -28,16 +28,22 @@ class TestMinifyFixtureToolContract(unittest.TestCase):
 
         with self.subTest("runs twice identically"):
             import tempfile
+
             with tempfile.TemporaryDirectory() as td:
                 td = Path(td)
                 out1 = td / "a.json"
                 out2 = td / "b.json"
 
                 cmd1 = [
-                    sys.executable, "-m", "scalpel.tools.minify_fixture",
-                    "--in", str(FIXTURE),
-                    "--q", f"uuid:{u}",
-                    "--out", str(out1),
+                    sys.executable,
+                    "-m",
+                    "scalpel.tools.minify_fixture",
+                    "--in",
+                    str(FIXTURE),
+                    "--q",
+                    f"uuid:{u}",
+                    "--out",
+                    str(out1),
                     "--pretty",
                 ]
                 p1 = subprocess.run(cmd1, cwd=str(REPO_ROOT), capture_output=True, text=True)
@@ -45,10 +51,15 @@ class TestMinifyFixtureToolContract(unittest.TestCase):
                 self.assertEqual(p1.returncode, 0, combined1)
 
                 cmd2 = [
-                    sys.executable, "-m", "scalpel.tools.minify_fixture",
-                    "--in", str(FIXTURE),
-                    "--q", f"uuid:{u}",
-                    "--out", str(out2),
+                    sys.executable,
+                    "-m",
+                    "scalpel.tools.minify_fixture",
+                    "--in",
+                    str(FIXTURE),
+                    "--q",
+                    f"uuid:{u}",
+                    "--out",
+                    str(out2),
                     "--pretty",
                 ]
                 p2 = subprocess.run(cmd2, cwd=str(REPO_ROOT), capture_output=True, text=True)
@@ -67,18 +78,26 @@ class TestMinifyFixtureToolContract(unittest.TestCase):
 
         with self.subTest("manifest upsert"):
             import tempfile
+
             with tempfile.TemporaryDirectory() as td:
                 td = Path(td)
                 outp = td / "m.json"
                 man = td / "manifest.json"
                 cmdm = [
-                    sys.executable, "-m", "scalpel.tools.minify_fixture",
-                    "--in", str(FIXTURE),
-                    "--q", f"uuid:{u}",
-                    "--out", str(outp),
-                    "--name", "tiny_uuid_fixture",
+                    sys.executable,
+                    "-m",
+                    "scalpel.tools.minify_fixture",
+                    "--in",
+                    str(FIXTURE),
+                    "--q",
+                    f"uuid:{u}",
+                    "--out",
+                    str(outp),
+                    "--name",
+                    "tiny_uuid_fixture",
                     "--update-manifest",
-                    "--manifest", str(man),
+                    "--manifest",
+                    str(man),
                 ]
                 pm = subprocess.run(cmdm, cwd=str(REPO_ROOT), capture_output=True, text=True)
                 combinedm = (pm.stdout or "") + "\n" + (pm.stderr or "")

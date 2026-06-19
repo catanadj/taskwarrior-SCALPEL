@@ -6,7 +6,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -22,9 +21,7 @@ class TestCompileAllContract(unittest.TestCase):
         self.assertEqual(
             p.returncode,
             0,
-            "compileall failed:\n"
-            f"cmd: {cmd}\n"
-            f"stdout/stderr:\n{combined}",
+            f"compileall failed:\ncmd: {cmd}\nstdout/stderr:\n{combined}",
         )
 
 

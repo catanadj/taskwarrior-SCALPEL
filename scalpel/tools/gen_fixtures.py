@@ -1,4 +1,3 @@
-
 """Generate and/or check golden fixtures.
 
 Fixtures:
@@ -17,6 +16,7 @@ Design:
 """
 
 from __future__ import annotations
+
 import argparse
 import copy
 import difflib
@@ -27,10 +27,10 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 from scalpel.process import CommandFailedError, run_checked
-from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
+from scalpel.schema import LATEST_SCHEMA_VERSION
 
 GEN_START = "2020-01-01"
 GEN_DAYS = 7
@@ -211,7 +211,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ns = ap.parse_args(argv)
     # SCALPEL_SCHEMA_SELECT_4_1
     # Schema selection: default to latest; never downgrade input.
-    _req_schema = getattr(ns, 'schema', None)
+    _req_schema = getattr(ns, "schema", None)
     try:
         _req_schema_i = int(_req_schema) if _req_schema is not None else int(LATEST_SCHEMA_VERSION)
     except Exception:

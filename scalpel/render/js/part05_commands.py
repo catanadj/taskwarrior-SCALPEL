@@ -1,7 +1,7 @@
 # scalpel/render/js/part05_commands.py
 from __future__ import annotations
 
-JS_PART = r'''// Commands (diff-only schedule + actions)
+JS_PART = r"""// Commands (diff-only schedule + actions)
   // -----------------------------
   function getIdentifier(t) {
     return (t.uuid || "").slice(0,8);
@@ -1283,4 +1283,4 @@ JS_PART = r'''// Commands (diff-only schedule + actions)
   }
 
   // -----------------------------
-'''
+"""

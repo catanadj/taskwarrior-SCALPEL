@@ -1,7 +1,7 @@
 # scalpel/render/css/part01_tokens_theme.py
 from __future__ import annotations
 
-CSS_PART = r'''
+CSS_PART = r"""
 :root {
     /* Core surfaces */
     --bg: #0a131d;
@@ -558,4 +558,4 @@ CSS_PART = r'''
   body.theme-paper .dimmed{ opacity: 0.30; }
 
 * { box-sizing: border-box; }
-'''
+"""

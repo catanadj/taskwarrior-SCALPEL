@@ -8,7 +8,6 @@ from pathlib import Path
 
 from scalpel.query_lang import Query
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "golden_payload_v1.json"
 
@@ -102,8 +101,6 @@ class TestQueryLangContract(unittest.TestCase):
         res = Query.parse(f"uuid:{u} {w}").run(payload)
         self.assertTrue(any(x.get("uuid") == u for x in res))
 
-
-
     def test_desc_regex_preserves_backslashes(self):
         payload = {
             "schema_version": 1,
@@ -129,5 +126,7 @@ class TestQueryLangContract(unittest.TestCase):
         q_out = Query.parse(r"desc!~\\[")
         got_out = {t.get("uuid") for t in q_out.run(payload)}
         self.assertEqual(got_out, {"u2"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

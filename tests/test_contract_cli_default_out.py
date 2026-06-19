@@ -46,8 +46,9 @@ class TestCliDefaultOutContract(unittest.TestCase):
             old_cwd = Path.cwd()
             try:
                 os.chdir(tmp)
-                with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-                    "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+                with (
+                    patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+                    patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
                 ):
                     cli.main(["--once", "--no-open", "--start", "2026-01-01"])
             finally:
@@ -61,15 +62,17 @@ class TestCliDefaultOutContract(unittest.TestCase):
         self.assertIn("Invalid --tz value", str(ctx.exception))
 
     def test_nautical_hooks_enabled_by_default(self) -> None:
-        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp, patch(
-            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        with (
+            patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp,
+            patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
         ):
             cli.main(["--once", "--no-open", "--start", "2026-01-01"])
         self.assertTrue(bp.call_args.kwargs.get("nautical_hooks_enabled"))
 
     def test_no_nautical_hooks_flag_disables_preview_expansion(self) -> None:
-        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp, patch(
-            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        with (
+            patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}) as bp,
+            patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
         ):
             cli.main(["--once", "--no-open", "--start", "2026-01-01", "--no-nautical-hooks"])
         self.assertFalse(bp.call_args.kwargs.get("nautical_hooks_enabled"))
@@ -89,11 +92,13 @@ class TestCliDefaultOutContract(unittest.TestCase):
                     raise PermissionError(13, "Permission denied", str(self))
                 return orig_mkdir(self, *args, **kwargs)
 
-            with patch.dict(os.environ, {"HOME": str(home)}), patch(
-                "scalpel.cli.os.path.abspath", return_value=blocked_out
-            ), patch("pathlib.Path.mkdir", new=fake_mkdir), patch(
-                "scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}
-            ), patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"):
+            with (
+                patch.dict(os.environ, {"HOME": str(home)}),
+                patch("scalpel.cli.os.path.abspath", return_value=blocked_out),
+                patch("pathlib.Path.mkdir", new=fake_mkdir),
+                patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+                patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
+            ):
                 cli.main(["--once", "--no-open", "--start", "2026-01-01"])
 
             self.assertTrue((home / ".scalpel" / "build" / "scalpel_schedule.html").exists())
@@ -115,9 +120,11 @@ class TestCliDefaultOutContract(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             outp = Path(td) / "serve.html"
-            with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-                "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
-            ), patch("scalpel.cli.ThreadingHTTPServer", FakeServer):
+            with (
+                patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+                patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
+                patch("scalpel.cli.ThreadingHTTPServer", FakeServer),
+            ):
                 cli.main(["--no-open", "--start", "2026-01-01", "--port", "0", "--out", str(outp)])
 
             self.assertTrue(outp.exists())
@@ -126,24 +133,28 @@ class TestCliDefaultOutContract(unittest.TestCase):
     def test_once_flag_renders_without_starting_http_server(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             outp = Path(td) / "once.html"
-            with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-                "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
-            ), patch("scalpel.cli.ThreadingHTTPServer", side_effect=AssertionError("server should not start")):
+            with (
+                patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+                patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
+                patch("scalpel.cli.ThreadingHTTPServer", side_effect=AssertionError("server should not start")),
+            ):
                 cli.main(["--once", "--no-open", "--start", "2026-01-01", "--out", str(outp)])
 
             self.assertTrue(outp.exists())
 
     def test_serve_remote_host_requires_allow_remote_flag(self) -> None:
-        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        with (
+            patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+            patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
         ):
             with self.assertRaises(SystemExit) as ctx:
                 cli.main(["--serve", "--no-open", "--start", "2026-01-01", "--host", "0.0.0.0"])
         self.assertIn("without --allow-remote", str(ctx.exception))
 
     def test_serve_remote_host_requires_token(self) -> None:
-        with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-            "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
+        with (
+            patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+            patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
         ):
             with self.assertRaises(SystemExit) as ctx:
                 cli.main(
@@ -176,9 +187,11 @@ class TestCliDefaultOutContract(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             outp = Path(td) / "serve.html"
-            with patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}), patch(
-                "scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"
-            ), patch("scalpel.cli.ThreadingHTTPServer", FakeServer):
+            with (
+                patch("scalpel.cli.build_payload", return_value={"cfg": {}, "tasks": []}),
+                patch("scalpel.cli.build_html", return_value="<!doctype html><html><body>ok</body></html>"),
+                patch("scalpel.cli.ThreadingHTTPServer", FakeServer),
+            ):
                 cli.main(
                     [
                         "--serve",
