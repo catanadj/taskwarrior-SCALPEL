@@ -5,9 +5,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 from scalpel.api import filter_payload
 from scalpel.html_extract import extract_payload_json_from_html_file
+from scalpel.model import Payload
 from scalpel.validate import assert_valid_payload
 
 
@@ -16,7 +18,7 @@ def _die(msg: str, rc: int = 2) -> int:
     return rc
 
 
-def _read_json(p: Path) -> dict:
+def _read_json(p: Path) -> dict[str, Any]:
     obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
     if not isinstance(obj, dict):
         raise ValueError(f"payload must be an object/dict; got {type(obj).__name__}")
@@ -43,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         return _die("Provide --in and/or --from-html")
 
     # Load (JSON takes precedence if both provided)
-    payload: dict
+    payload: dict[str, Any]
     if ns.in_json:
         p = Path(ns.in_json)
         if not p.exists():
@@ -65,8 +67,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Filter and validate
     try:
-        outp = filter_payload(payload, ns.q)
-        assert_valid_payload(outp)
+        outp = filter_payload(cast(Payload, payload), ns.q)
+        assert_valid_payload(cast(dict[str, Any], outp))
     except Exception as e:
         return _die(f"Filter/validate failed: {e}", rc=3)
 

@@ -151,7 +151,8 @@ def build_candidate_slots(
     slot_catalog maps slot_id -> {start_ms, due_ms}.
     """
 
-    cfg = payload.get("cfg") if isinstance(payload.get("cfg"), dict) else {}
+    cfg_raw = payload.get("cfg")
+    cfg: dict[str, Any] = dict(cfg_raw) if isinstance(cfg_raw, dict) else {}
     tz_name = normalize_tz_name(cfg.get("tz") if isinstance(cfg.get("tz"), str) else "local")
     tz = resolve_tz(tz_name)
 

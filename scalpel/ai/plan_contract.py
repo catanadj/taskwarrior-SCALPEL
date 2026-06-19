@@ -78,7 +78,8 @@ def _validate_v2_ops(ops: Any, slot_catalog: Any, errs: List[str]) -> None:
                 and not isinstance(op.get("duration_min"), int)
             ):
                 errs.append("create_task duration_min must be int when provided")
-            if isinstance(op.get("duration_min"), int) and int(op.get("duration_min")) <= 0:
+            duration_min = op.get("duration_min")
+            if isinstance(duration_min, int) and duration_min <= 0:
                 errs.append("create_task duration_min must be positive when provided")
         elif kind == "split_task":
             if not _is_nonempty_str(op.get("uuid")):
@@ -97,8 +98,10 @@ def _validate_v2_ops(ops: Any, slot_catalog: Any, errs: List[str]) -> None:
                         errs.append("split_task subtasks must include non-empty description")
                     if not isinstance(st.get("duration_min"), int):
                         errs.append("split_task subtasks must include int duration_min")
-                    elif int(st.get("duration_min")) <= 0:
-                        errs.append("split_task subtasks duration_min must be positive")
+                    else:
+                        duration_min = st.get("duration_min")
+                        if isinstance(duration_min, int) and duration_min <= 0:
+                            errs.append("split_task subtasks duration_min must be positive")
         elif kind == "place":
             if not _is_nonempty_str(op.get("target")):
                 errs.append("place must include non-empty target")

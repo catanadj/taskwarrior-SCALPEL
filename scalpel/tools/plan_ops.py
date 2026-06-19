@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
-from scalpel.ai import apply_plan_overrides, load_plan_overrides
+from scalpel.ai import PlanOverride, apply_plan_overrides, load_plan_overrides
+from scalpel.model import CalendarConfig
 from scalpel.planner import (
     apply_overrides,
     op_align_ends,
@@ -42,18 +44,18 @@ def _load_selected(path: Path) -> List[str]:
     return out
 
 
-def _op_func(name: str):
+def _op_func(name: str) -> Callable[..., dict[str, PlanOverride]]:
     name = name.lower().strip()
     if name == "align-starts":
-        return op_align_starts
+        return cast(Callable[..., dict[str, PlanOverride]], op_align_starts)
     if name == "align-ends":
-        return op_align_ends
+        return cast(Callable[..., dict[str, PlanOverride]], op_align_ends)
     if name == "stack":
-        return op_stack
+        return cast(Callable[..., dict[str, PlanOverride]], op_stack)
     if name == "distribute":
-        return op_distribute
+        return cast(Callable[..., dict[str, PlanOverride]], op_distribute)
     if name == "nudge":
-        return op_nudge
+        return cast(Callable[..., dict[str, PlanOverride]], op_nudge)
     raise ValueError(f"Unknown op: {name}")
 
 
@@ -95,7 +97,8 @@ def main(argv: List[str] | None = None) -> int:
         except Exception as e:
             return _die(f"Failed to load overrides: {e}")
 
-    cfg = payload.get("cfg", {}) if isinstance(payload.get("cfg"), dict) else {}
+    cfg_raw = payload.get("cfg")
+    cfg = cast(CalendarConfig, cfg_raw) if isinstance(cfg_raw, dict) else CalendarConfig()
     tz_name = cfg.get("tz") if isinstance(cfg.get("tz"), str) else "UTC"
 
     events = apply_overrides(payload.get("tasks", []), overrides, cfg)

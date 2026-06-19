@@ -7,9 +7,11 @@ import random
 import statistics
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, cast
 
+from scalpel.model import Payload
 from scalpel.query_lang import Query, QueryError
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import validate_payload
@@ -31,7 +33,7 @@ def _load_json(path: Path) -> Dict[str, Any]:
     return obj
 
 
-def _time_one(fn, *, repeats: int, warmup: int) -> Tuple[float, float, float]:
+def _time_one(fn: Callable[[], object], *, repeats: int, warmup: int) -> Tuple[float, float, float]:
     for _ in range(max(0, warmup)):
         fn()
 
@@ -65,7 +67,7 @@ def _scale_payload_tasks(payload: Dict[str, Any], n: int, seed: int, schema: int
         p = dict(payload)
         p["tasks"] = []
         p.pop("indices", None)
-        return upgrade_payload(p, target_version=schema)  # type: ignore[arg-type]
+        return cast(Dict[str, Any], upgrade_payload(p, target_version=schema))
 
     rng = random.Random(seed)
     out_tasks: List[Dict[str, Any]] = []
@@ -81,7 +83,7 @@ def _scale_payload_tasks(payload: Dict[str, Any], n: int, seed: int, schema: int
     p["tasks"] = out_tasks
     # Force indices rebuild in the upgrader.
     p.pop("indices", None)
-    return upgrade_payload(p, target_version=schema)  # type: ignore[arg-type]
+    return cast(Dict[str, Any], upgrade_payload(p, target_version=schema))
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -140,7 +142,7 @@ def main(argv: List[str] | None = None) -> int:
     )
 
     def _normalize() -> None:
-        _ = upgrade_payload(payload, target_version=schema)  # type: ignore[arg-type]
+        _ = upgrade_payload(payload, target_version=schema)
 
     def _validate() -> None:
         errs = validate_payload(payload)
@@ -153,7 +155,7 @@ def main(argv: List[str] | None = None) -> int:
         for s in qs:
             try:
                 q = Query.parse(s)
-                _ = q.run(payload)
+                _ = q.run(cast(Payload, payload))
             except QueryError as e:
                 raise RuntimeError(f"query failed: {s!r} ({e})") from e
 
@@ -171,7 +173,7 @@ def main(argv: List[str] | None = None) -> int:
         return 0
 
     # Lazy import to keep fast-path lean.
-    from scalpel.render.inline import build_html  # type: ignore
+    from scalpel.render.inline import build_html
 
     def _render() -> None:
         html = build_html(payload)

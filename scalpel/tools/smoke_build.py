@@ -33,7 +33,7 @@ def _die(msg: str, rc: int = 2) -> int:
     return rc
 
 
-def _embed_payload_html(payload: dict, *, pretty: bool) -> str:
+def _embed_payload_html(payload: dict[str, Any], *, pretty: bool) -> str:
     n = HTML_TEMPLATE.count(MARKER)
     if n != 1:
         raise RuntimeError(f"HTML_TEMPLATE must contain {MARKER} exactly once (found {n})")
@@ -210,7 +210,7 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
     if not any("SMOKE: Planned task" in d for d in descs):
         raise RuntimeError("Strict: synthetic planned task description missing from tasks payload.")
 
-    def _parse_dt_any(s: str):
+    def _parse_dt_any(s: object) -> dt.datetime | None:
         """Parse a datetime string in either ISO or Taskwarrior compact forms. Returns aware UTC datetime or None."""
         if not s or not isinstance(s, str):
             return None
@@ -234,26 +234,26 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
         except Exception:
             return None
 
-    def _dt_to_iso_z(dt):
-        if dt is None:
+    def _dt_to_iso_z(value: dt.datetime | None) -> str | None:
+        if value is None:
             return None
         try:
             from datetime import timezone
 
-            dt = dt.astimezone(timezone.utc)
-            return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            value = value.astimezone(timezone.utc)
+            return value.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         except Exception:
             return None
 
-    def _ms(dt):
-        if dt is None:
+    def _ms(value: dt.datetime | None) -> int | None:
+        if value is None:
             return None
         try:
-            return int(dt.timestamp() * 1000)
+            return int(value.timestamp() * 1000)
         except Exception:
             return None
 
-    def _normalize_tags(v):
+    def _normalize_tags(v: object) -> list[str]:
         if v is None:
             return []
         if isinstance(v, list):
@@ -268,7 +268,7 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
             return [x for x in vv.split() if x]
         return [str(v)]
 
-    def _normalize_task_v1(t: dict) -> dict:
+    def _normalize_task_v1(t: dict[str, Any]) -> dict[str, Any]:
         """Return a normalized task dict suitable for UI consumption."""
         if not isinstance(t, dict):
             t = {"description": str(t)}
@@ -328,7 +328,7 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
         )
         return out
 
-    def _build_indices_v1(tasks: list[dict]) -> dict:
+    def _build_indices_v1(tasks: list[dict[str, Any]]) -> dict[str, Any]:
         by_uuid: dict[str, int] = {}
         by_status: dict[str, list[int]] = {}
         by_project: dict[str, list[int]] = {}
@@ -365,7 +365,7 @@ def _basic_html_checks(html: str, *, strict: bool = False) -> None:
             "by_day": by_day,
         }
 
-    def _apply_schema_v1(payload: dict) -> dict:
+    def _apply_schema_v1(payload: dict[str, Any]) -> dict[str, Any]:
         """Idempotently upgrade payload to schema v1 (versioned, normalized, indexed)."""
         if not isinstance(payload, dict):
             return payload
@@ -492,7 +492,7 @@ def main(argv: list[str] | None = None) -> int:
     if schema_req > int(LATEST_SCHEMA_VERSION):
         return _die(f"--schema {schema_req} unsupported (latest={LATEST_SCHEMA_VERSION})")
 
-    payload = upgrade_payload(payload, target_version=schema_req)  # type: ignore[arg-type]
+    payload = upgrade_payload(payload, target_version=schema_req)
 
     # Canonical JSON blob used BOTH for --out-json and HTML embedding
     payload_json = (

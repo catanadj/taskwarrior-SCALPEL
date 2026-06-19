@@ -5,20 +5,12 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from scalpel.html_extract import extract_payload_json_from_html_file
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
-
-try:
-    from scalpel.schema_contracts.v1 import validate_payload_v1  # type: ignore
-except Exception:  # pragma: no cover
-    validate_payload_v1 = None  # type: ignore
-
-try:
-    from scalpel.schema_contracts.v2 import validate_payload_v2  # type: ignore
-except Exception:  # pragma: no cover
-    validate_payload_v2 = None  # type: ignore
+from scalpel.schema_contracts.v1 import validate_payload_v1
+from scalpel.schema_contracts.v2 import validate_payload_v2
 
 
 def _die(msg: str, rc: int = 2) -> int:
@@ -44,12 +36,8 @@ def _declared_schema(payload: Dict[str, Any]) -> int:
 
 def _validate_schema(payload: Dict[str, Any], schema: int) -> List[str]:
     if schema == 1:
-        if validate_payload_v1 is None:
-            return ["schema v1 validator not available"]
         return list(validate_payload_v1(payload))
     if schema == 2:
-        if validate_payload_v2 is None:
-            return ["schema v2 validator not available"]
         return list(validate_payload_v2(payload))
     return [f"unsupported schema_version: {schema!r}"]
 
@@ -101,7 +89,7 @@ def _prepare_for_schema(payload_raw: Dict[str, Any], target_schema: int, *, requ
         return payload_raw
 
     # Otherwise, upgrade to requested schema.
-    return upgrade_payload(payload_raw, target_version=int(target_schema))  # type: ignore[arg-type]
+    return cast(Dict[str, Any], upgrade_payload(payload_raw, target_version=int(target_schema)))
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -182,8 +170,8 @@ def main(argv: List[str] | None = None) -> int:
 
     if all_errs:
         print("[scalpel-validate-payload] FAIL", file=sys.stderr)
-        for e in all_errs:
-            print(f"  - {e}", file=sys.stderr)
+        for error in all_errs:
+            print(f"  - {error}", file=sys.stderr)
         return 3
 
     print("[scalpel-validate-payload] OK")

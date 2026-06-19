@@ -5,9 +5,10 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from scalpel.ai import AiPlanResult
+from scalpel.model import CalendarConfig
 from scalpel.planner import (
     apply_overrides,
     op_align_ends,
@@ -91,7 +92,8 @@ def main(argv: List[str] | None = None) -> int:
     except Exception as e:
         return _die(f"Failed to load selected uuids: {e}")
 
-    cfg = payload.get("cfg", {}) if isinstance(payload.get("cfg"), dict) else {}
+    cfg_raw = payload.get("cfg")
+    cfg = cast(CalendarConfig, cfg_raw) if isinstance(cfg_raw, dict) else CalendarConfig()
     tz_name = cfg.get("tz") if isinstance(cfg.get("tz"), str) else "UTC"
 
     events = apply_overrides(payload.get("tasks", []), {}, cfg)
@@ -142,7 +144,7 @@ def main(argv: List[str] | None = None) -> int:
             slot_catalog[sid] = {"start_ms": int(v.start_ms), "due_ms": int(v.due_ms)}
             ops.append({"op": "place", "target": k, "slot_id": sid})
 
-        data = {
+        data: dict[str, Any] = {
             "schema": "scalpel.plan.v2",
             "ops": ops,
             "slot_catalog": slot_catalog,

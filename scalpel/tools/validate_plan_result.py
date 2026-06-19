@@ -41,8 +41,8 @@ def main(argv: List[str] | None = None) -> int:
 
     errs = validate_plan_result(obj)
     if errs:
-        for e in errs[:50]:
-            print(f"[scalpel-validate-plan-result] ERROR: {e}", file=sys.stderr)
+        for error in errs[:50]:
+            print(f"[scalpel-validate-plan-result] ERROR: {error}", file=sys.stderr)
         return 3
 
     print("[scalpel-validate-plan-result] OK")

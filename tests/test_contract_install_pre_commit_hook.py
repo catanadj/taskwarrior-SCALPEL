@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -10,7 +11,7 @@ class TestInstallPreCommitHookContract(unittest.TestCase):
     def test_installer_help_runs(self):
         self.assertTrue(INSTALLER.exists(), f"missing: {INSTALLER}")
         p = subprocess.run(
-            ["python3", str(INSTALLER), "--help"],
+            [sys.executable, str(INSTALLER), "--help"],
             cwd=str(REPO_ROOT),
             text=True,
             capture_output=True,

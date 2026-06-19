@@ -46,8 +46,8 @@ def _project_match(project: str, prefixes: List[str]) -> bool:
 
 def _goal_match(task: Dict[str, Any], goal: Dict[str, Any]) -> bool:
     project = str(task.get("project") or "")
-    tags = task.get("tags") if isinstance(task.get("tags"), list) else []
-    tags = [str(x) for x in tags if str(x).strip()]
+    tags_raw = task.get("tags")
+    tags = [str(x) for x in tags_raw if str(x).strip()] if isinstance(tags_raw, list) else []
 
     projects = goal.get("projects") or []
     tags_any = goal.get("tags") or []
@@ -186,16 +186,18 @@ def _apply_ops(
                 "description": desc,
                 "status": str(op.get("status") or "pending"),
             }
-            if isinstance(op.get("project"), str) and op.get("project").strip():
-                t["project"] = str(op.get("project")).strip()
+            project_raw = op.get("project")
+            if isinstance(project_raw, str) and project_raw.strip():
+                t["project"] = project_raw.strip()
             elif default_project:
                 t["project"] = default_project
             tags = op.get("tags")
             if isinstance(tags, list):
                 t["tags"] = [str(x) for x in tags if str(x).strip()]
             for k in ("due_iso", "scheduled_iso"):
-                if isinstance(op.get(k), str) and op.get(k).strip():
-                    tw = _iso_to_tw_utc(str(op.get(k)))
+                iso_raw = op.get(k)
+                if isinstance(iso_raw, str) and iso_raw.strip():
+                    tw = _iso_to_tw_utc(iso_raw)
                     t[k.replace("_iso", "")] = tw
             tasks_by_uuid[u] = t
         elif kind == "update_task":
@@ -239,11 +241,13 @@ def _summarize_ops(ops: List[Dict[str, Any]], tasks_by_uuid: Optional[Dict[str, 
                 matches = [u for u in tasks_by_uuid.keys() if isinstance(u, str) and u.startswith(target)]
                 if len(matches) == 1:
                     target = matches[0]
-            patch = op.get("patch") if isinstance(op.get("patch"), dict) else {}
+            patch_raw = op.get("patch")
+            patch: Dict[str, Any] = dict(patch_raw) if isinstance(patch_raw, dict) else {}
             keys = ", ".join(sorted(str(k) for k in patch.keys())) if patch else ""
             preview = ""
-            if isinstance(patch.get("description"), str):
-                new_desc = patch.get("description")
+            description_raw = patch.get("description")
+            if isinstance(description_raw, str):
+                new_desc = description_raw
                 old_desc = None
                 if tasks_by_uuid and target in tasks_by_uuid:
                     old_desc = tasks_by_uuid[target].get("description")
@@ -271,8 +275,8 @@ def _summarize_ops(ops: List[Dict[str, Any]], tasks_by_uuid: Optional[Dict[str, 
 
 
 def _diff_summary(before: List[Dict[str, Any]], after: List[Dict[str, Any]]) -> str:
-    bmap = {t.get("uuid"): t for t in before if isinstance(t.get("uuid"), str)}
-    amap = {t.get("uuid"): t for t in after if isinstance(t.get("uuid"), str)}
+    bmap = {str(t["uuid"]): t for t in before if isinstance(t.get("uuid"), str)}
+    amap = {str(t["uuid"]): t for t in after if isinstance(t.get("uuid"), str)}
 
     added = [u for u in amap.keys() if u not in bmap]
     updated = []
@@ -364,7 +368,8 @@ def _selection_summary(tasks: List[Dict[str, Any]]) -> str:
         by_status[st] = by_status.get(st, 0) + 1
         proj = str(t.get("project") or "").strip() or "(none)"
         by_project[proj] = by_project.get(proj, 0) + 1
-        tags = t.get("tags") if isinstance(t.get("tags"), list) else []
+        tags_raw = t.get("tags")
+        tags = tags_raw if isinstance(tags_raw, list) else []
         for tag in tags[:20]:
             tag_s = str(tag).strip()
             if tag_s:
@@ -380,10 +385,10 @@ def _update_summary(summary: str, user_prompt: str, plan_obj: Dict[str, Any], ma
     if summary:
         lines.append(summary.strip())
     lines.append(f"User: {user_prompt.strip()}")
-    ops = plan_obj.get("ops") if isinstance(plan_obj.get("ops"), list) else []
+    ops = _list_field(plan_obj, "ops")
     lines.append(f"Model ops: {len(ops)}")
-    warnings = plan_obj.get("warnings") if isinstance(plan_obj.get("warnings"), list) else []
-    notes = plan_obj.get("notes") if isinstance(plan_obj.get("notes"), list) else []
+    warnings = _list_field(plan_obj, "warnings")
+    notes = _list_field(plan_obj, "notes")
     if warnings:
         lines.append("Warnings: " + "; ".join(str(w) for w in warnings[:3]))
     if notes:
@@ -394,8 +399,8 @@ def _update_summary(summary: str, user_prompt: str, plan_obj: Dict[str, Any], ma
     return out
 
 
-def _normalize_ops(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out = []
+def _normalize_ops(ops: List[Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
     for op in ops:
         if not isinstance(op, dict):
             continue
@@ -410,6 +415,15 @@ def _normalize_ops(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             op["patch"] = patch
         out.append(op)
     return out
+
+
+def _list_field(obj: Dict[str, Any], key: str) -> List[Any]:
+    value = obj.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _tasks_map(tasks: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    return {str(task["uuid"]): task for task in tasks if isinstance(task.get("uuid"), str)}
 
 
 def _taskplan_schema() -> Dict[str, Any]:
@@ -552,10 +566,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         full_map[u] = s
     tasks_payload = []
     for t in selected:
-        u = t.get("uuid")
-        if not isinstance(u, str):
+        task_uuid = t.get("uuid")
+        if not isinstance(task_uuid, str):
             continue
-        uid = full_map.get(u, u)
+        uid = full_map.get(task_uuid, task_uuid)
         tasks_payload.append(
             {
                 "uuid": uid,
@@ -681,7 +695,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         ops = _normalize_ops(ops)
         plan_obj = dict(plan_obj)
         plan_obj["ops"] = ops
-        ambiguities = plan_obj.get("ambiguities") if isinstance(plan_obj.get("ambiguities"), list) else []
+        ambiguities = _list_field(plan_obj, "ambiguities")
         confidence = plan_obj.get("confidence")
         response = plan_obj.get("response") if isinstance(plan_obj.get("response"), str) else None
         clar_qs = plan_obj.get("clarifying_questions") if isinstance(plan_obj.get("clarifying_questions"), list) else []
@@ -721,34 +735,31 @@ def main(argv: Optional[List[str]] = None) -> int:
     last_plan: Optional[Dict[str, Any]] = None
     initial_prompt = (ns.prompt or "").strip()
     if initial_prompt:
+        initial_plan: Optional[Dict[str, Any]]
         try:
-            plan_obj = run_round(initial_prompt, summary)
+            initial_plan = run_round(initial_prompt, summary)
         except Exception as e:
             print(f"Request failed: {e}")
-            plan_obj = None
-        if plan_obj:
+            initial_plan = None
+        if initial_plan:
+            plan_obj = initial_plan
             if plan_obj.get("schema") != "scalpel.taskplan.v1":
                 print("Invalid schema in model output")
                 print(json.dumps(plan_obj, indent=2))
             else:
-                ops = plan_obj.get("ops") if isinstance(plan_obj.get("ops"), list) else []
-                ops = _normalize_ops(ops)
+                ops = _normalize_ops(_list_field(plan_obj, "ops"))
                 plan_obj = dict(plan_obj)
                 plan_obj["ops"] = ops
 
                 print("\nOps summary:")
-                tasks_map = {t.get("uuid"): t for t in tasks_full if isinstance(t.get("uuid"), str)}
+                tasks_map = _tasks_map(tasks_full)
                 print(_summarize_ops(ops, tasks_map) or "(none)")
 
-                warnings = plan_obj.get("warnings") if isinstance(plan_obj.get("warnings"), list) else []
-                ambiguities = plan_obj.get("ambiguities") if isinstance(plan_obj.get("ambiguities"), list) else []
-                suggestions = plan_obj.get("suggestions") if isinstance(plan_obj.get("suggestions"), list) else []
+                warnings = _list_field(plan_obj, "warnings")
+                ambiguities = _list_field(plan_obj, "ambiguities")
+                suggestions = _list_field(plan_obj, "suggestions")
                 response = plan_obj.get("response") if isinstance(plan_obj.get("response"), str) else None
-                clar_qs = (
-                    plan_obj.get("clarifying_questions")
-                    if isinstance(plan_obj.get("clarifying_questions"), list)
-                    else []
-                )
+                clar_qs = _list_field(plan_obj, "clarifying_questions")
                 confidence = plan_obj.get("confidence")
 
                 if warnings:
@@ -771,7 +782,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         print(f"- {s}")
 
                 if not ops:
-                    raw_ops = plan_obj.get("ops") if isinstance(plan_obj.get("ops"), list) else []
+                    raw_ops = _list_field(plan_obj, "ops")
                     print("\nNo actionable ops. Refine the prompt.")
                     if raw_ops:
                         print("\nRaw ops (first 5):")
@@ -803,7 +814,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if not last_plan:
                 print("No plan to accept yet.")
                 continue
-            ops = last_plan.get("ops") if isinstance(last_plan.get("ops"), list) else []
+            ops = _normalize_ops(_list_field(last_plan, "ops"))
             try:
                 if ns.out_mode == "full":
                     merged = _apply_ops(list(tasks_full), ops, default_project=default_project)
@@ -857,14 +868,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         plan_obj["ops"] = ops
 
         print("\nOps summary:")
-        tasks_map = {t.get("uuid"): t for t in tasks_full if isinstance(t.get("uuid"), str)}
+        tasks_map = _tasks_map(tasks_full)
         print(_summarize_ops(ops, tasks_map) or "(none)")
-        warnings = plan_obj.get("warnings") if isinstance(plan_obj.get("warnings"), list) else []
-        ambiguities = plan_obj.get("ambiguities") if isinstance(plan_obj.get("ambiguities"), list) else []
-        suggestions = plan_obj.get("suggestions") if isinstance(plan_obj.get("suggestions"), list) else []
+        warnings = _list_field(plan_obj, "warnings")
+        ambiguities = _list_field(plan_obj, "ambiguities")
+        suggestions = _list_field(plan_obj, "suggestions")
         confidence = plan_obj.get("confidence")
         response = plan_obj.get("response") if isinstance(plan_obj.get("response"), str) else None
-        clar_qs = plan_obj.get("clarifying_questions") if isinstance(plan_obj.get("clarifying_questions"), list) else []
+        clar_qs = _list_field(plan_obj, "clarifying_questions")
         if warnings:
             print("\nWarnings:")
             for w in warnings:
@@ -884,7 +895,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             for s in suggestions:
                 print(f"- {s}")
         if not ops:
-            raw_ops = plan_obj.get("ops") if isinstance(plan_obj.get("ops"), list) else []
+            raw_ops = _list_field(plan_obj, "ops")
             print("\nNo actionable ops. Refine the prompt.")
             if raw_ops:
                 print("\nRaw ops (first 5):")

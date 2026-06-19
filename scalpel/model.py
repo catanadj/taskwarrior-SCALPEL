@@ -71,6 +71,7 @@ class CalendarConfig(TypedDict, total=False):
     px_per_min: float
     view_start_ms: int
     view_key: str
+    viewwin_seed: dict[str, Any]
 
 
 class Payload(TypedDict, total=False):

@@ -16,7 +16,7 @@ from typing import Any, cast
 from scalpel.html_extract import extract_payload_json_from_html_file
 from scalpel.model import Payload as ScalpelPayload
 from scalpel.model import Task
-from scalpel.query_lang import Query
+from scalpel.query_lang import Query as Query
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import assert_valid_payload
 
@@ -141,7 +141,7 @@ def load_payload_from_json(
         payload = cast(ScalpelPayload, upgraded)
 
     if validate:
-        assert_valid_payload(payload)
+        assert_valid_payload(cast(dict[str, Any], payload))
 
     return payload
 
@@ -163,7 +163,7 @@ def normalize_payload(
     out = cast(ScalpelPayload, out_raw)
 
     if validate:
-        assert_valid_payload(out)
+        assert_valid_payload(cast(dict[str, Any], out))
 
     return out
 

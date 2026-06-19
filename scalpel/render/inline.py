@@ -2,24 +2,25 @@
 from __future__ import annotations
 
 import json
+from typing import Any, Mapping
 
 from .template import HTML_TEMPLATE
 
 try:
-    import orjson  # type: ignore
+    import orjson  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
-    orjson = None  # type: ignore
+    orjson = None
 
 _DATA_MARKER = "__DATA_JSON__"
 _DATA_MARKER_COUNT = HTML_TEMPLATE.count(_DATA_MARKER)
 
 
-def build_html(payload: dict) -> str:
+def build_html(payload: Mapping[str, Any]) -> str:
     # Inject DATA JSON into the HTML template.
     # Hardening:
     #   - Template must contain the __DATA_JSON__ placeholder exactly once.
     #   - Generated HTML must not contain the placeholder after injection.
-    if not isinstance(payload, dict):
+    if not isinstance(payload, Mapping):
         raise TypeError(f"payload must be dict, got {type(payload).__name__}")
 
     if _DATA_MARKER_COUNT != 1:

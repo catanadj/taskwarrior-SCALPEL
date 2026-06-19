@@ -6,9 +6,10 @@ import copy
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from scalpel.ai import apply_plan_overrides, apply_plan_result, load_plan_overrides, load_plan_result
+from scalpel.model import Payload
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import validate_payload
 
@@ -83,9 +84,9 @@ def main(argv: List[str] | None = None) -> int:
         return _die(str(e))
 
     # Default behavior: upgrade to v2 (latest). This is the v2-default lock.
-    payload = payload_raw
+    payload = cast(Payload, payload_raw)
     if _declared_schema(payload_raw) != target or _declared_schema(payload_raw) < 1:
-        payload = upgrade_payload(payload_raw, target_version=int(target))  # type: ignore[arg-type]
+        payload = upgrade_payload(payload_raw, target_version=int(target))
 
     if ns.plan_overrides:
         try:
@@ -101,7 +102,7 @@ def main(argv: List[str] | None = None) -> int:
             return _die(f"Failed to apply plan result: {e}")
 
     # Validate (on a deep copy to avoid accidental mutation).
-    errs = validate_payload(copy.deepcopy(payload))
+    errs = validate_payload(cast(dict[str, Any], copy.deepcopy(payload)))
     if errs:
         msg = "; ".join(errs[:10])
         return _die(f"Invalid payload: {msg}", rc=3)
@@ -109,7 +110,7 @@ def main(argv: List[str] | None = None) -> int:
     # Render by embedding JSON directly into the HTML template marker.
     # This guarantees extract_payload_json_from_html_file(replay.html) == embedded payload (dict-equal).
     try:
-        from scalpel.render.template import HTML_TEMPLATE  # type: ignore
+        from scalpel.render.template import HTML_TEMPLATE
     except Exception as e:
         return _die(f"Failed to import HTML_TEMPLATE: {e}")
 
@@ -122,16 +123,12 @@ def main(argv: List[str] | None = None) -> int:
     html = HTML_TEMPLATE.replace(marker, data_json)
 
     if bool(ns.strict):
-        # Best-effort: strict checks are optional for the tool.
         try:
-            from scalpel.html_checks import basic_html_checks  # type: ignore
-        except Exception:
-            basic_html_checks = None
-        if basic_html_checks is not None:
-            try:
-                basic_html_checks(html, strict=True)  # type: ignore[misc]
-            except Exception as e:
-                return _die(f"Strict HTML checks failed: {e}", rc=4)
+            from scalpel.tools.smoke_build import _basic_html_checks
+
+            _basic_html_checks(html, strict=True)
+        except Exception as e:
+            return _die(f"Strict HTML checks failed: {e}", rc=4)
 
     out = Path(ns.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)

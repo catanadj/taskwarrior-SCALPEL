@@ -94,7 +94,7 @@ def validate_payload_v2(payload: Dict[str, Any]) -> List[str]:
                 errs.append(f"tasks[{i}] must be dict")
                 continue
             u = t.get("uuid")
-            _require(isinstance(u, str) and u.strip(), f"tasks[{i}].uuid must be non-empty string", errs)
+            _require(isinstance(u, str) and bool(u.strip()), f"tasks[{i}].uuid must be non-empty string", errs)
             st = t.get("status")
             _require(isinstance(st, str) and bool(st), f"tasks[{i}].status must be non-empty string", errs)
             tags = t.get("tags")

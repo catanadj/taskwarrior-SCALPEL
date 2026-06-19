@@ -515,10 +515,7 @@ def build_payload(
 
     payload: Payload = {"cfg": cfg, "tasks": tasks, "goals": goals_cfg}
     if plan_overrides:
-        payload = cast(
-            Payload,
-            apply_plan_overrides(cast(dict[str, Any], payload), plan_overrides, normalize=False),
-        )
+        payload = apply_plan_overrides(payload, plan_overrides, normalize=False)
 
     # v2 is applied by callers/tools via scalpel.schema.upgrade_payload.
     return cast(Payload, apply_schema_v1(payload))

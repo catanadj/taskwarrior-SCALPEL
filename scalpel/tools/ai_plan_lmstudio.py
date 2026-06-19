@@ -91,7 +91,8 @@ def _extract_json_from_text(text: str) -> Dict[str, Any]:
 
 
 def _build_prompt_v1(payload: Dict[str, Any], selected: List[str], user_prompt: str) -> str:
-    cfg = payload.get("cfg") if isinstance(payload.get("cfg"), dict) else {}
+    cfg_raw = payload.get("cfg")
+    cfg: Dict[str, Any] = dict(cfg_raw) if isinstance(cfg_raw, dict) else {}
     tasks = _extract_tasks(payload, selected)
     return json.dumps(
         {
@@ -131,7 +132,8 @@ def _build_prompt_v2(
     *,
     max_slots_per_task: int,
 ) -> Tuple[str, Dict[str, Dict[str, int]]]:
-    cfg = payload.get("cfg") if isinstance(payload.get("cfg"), dict) else {}
+    cfg_raw = payload.get("cfg")
+    cfg: Dict[str, Any] = dict(cfg_raw) if isinstance(cfg_raw, dict) else {}
     tz_name = normalize_tz_name(cfg.get("tz") if isinstance(cfg.get("tz"), str) else "local")
     tz = resolve_tz(tz_name)
     now_iso = dt.datetime.now(tz=tz).replace(second=0, microsecond=0).isoformat(timespec="minutes")
@@ -429,7 +431,7 @@ def main(argv: List[str] | None = None) -> int:
 
     try:
         choices = resp.get("choices")
-        content = None
+        content: str | None = None
         if isinstance(choices, list) and choices:
             msg = choices[0].get("message") if isinstance(choices[0], dict) else None
             if isinstance(msg, dict):
@@ -440,7 +442,7 @@ def main(argv: List[str] | None = None) -> int:
             Path(ns.raw_out).write_text(content, encoding="utf-8")
         plan_obj = _extract_json_from_text(content)
     except Exception as e:
-        if ns.raw_out and isinstance(locals().get("content"), str):
+        if ns.raw_out and isinstance(content, str):
             try:
                 Path(ns.raw_out).write_text(content, encoding="utf-8")
             except Exception:
@@ -453,8 +455,8 @@ def main(argv: List[str] | None = None) -> int:
             existing = plan_obj.get("slot_catalog")
             if isinstance(existing, dict):
                 merged = dict(existing)
-                for k, v in slot_catalog.items():
-                    merged.setdefault(k, v)
+                for k, catalog_entry in slot_catalog.items():
+                    merged.setdefault(k, catalog_entry)
                 plan_obj["slot_catalog"] = merged
             else:
                 plan_obj["slot_catalog"] = slot_catalog
@@ -470,10 +472,14 @@ def main(argv: List[str] | None = None) -> int:
         if ns.overrides_in:
             try:
                 overrides = load_plan_overrides(Path(ns.overrides_in))
-                ov = plan_obj.get("overrides") if isinstance(plan_obj.get("overrides"), dict) else {}
-                merged = dict(ov)
-                for k, v in overrides.items():
-                    merged[k] = {"start_ms": v.start_ms, "due_ms": v.due_ms, "duration_min": v.duration_min}
+                overrides_raw = plan_obj.get("overrides")
+                merged = dict(overrides_raw) if isinstance(overrides_raw, dict) else {}
+                for k, override in overrides.items():
+                    merged[k] = {
+                        "start_ms": override.start_ms,
+                        "due_ms": override.due_ms,
+                        "duration_min": override.duration_min,
+                    }
                 plan_obj["overrides"] = merged
             except Exception as e:
                 return _die(f"Failed to merge overrides: {e}")

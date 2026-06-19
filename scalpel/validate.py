@@ -62,7 +62,7 @@ def _validate_common(payload: Dict[str, Any], *, label: str, expect_version: int
                 errs.append(f"{label}: tasks[{i}] must be dict")
                 continue
             u = t.get("uuid")
-            _require(isinstance(u, str) and u.strip(), f"{label}: tasks[{i}].uuid must be non-empty string", errs)
+            _require(isinstance(u, str) and bool(u.strip()), f"{label}: tasks[{i}].uuid must be non-empty string", errs)
             _require(
                 isinstance(t.get("status"), str) and bool(t.get("status")),
                 f"{label}: tasks[{i}].status must be non-empty string",

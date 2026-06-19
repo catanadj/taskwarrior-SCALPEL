@@ -6,8 +6,8 @@ Public API:
 
 from __future__ import annotations
 
-from .api import *  # noqa: F401,F403
 from . import api as _api
+from .api import *  # noqa: F401,F403
 
 __all__ = list(_api.__all__)
 
@@ -23,10 +23,4 @@ from .api import (
     tasks_by_project,
     tasks_by_tag,
     tasks_by_day,
-
-
-
-
-
 )
-

@@ -122,10 +122,10 @@ def compile_plan_v2(obj: Dict[str, Any]) -> AiPlanResult:
     for op in ops:
         if not isinstance(op, dict):
             raise ValueError("ops entries must be objects")
-        kind = op.get("op")
-        if not _is_nonempty_str(kind):
+        kind_raw = op.get("op")
+        if not _is_nonempty_str(kind_raw):
             raise ValueError("each op must include non-empty string 'op'")
-        kind = str(kind).strip()
+        kind = str(kind_raw).strip()
 
         if kind == "create_task":
             tid = op.get("temp_id")
@@ -148,8 +148,9 @@ def compile_plan_v2(obj: Dict[str, Any]) -> AiPlanResult:
                 t["tags"] = [str(x) for x in tags if str(x).strip()]
             elif isinstance(tags, str) and tags.strip():
                 t["tags"] = [x for x in tags.split() if x]
-            if isinstance(op.get("duration_min"), int) and int(op.get("duration_min")) > 0:
-                t["duration_min"] = int(op.get("duration_min"))
+            duration = op.get("duration_min")
+            if isinstance(duration, int) and duration > 0:
+                t["duration_min"] = duration
             added_tasks.append(t)
 
         elif kind == "split_task":
@@ -188,8 +189,8 @@ def compile_plan_v2(obj: Dict[str, Any]) -> AiPlanResult:
         elif kind == "place":
             target = resolve_target_id(op.get("target"))
             slot_id = op.get("slot_id")
-            start_ms = None
-            due_ms = None
+            start_ms: int
+            due_ms: int
 
             if _is_nonempty_str(slot_id):
                 slot = slot_catalog.get(str(slot_id).strip())
@@ -214,8 +215,8 @@ def compile_plan_v2(obj: Dict[str, Any]) -> AiPlanResult:
             overrides[target] = PlanOverride(start_ms=int(start_ms), due_ms=int(due_ms), duration_min=duration_min)
 
         elif kind == "update_task":
-            target = op.get("uuid") if _is_nonempty_str(op.get("uuid")) else op.get("target")
-            uuid = resolve_target_id(target)
+            target_raw = op.get("uuid") if _is_nonempty_str(op.get("uuid")) else op.get("target")
+            uuid = resolve_target_id(target_raw)
             patch = op.get("patch")
             if not isinstance(patch, dict):
                 raise ValueError("update_task must include patch object")

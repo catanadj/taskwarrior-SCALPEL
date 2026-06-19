@@ -1,6 +1,8 @@
 # scalpel/render/template.py
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from .html_markup import BODY_MARKUP
 from .html_shell import HTML_SHELL
 from .inline_css import CSS_BLOCK
@@ -14,7 +16,7 @@ HTML_TEMPLATE = (
 )
 
 
-def build_html(data: dict) -> str:
+def build_html(data: Mapping[str, Any]) -> str:
     import json
 
     payload = json.dumps(data, ensure_ascii=False)

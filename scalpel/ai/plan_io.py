@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Tuple, cast
+from typing import Any, Dict, Tuple
 
 from .interface import AiPlanResult, PlanOverride
 from .plan_contract import validate_plan_result
@@ -31,7 +31,7 @@ def load_plan_result(path: Path) -> AiPlanResult:
     schema = obj.get("schema")
     if schema == "scalpel.plan.v2":
         # Compile op-based plan into the stable AiPlanResult shape.
-        return cast(AiPlanResult, compile_plan_v2(obj))
+        return compile_plan_v2(obj)
 
     overrides_raw = obj.get("overrides") or {}
     if not isinstance(overrides_raw, dict):

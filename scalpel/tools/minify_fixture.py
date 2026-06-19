@@ -7,8 +7,9 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
+from scalpel.model import Payload
 from scalpel.query_lang import Query, QueryError
 from scalpel.schema import LATEST_SCHEMA_VERSION, upgrade_payload
 from scalpel.validate import validate_payload
@@ -240,7 +241,7 @@ def main(argv: List[str] | None = None) -> int:
 
     # Upgrade once to target schema, then force indices to exist for Query + contracts.
     try:
-        payload_up = upgrade_payload(payload_in, target_version=int(schema))  # type: ignore[arg-type]
+        payload_up = upgrade_payload(payload_in, target_version=int(schema))
         if not isinstance(payload_up, dict):
             raise MinifyError("upgrade_payload() did not return a dict")
         payload_up = _ensure_indices(payload_up)
@@ -249,7 +250,7 @@ def main(argv: List[str] | None = None) -> int:
 
     try:
         q = Query.parse(str(ns.q))
-        selected = q.run(payload_up)
+        selected = q.run(cast(Payload, payload_up))
     except QueryError as e:
         return _die(f"Query parse/run failed: {e}")
 
@@ -268,7 +269,7 @@ def main(argv: List[str] | None = None) -> int:
             continue
         u = t.get("uuid")
         if isinstance(u, str) and u.strip() in keep:
-            min_tasks.append(t)
+            min_tasks.append(dict(t))
 
     out_payload = dict(payload_up)
     out_payload["tasks"] = min_tasks

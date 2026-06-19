@@ -50,13 +50,13 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
         return None
 
     if isinstance(raw, dict) and isinstance(raw.get("goals"), list):
-        goals = raw.get("goals")
+        goals: list[Any] = raw["goals"]
     elif isinstance(raw, list):
         goals = raw
     else:
         return None
 
-    out = []
+    out: list[dict[str, Any]] = []
     for g in goals:
         if not isinstance(g, dict):
             continue

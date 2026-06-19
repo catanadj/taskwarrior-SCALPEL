@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,7 +24,7 @@ class TestGoldenLargePayloadFixtureContract(unittest.TestCase):
         self.assertTrue(GEN.exists(), f"missing generator: {GEN}")
         with tempfile.TemporaryDirectory() as td:
             outp = Path(td) / "golden_payload_large_v1.json"
-            cmd = ["python3", str(GEN), "--out", str(outp)]
+            cmd = [sys.executable, str(GEN), "--out", str(outp)]
             p = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, (p.stdout or "") + "\n" + (p.stderr or ""))
 
@@ -34,7 +35,7 @@ class TestGoldenLargePayloadFixtureContract(unittest.TestCase):
             )
 
     def test_fixture_validates_with_validate_payload_tool(self):
-        cmd = ["python3", "-m", "scalpel.tools.validate_payload", "--in", str(FIXTURE)]
+        cmd = [sys.executable, "-m", "scalpel.tools.validate_payload", "--in", str(FIXTURE)]
         p = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         self.assertEqual(p.returncode, 0, combined)

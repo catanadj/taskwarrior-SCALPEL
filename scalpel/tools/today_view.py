@@ -6,7 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from scalpel.payload import build_payload
 from scalpel.util.timeparse import parse_workhours
@@ -285,7 +285,7 @@ def main(argv: list[str] | None = None) -> None:
 
     day_payloads = [
         _day_payload(
-            payload=payload,
+            payload=cast(Dict[str, Any], payload),
             day=d,
             tzinfo=tzinfo,
             work_start=work_start,
