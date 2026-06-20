@@ -1,4 +1,6 @@
 # scalpel/render/js/drag_resize.py
 from __future__ import annotations
 
-from .part06_drag_resize import JS_PART as JS_PART
+from ..assets import read_render_asset
+
+JS_PART = read_render_asset("js/part06_drag_resize.js")

@@ -1,4 +1,6 @@
 # scalpel/render/js/init.py
 from __future__ import annotations
 
-from .part07_init import JS_PART as JS_PART
+from ..assets import read_render_asset
+
+JS_PART = read_render_asset("js/part07_init.js")

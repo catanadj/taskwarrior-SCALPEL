@@ -1,8 +1,10 @@
 # scalpel/render/js/core.py
 from __future__ import annotations
 
-from .part01_core import JS_PART as _CORE
-from .persist import JS_PART as _PERSIST
+from ..assets import read_render_asset
+
+_CORE = read_render_asset("js/part01_core.js")
+_PERSIST = read_render_asset("js/persist.js")
 
 
 def _inject_after_use_strict(js: str, inject: str) -> str:

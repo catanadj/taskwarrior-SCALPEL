@@ -1,7 +1,4 @@
-# scalpel/render/css/part07_modals_misc.py
-from __future__ import annotations
-
-CSS_PART = r"""  .modal {
+  .modal {
     width: min(720px, 100%);
     max-height: min(90vh, 920px);
     background:
@@ -995,4 +992,3 @@ CSS_PART = r"""  .modal {
   .themedit-alpha input[type="range"]{ flex: 1 1 auto; }
   #themeEditNameInput{ min-width: 220px; }
 
-"""

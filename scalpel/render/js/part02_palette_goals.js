@@ -1,7 +1,4 @@
-# scalpel/render/js/part02_palette_goals.py
-from __future__ import annotations
-
-JS_PART = r"""// Palette colors (projects/tags)
+// Palette colors (projects/tags)
   // Persistence helpers (KV) + global focus key
   const FOCUS_GLOBAL_KEY = 'scalpel.focus.global';
 
@@ -1679,4 +1676,3 @@ function buildAddCommandForLocal(uuid, desc) {
   }
 
   // -----------------------------
-"""

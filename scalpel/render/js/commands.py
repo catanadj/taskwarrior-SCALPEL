@@ -1,4 +1,6 @@
 # scalpel/render/js/commands.py
 from __future__ import annotations
 
-from .part05_commands import JS_PART as JS_PART
+from ..assets import read_render_asset
+
+JS_PART = read_render_asset("js/part05_commands.js")

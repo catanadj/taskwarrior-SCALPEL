@@ -1,7 +1,4 @@
-# scalpel/render/js/part03_selection_ops.py
-from __future__ import annotations
-
-JS_PART = r"""// Selection model
+// Selection model
   // -----------------------------
   const selected = new Set(); // uuid
   let selectionLead = null;   // uuid
@@ -2062,4 +2059,3 @@ function renderPaletteFromEvents(events) {
   });
 
   // -----------------------------
-"""

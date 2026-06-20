@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class TestNotesToggleContract(unittest.TestCase):
     def test_showing_notes_opens_actions_section(self) -> None:
-        text = (REPO_ROOT / "scalpel" / "render" / "js" / "part08_notes.py").read_text(
+        text = (REPO_ROOT / "scalpel" / "render" / "js" / "part08_notes.js").read_text(
             encoding="utf-8",
             errors="replace",
         )

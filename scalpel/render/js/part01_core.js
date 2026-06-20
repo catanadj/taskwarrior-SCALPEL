@@ -1,7 +1,4 @@
-# scalpel/render/js/part01_core.py
-from __future__ import annotations
 
-JS_PART = r"""
 (() => {
   "use strict";
 
@@ -880,4 +877,3 @@ startYmd: ymdFromMs(cfg.view_start_ms),
     if (changed) __scalpelInvalidateTimeCaches("effective");
   }
   loadEdits();
-"""

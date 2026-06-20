@@ -1,7 +1,4 @@
-# scalpel/render/js/part06_drag_resize.py
-from __future__ import annotations
-
-JS_PART = r"""// Drag / Resize engine
+// Drag / Resize engine
   // -----------------------------
   function autoScrollDaysPane(x, y) {
     const pane = getDaysPane();
@@ -1385,4 +1382,3 @@ JS_PART = r"""// Drag / Resize engine
   })();
 
   // -----------------------------
-"""

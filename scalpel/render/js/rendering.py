@@ -1,4 +1,6 @@
 # scalpel/render/js/rendering.py
 from __future__ import annotations
 
-from .part04_rendering import JS_PART as JS_PART
+from ..assets import read_render_asset
+
+JS_PART = read_render_asset("js/part04_rendering.js")

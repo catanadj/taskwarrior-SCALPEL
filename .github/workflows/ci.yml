@@ -61,6 +61,14 @@ jobs:
       - name: Frontend Syntax Gate
         run: python -m scalpel.tools.check_frontend --require-node
 
+      - name: Wheel Frontend Asset Gate
+        run: |
+          python -m pip wheel --no-deps --wheel-dir /tmp/scalpel-wheel .
+          python -m venv /tmp/scalpel-wheel-venv
+          /tmp/scalpel-wheel-venv/bin/pip install /tmp/scalpel-wheel/*.whl
+          cd /tmp
+          /tmp/scalpel-wheel-venv/bin/python -m scalpel.tools.check_frontend --require-node
+
   compatibility:
     runs-on: ubuntu-latest
     strategy:

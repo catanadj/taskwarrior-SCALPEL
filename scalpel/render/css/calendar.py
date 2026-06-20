@@ -1,4 +1,6 @@
 # scalpel/render/css/calendar.py
 from __future__ import annotations
 
-from .part05_calendar import CSS_PART as CSS_PART
+from ..assets import read_render_asset
+
+CSS_PART = read_render_asset("css/part05_calendar.css")

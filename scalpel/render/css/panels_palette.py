@@ -1,4 +1,6 @@
 # scalpel/render/css/panels_palette.py
 from __future__ import annotations
 
-from .part04_panels_palette import CSS_PART as CSS_PART
+from ..assets import read_render_asset
+
+CSS_PART = read_render_asset("css/part04_panels_palette.css")
