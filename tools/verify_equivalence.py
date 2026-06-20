@@ -438,12 +438,12 @@ def main() -> None:
         try:
             check_payload_invariants(p_new)
         except Exception as ex:
-            raise SystemExit(f"NEW payload invariant failure: {ex}")
+            raise SystemExit(f"NEW payload invariant failure: {ex}") from ex
 
         try:
             check_payload_invariants(p_old)
         except Exception as ex:
-            raise SystemExit(f"OLD payload invariant failure: {ex}")
+            raise SystemExit(f"OLD payload invariant failure: {ex}") from ex
 
         fp_new = payload_fingerprint(p_new)
         fp_old = payload_fingerprint(p_old)

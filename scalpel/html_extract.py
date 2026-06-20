@@ -115,7 +115,7 @@ def extract_payload_json_from_html_text(html_text: str) -> dict[str, Any]:
             continue
         try:
             payload = json.loads(_html.unescape(body))
-        except Exception:
+        except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
             return cast(dict[str, Any], payload)
@@ -128,7 +128,7 @@ def extract_payload_json_from_html_text(html_text: str) -> dict[str, Any]:
             continue
         try:
             payload = json.loads(_html.unescape(body))
-        except Exception:
+        except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
             return cast(dict[str, Any], payload)

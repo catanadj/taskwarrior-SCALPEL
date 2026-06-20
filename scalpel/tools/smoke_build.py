@@ -452,14 +452,14 @@ def main(argv: list[str] | None = None) -> int:
         try:
             start_date = today_date(resolve_tz(tz_name))
         except ValueError as e:
-            raise SystemExit(f"Invalid --tz value: {e}")
+            raise SystemExit(f"Invalid --tz value: {e}") from e
     tz_name = normalize_tz_name(getattr(args, "tz", os.getenv("SCALPEL_TZ", "local")))
     display_tz = normalize_tz_name(getattr(args, "display_tz", os.getenv("SCALPEL_DISPLAY_TZ", "local")))
     try:
         resolve_tz(tz_name)
         resolve_tz(display_tz)
     except ValueError as e:
-        raise SystemExit(f"Invalid timezone value: {e}")
+        raise SystemExit(f"Invalid timezone value: {e}") from e
 
     view_start_ms = _midnight_ms(start_date, tz_name)
 

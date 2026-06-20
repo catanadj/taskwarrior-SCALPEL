@@ -4,6 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
+from scalpel.process import CommandNotFoundError, CommandTimeoutError
 from scalpel.taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
 
 
@@ -30,18 +31,29 @@ class TestTaskwarriorFilterQuotingContract(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             run_task_export('project:"unterminated')
         self.assertIn("Invalid Taskwarrior filter expression", str(ctx.exception))
+        self.assertIsInstance(ctx.exception.__cause__, ValueError)
 
     def test_missing_task_binary_fails_with_actionable_message(self) -> None:
         with patch("subprocess.run", side_effect=FileNotFoundError()):
             with self.assertRaises(SystemExit) as ctx:
                 run_task_export("status:pending")
         self.assertIn("binary 'task' not found", str(ctx.exception))
+        self.assertIsInstance(ctx.exception.__cause__, CommandNotFoundError)
 
     def test_task_export_timeout_fails_fast(self) -> None:
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["task"], timeout=0.01)):
             with self.assertRaises(SystemExit) as ctx:
                 run_task_export("status:pending")
         self.assertIn("timed out", str(ctx.exception))
+        self.assertIsInstance(ctx.exception.__cause__, CommandTimeoutError)
+
+    def test_invalid_export_json_preserves_decode_cause(self) -> None:
+        completed = subprocess.CompletedProcess(["task", "export"], 0, stdout=b"{", stderr=b"")
+        with patch("subprocess.run", return_value=completed):
+            with self.assertRaises(SystemExit) as ctx:
+                run_task_export("status:pending")
+        self.assertIn("Failed to parse", str(ctx.exception))
+        self.assertIsInstance(ctx.exception.__cause__, ValueError)
 
     def test_malformed_compact_timestamp_returns_none(self) -> None:
         self.assertIsNone(parse_tw_utc_to_epoch_ms("20251301T000000Z"))

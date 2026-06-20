@@ -46,7 +46,7 @@ def load_goals_config(path: str) -> Optional[Dict[str, Any]]:
             return None
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
-    except Exception:
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
 
     if isinstance(raw, dict) and isinstance(raw.get("goals"), list):

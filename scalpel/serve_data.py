@@ -58,16 +58,16 @@ def run_timew_export_for_day(
             timeout_s=_timew_timeout_s(),
             run_proc=run_proc,
         )
-    except CommandNotFoundError:
-        raise SystemExit("Timewarrior binary 'timew' not found on PATH.")
-    except CommandTimeoutError:
-        raise SystemExit("Timewarrior export timed out.")
+    except CommandNotFoundError as ex:
+        raise SystemExit("Timewarrior binary 'timew' not found on PATH.") from ex
+    except CommandTimeoutError as ex:
+        raise SystemExit("Timewarrior export timed out.") from ex
     except CommandFailedError as ex:
         err = ex.result.combined_output.strip()
         msg = f"Timewarrior export failed (exit {ex.result.returncode})."
         if err:
             msg = f"{msg} {err}"
-        raise SystemExit(msg)
+        raise SystemExit(msg) from ex
 
     text = result.stdout.strip()
     if not text:
@@ -75,8 +75,8 @@ def run_timew_export_for_day(
 
     try:
         raw = json.loads(text)
-    except Exception as e:
-        raise SystemExit(f"Failed to parse `timew export` JSON: {e}")
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Failed to parse `timew export` JSON: {e}") from e
     if not isinstance(raw, list):
         raise SystemExit("`timew export` did not return a JSON list.")
 

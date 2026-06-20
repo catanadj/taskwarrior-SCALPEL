@@ -104,8 +104,8 @@ def _build_smoke_payload_v1(repo: Path) -> Dict[str, Any]:
         except CommandFailedError as ex:
             combined = ex.result.combined_output.strip()
             if combined:
-                raise SystemExit(f"smoke_build fixture generation failed:\n{combined}")
-            raise SystemExit("smoke_build fixture generation failed.")
+                raise SystemExit(f"smoke_build fixture generation failed:\n{combined}") from ex
+            raise SystemExit("smoke_build fixture generation failed.") from ex
 
         raw = json.loads(out_json.read_text(encoding="utf-8", errors="replace"))
         if not isinstance(raw, dict):

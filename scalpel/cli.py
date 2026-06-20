@@ -134,7 +134,7 @@ def _resolve_out_path(out_arg: str, default_out: str) -> str:
                 file=sys.stderr,
             )
         else:
-            raise SystemExit(f"Cannot create output directory '{Path(out_path).parent}': {e}")
+            raise SystemExit(f"Cannot create output directory '{Path(out_path).parent}': {e}") from e
     return out_path
 
 
@@ -144,7 +144,7 @@ def _resolve_start_date(start_arg: str | None, tz_name: str) -> dt.date:
     try:
         return today_date(resolve_tz(tz_name))
     except ValueError as e:
-        raise SystemExit(f"Invalid --tz value: {e}")
+        raise SystemExit(f"Invalid --tz value: {e}") from e
 
 
 def _load_plan_inputs(args: argparse.Namespace) -> tuple[dict[str, PlanOverride] | None, AiPlanResult | None]:
@@ -154,12 +154,12 @@ def _load_plan_inputs(args: argparse.Namespace) -> tuple[dict[str, PlanOverride]
         try:
             plan_overrides = load_plan_overrides(Path(args.plan_overrides))
         except Exception as e:
-            raise SystemExit(f"Failed to load plan overrides: {e}")
+            raise SystemExit(f"Failed to load plan overrides: {e}") from e
     if args.plan_result:
         try:
             plan_result = load_plan_result(Path(args.plan_result))
         except Exception as e:
-            raise SystemExit(f"Failed to load plan result: {e}")
+            raise SystemExit(f"Failed to load plan result: {e}") from e
     return plan_overrides, plan_result
 
 

@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         today = today_date(resolve_tz(tz_name))
     except ValueError as e:
-        raise SystemExit(f"Invalid --tz value: {e}")
+        raise SystemExit(f"Invalid --tz value: {e}") from e
     start_date = today - dt.timedelta(days=1)
 
     work_start, work_end = parse_workhours(args.workhours)

@@ -67,7 +67,7 @@ def run_task_export(filter_str: str) -> list[RawTask]:
         try:
             cmd += shlex.split(filter_str.strip(), posix=True)
         except ValueError as ex:
-            raise SystemExit(f"Invalid Taskwarrior filter expression: {ex}")
+            raise SystemExit(f"Invalid Taskwarrior filter expression: {ex}") from ex
     cmd += ["export"]
 
     timeout_s = _task_export_timeout_s()
@@ -77,16 +77,16 @@ def run_task_export(filter_str: str) -> list[RawTask]:
             cmd,
             timeout_s=timeout_s,
         )
-    except CommandNotFoundError:
-        raise SystemExit("Taskwarrior binary 'task' not found on PATH.")
-    except CommandTimeoutError:
-        raise SystemExit(f"Taskwarrior export timed out after {timeout_s:.1f}s.")
+    except CommandNotFoundError as ex:
+        raise SystemExit("Taskwarrior binary 'task' not found on PATH.") from ex
+    except CommandTimeoutError as ex:
+        raise SystemExit(f"Taskwarrior export timed out after {timeout_s:.1f}s.") from ex
     except CommandFailedError as ex:
         elapsed_ms = int((time.monotonic() - t0) * 1000)
         out_err = ex.result.combined_output
         if out_err:
             eprint(out_err)
-        raise SystemExit(f"Taskwarrior export failed (exit {ex.result.returncode}, {elapsed_ms}ms).")
+        raise SystemExit(f"Taskwarrior export failed (exit {ex.result.returncode}, {elapsed_ms}ms).") from ex
 
     elapsed_ms = int((time.monotonic() - t0) * 1000)
     text = result.stdout.strip()
@@ -101,5 +101,5 @@ def run_task_export(filter_str: str) -> list[RawTask]:
         if _obs_enabled():
             eprint(f"[scalpel.taskwarrior] export.ok ms={elapsed_ms} tasks={len(data)}")
         return data
-    except Exception as ex:
-        raise SystemExit(f"Failed to parse `task export` JSON after {elapsed_ms}ms: {ex}")
+    except (json.JSONDecodeError, ValueError) as ex:
+        raise SystemExit(f"Failed to parse `task export` JSON after {elapsed_ms}ms: {ex}") from ex

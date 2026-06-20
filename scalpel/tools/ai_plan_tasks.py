@@ -104,7 +104,7 @@ def _extract_json_from_text(text: str) -> Dict[str, Any]:
         obj = json.loads(text)
         if isinstance(obj, dict):
             return obj
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     start = text.find("{")
@@ -131,7 +131,7 @@ def _post_json(url: str, body: Dict[str, Any], api_key: Optional[str]) -> Dict[s
         raw = ""
         try:
             raw = e.read().decode("utf-8", errors="replace")
-        except Exception:
+        except (OSError, UnicodeError):
             raw = ""
         raise ValueError(f"HTTP {e.code} error: {raw}") from e
     obj = json.loads(text)

@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         tzinfo = resolve_tz(tz_name)
     except ValueError as e:
-        raise SystemExit(f"Invalid --tz value: {e}")
+        raise SystemExit(f"Invalid --tz value: {e}") from e
     display_tz = normalize_tz_name(args.display_tz)
     today = today_date(tzinfo)
     work_start, work_end = parse_workhours(args.workhours)

@@ -75,7 +75,7 @@ def _extract_json_from_text(text: str) -> Dict[str, Any]:
         obj = json.loads(text)
         if isinstance(obj, dict):
             return obj
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     m = re.search(r"\{.*\}", text, flags=re.S)
@@ -83,8 +83,8 @@ def _extract_json_from_text(text: str) -> Dict[str, Any]:
         raise ValueError("No JSON object found in model output")
     try:
         obj = json.loads(m.group(0))
-    except Exception as e:
-        raise ValueError(f"Failed to parse JSON from model output: {e}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse JSON from model output: {e}") from e
     if not isinstance(obj, dict):
         raise ValueError("Model output JSON must be an object")
     return obj
@@ -215,7 +215,7 @@ def _post_json(url: str, body: Dict[str, Any], api_key: Optional[str]) -> Dict[s
         body_txt = ""
         try:
             body_txt = e.read().decode("utf-8", errors="replace").strip()
-        except Exception:
+        except (OSError, UnicodeError):
             body_txt = ""
         suffix = f" body={body_txt[:400]!r}" if body_txt else ""
         raise RuntimeError(f"LM Studio HTTP {e.code} after {elapsed_ms}ms.{suffix}") from e
