@@ -9,6 +9,113 @@ from scalpel.ai.slots import build_candidate_slots
 
 
 class TestAiPlanV2Contract(unittest.TestCase):
+    def test_compile_plan_v2_supports_full_operation_set(self) -> None:
+        obj = {
+            "schema": "scalpel.plan.v2",
+            "ops": [
+                {
+                    "op": "create_task",
+                    "temp_id": "tmp:new",
+                    "description": " New task ",
+                    "project": " work ",
+                    "tags": "focus quick",
+                    "duration_min": 45,
+                },
+                {
+                    "op": "split_task",
+                    "uuid": "parent",
+                    "subtasks": [
+                        {
+                            "temp_id": "sub",
+                            "description": "Subtask",
+                            "duration_min": 20,
+                            "project": "work",
+                            "tags": ["focus", ""],
+                        }
+                    ],
+                },
+                {
+                    "op": "place",
+                    "target": "new",
+                    "start_iso": "2026-01-01T10:00:00Z",
+                    "due_iso": "2026-01-01T10:45:00+00:00",
+                },
+                {"op": "update_task", "target": "sub", "patch": {"priority": "H"}},
+                {"op": "complete_task", "target": "new"},
+                {"op": "delete_task", "uuid": "old"},
+                {"op": "future_operation", "value": 1},
+            ],
+            "warnings": ["warning"],
+            "notes": ["note"],
+            "model_id": "model",
+        }
+
+        plan = compile_plan_v2(obj)
+
+        self.assertEqual([task["uuid"] for task in plan.added_tasks], ["tmp:new", "tmp:sub"])
+        self.assertEqual(plan.added_tasks[0]["tags"], ["focus", "quick"])
+        self.assertEqual(plan.added_tasks[1]["split_of"], "parent")
+        self.assertEqual(plan.overrides["tmp:new"].duration_min, 45)
+        self.assertEqual(plan.task_updates["tmp:new"]["status"], "completed")
+        self.assertEqual(plan.task_updates["tmp:sub"]["priority"], "H")
+        self.assertEqual(plan.task_updates["old"]["status"], "deleted")
+        self.assertEqual(plan.warnings, ("warning",))
+        self.assertEqual(plan.notes, ("note",))
+        self.assertEqual(plan.model_id, "model")
+
+    def test_compile_plan_v2_rejects_invalid_document_shapes(self) -> None:
+        invalid = (
+            None,
+            {},
+            {"schema": "scalpel.plan.v2", "ops": None},
+            {"schema": "scalpel.plan.v2", "ops": [], "slot_catalog": []},
+            {"schema": "scalpel.plan.v2", "ops": [None]},
+            {"schema": "scalpel.plan.v2", "ops": [{}]},
+        )
+        for obj in invalid:
+            with self.subTest(obj=obj), self.assertRaises(ValueError):
+                compile_plan_v2(obj)  # type: ignore[arg-type]
+
+    def test_compile_plan_v2_rejects_invalid_operations_and_metadata(self) -> None:
+        invalid_ops = (
+            {"op": "create_task", "temp_id": "x"},
+            {"op": "split_task", "uuid": "x", "subtasks": []},
+            {"op": "split_task", "uuid": "x", "subtasks": [None]},
+            {"op": "place", "target": "x", "slot_id": "missing"},
+            {"op": "place", "target": "x", "start_iso": "2026-01-01T10:00:00Z"},
+            {
+                "op": "place",
+                "target": "x",
+                "start_iso": "2026-01-01T10:00:00Z",
+                "due_iso": "2026-01-01T09:00:00Z",
+            },
+            {"op": "update_task", "uuid": "x", "patch": None},
+            {"op": "complete_task"},
+        )
+        for op in invalid_ops:
+            with self.subTest(op=op), self.assertRaises(ValueError):
+                compile_plan_v2({"schema": "scalpel.plan.v2", "ops": [op]})
+
+        for field, value in (("warnings", "bad"), ("notes", [1]), ("model_id", 1)):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                compile_plan_v2({"schema": "scalpel.plan.v2", "ops": [], field: value})
+
+    def test_compile_plan_v2_requires_timezone_aware_iso_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "timezone offset"):
+            compile_plan_v2(
+                {
+                    "schema": "scalpel.plan.v2",
+                    "ops": [
+                        {
+                            "op": "place",
+                            "target": "x",
+                            "start_iso": "2026-01-01T10:00:00",
+                            "due_iso": "2026-01-01T11:00:00",
+                        }
+                    ],
+                }
+            )
+
     def test_slot_ids_are_unique_across_different_durations(self) -> None:
         payload = {
             "cfg": {

@@ -21,9 +21,15 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Office/Business :: Scheduling",
   "Topic :: Utilities",
 ]
+
+[project.urls]
+Issues = "https://github.com/catanadj/taskwarrior-SCALPEL/issues"
+Repository = "https://github.com/catanadj/taskwarrior-SCALPEL"
 
 [project.optional-dependencies]
 dev = [
@@ -57,6 +63,7 @@ scalpel-ai-plan-stub = "scalpel.tools.ai_plan_stub:main"
 scalpel-validate-plan-result = "scalpel.tools.validate_plan_result:main"
 scalpel-ai-plan-lmstudio = "scalpel.tools.ai_plan_lmstudio:main"
 scalpel-check-frontend = "scalpel.tools.check_frontend:main"
+scalpel-check-wheel = "scalpel.tools.check_wheel:main"
 
 [tool.setuptools]
 include-package-data = true
@@ -100,7 +107,7 @@ patch = ["subprocess"]
 source = ["scalpel"]
 
 [tool.coverage.report]
-fail_under = 60
+fail_under = 62
 precision = 1
 show_missing = true
 skip_covered = true

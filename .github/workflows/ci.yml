@@ -54,6 +54,7 @@ jobs:
           # Coverage tracing invalidates the dedicated wall-clock performance budget.
           SCALPEL_SKIP_PERF_TESTS: "1"
         run: |
+          python -m coverage erase
           PYTHON="$(command -v python)" python -m coverage run -m unittest discover -s tests
           python -m coverage combine
           python -m coverage report
@@ -64,8 +65,10 @@ jobs:
       - name: Wheel Frontend Asset Gate
         run: |
           python -m pip wheel --no-deps --wheel-dir /tmp/scalpel-wheel .
+          python -m scalpel.tools.check_wheel /tmp/scalpel-wheel/*.whl
           python -m venv /tmp/scalpel-wheel-venv
           /tmp/scalpel-wheel-venv/bin/pip install /tmp/scalpel-wheel/*.whl
+          /tmp/scalpel-wheel-venv/bin/pip check
           cd /tmp
           /tmp/scalpel-wheel-venv/bin/python -m scalpel.tools.check_frontend --require-node
 
@@ -133,4 +136,4 @@ jobs:
         run: bandit -c pyproject.toml --severity-level high -r scalpel
 
       - name: Dependency Audit
-        run: pip-audit .
+        run: pip-audit --strict --progress-spinner off --timeout 15 .
