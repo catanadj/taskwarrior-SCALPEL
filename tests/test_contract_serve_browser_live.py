@@ -332,13 +332,19 @@ def _run_cdp_node_script(*, node_bin: str, devtools_port: int, page_url: str, sc
     env = dict(os.environ)
     env["SCALPEL_CDP_PORT"] = str(devtools_port)
     env["SCALPEL_PAGE_URL"] = page_url
-    proc = subprocess.run(
-        [node_bin, "-e", script],
-        cwd=str(Path(__file__).resolve().parents[1]),
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    try:
+        proc = subprocess.run(
+            [node_bin, "-e", script],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as ex:
+        raise AssertionError(
+            f"browser contract timed out\nstdout:\n{ex.stdout or ''}\nstderr:\n{ex.stderr or ''}"
+        ) from ex
     if proc.returncode != 0:
         raise AssertionError(f"browser contract failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
 
