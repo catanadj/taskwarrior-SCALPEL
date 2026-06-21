@@ -30,6 +30,11 @@
     background: var(--cal-surface);
   }
 
+  .calendar > .card-b{
+    flex: 1 1 auto;
+    background: var(--cal-surface);
+  }
+
   .time-col {
     border-right: 1px solid var(--line);
     background:
@@ -66,7 +71,11 @@
     letter-spacing: 0.2px;
   }
 
-  .days-col { overflow: auto; position: relative; }
+  .days-col {
+    overflow: auto;
+    position: relative;
+    background: var(--cal-surface);
+  }
   .days-col.selecting { user-select: none; cursor: crosshair; }
   .days-header {
     position: sticky;
@@ -183,6 +192,7 @@
     display: grid;
     grid-template-columns: repeat(var(--days), 1fr);
     height: calc(var(--cal-minutes) * var(--px-per-min) * 1px);
+    background: var(--cal-surface);
   }
 
   .day-col {
@@ -365,10 +375,10 @@
 
   .evt.nautical-preview{
     border-style: dashed;
-    border-color: rgba(var(--warn-rgb), 0.55);
-    background: linear-gradient(180deg, rgba(var(--warn-rgb), 0.10), rgba(0,0,0,0.18));
+    border-color: var(--ghost-border);
+    background: var(--ghost-bg);
     box-shadow: 0 6px 12px rgba(0,0,0,0.18);
-    opacity: 0.78;
+    opacity: var(--ghost-opacity);
     pointer-events: auto;
     cursor: context-menu;
   }
@@ -376,13 +386,13 @@
   .evt.nautical-preview .evt-time,
   .evt.nautical-preview .evt-bot,
   .evt.nautical-preview .evt-bot code {
-    color: rgba(var(--warn-rgb), 0.95);
-    text-shadow: 0 0 8px rgba(var(--warn-rgb), 0.85);
+    color: var(--ghost-text);
+    text-shadow: var(--ghost-text-shadow);
   }
   .evt.nautical-preview .evt-time .time-pill{
-    color: rgba(var(--warn-rgb), 0.95);
-    border-color: rgba(var(--warn-rgb), 0.45);
-    background: rgba(var(--warn-rgb), 0.08);
+    color: var(--ghost-text);
+    border-color: var(--ghost-pill-border);
+    background: var(--ghost-pill-bg);
   }
   .evt.nautical-preview .evt-sheen{ display: none; }
   .evt.nautical-preview .resize{ display: none; }

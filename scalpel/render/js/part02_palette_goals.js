@@ -660,6 +660,7 @@ function buildAddCommandForLocal(uuid, desc) {
     "--card-bg","--card-header-bg","--card-shadow","--card-backdrop-filter","--header-shadow","--heading-letter-spacing",
     "--radius","--control-radius","--control-small-radius","--control-shadow","--control-hover-shadow",
     "--event-radius","--event-accent-width","--event-bg","--event-shadow",
+    "--ghost-bg","--ghost-border","--ghost-text","--ghost-text-shadow","--ghost-opacity","--ghost-pill-bg","--ghost-pill-border",
     "--accent","--accent-rgb","--warn","--warn-rgb","--bad","--bad-rgb",
     "--block","--block2",
     "--task-border","--task-selected",

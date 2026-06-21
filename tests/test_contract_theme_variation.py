@@ -40,6 +40,39 @@ class ThemeVariationContractTests(unittest.TestCase):
         self.assertIn("--card-shadow: none", contrast)
         self.assertIn("--ambient-opacity: 0", contrast)
 
+    def test_paper_profile_uses_neutral_stock_and_ink_colors(self) -> None:
+        tokens = read_render_asset("css/part01_tokens_theme.css")
+        paper = tokens.split("body.theme-paper{", 1)[1].split("/* Muted:", 1)[0]
+        self.assertIn("--panel: #ffffff", paper)
+        self.assertIn("--cal-surface: #ffffff", paper)
+        self.assertIn("--text: #25292d", paper)
+        self.assertIn("--accent: #3f6179", paper)
+        self.assertIn("--ambient-opacity: 0", paper)
+        self.assertIn("radial-gradient(circle", paper)
+        self.assertNotIn("--accent: #b06c25", paper)
+
+    def test_calendar_layers_use_the_theme_surface_without_transparent_gaps(self) -> None:
+        calendar = read_render_asset("css/part05_calendar.css")
+        self.assertIn(".calendar > .card-b", calendar)
+        self.assertIn("background: var(--cal-surface)", calendar)
+        days_col = calendar.split(".days-col {", 1)[1].split("}", 1)[0]
+        days_body = calendar.split(".days-body {", 1)[1].split("}", 1)[0]
+        self.assertIn("background: var(--cal-surface)", days_col)
+        self.assertIn("background: var(--cal-surface)", days_body)
+
+    def test_light_themes_use_high_legibility_nautical_ghost_tokens(self) -> None:
+        tokens = read_render_asset("css/part01_tokens_theme.css")
+        calendar = read_render_asset("css/part05_calendar.css")
+        light = tokens.split("body.theme-light{", 1)[1].split("body.theme-paper{", 1)[0]
+        paper = tokens.split("body.theme-paper{", 1)[1].split("/* Muted:", 1)[0]
+        for profile in (light, paper):
+            self.assertIn("--ghost-opacity: 0.96", profile)
+            self.assertIn("--ghost-text-shadow: none", profile)
+            self.assertIn("--ghost-border: rgba(var(--accent-rgb), 0.68)", profile)
+        self.assertIn("background: var(--ghost-bg)", calendar)
+        self.assertIn("color: var(--ghost-text)", calendar)
+        self.assertIn("opacity: var(--ghost-opacity)", calendar)
+
     def test_custom_theme_exports_include_structural_tokens(self) -> None:
         theme_js = read_render_asset("js/part02_palette_goals.js")
         for token in (
