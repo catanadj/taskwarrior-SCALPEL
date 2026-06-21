@@ -36,6 +36,12 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('querySelector(".evt-time .time-range")', drag_js)
         self.assertIn('querySelector(".evt-time .time-start")', drag_js)
 
+    def test_overlap_warning_does_not_replace_event_content(self) -> None:
+        calendar_css = read_render_asset("css/part05_calendar.css")
+        self.assertIn(".evt.warn-overlap::before", calendar_css)
+        self.assertNotIn(".evt.warn-overlap .evt-time::after", calendar_css)
+        self.assertNotIn('content: "OVERLAP"', calendar_css)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

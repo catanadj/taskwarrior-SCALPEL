@@ -7,7 +7,7 @@
     background:
       radial-gradient(90% 180% at 0% 0%, var(--header-glow), transparent 55%),
       linear-gradient(180deg, var(--hdr-top), var(--hdr-bot));
-    box-shadow: 0 5px 14px rgba(2,10,20,0.18);
+    box-shadow: var(--header-shadow);
     backdrop-filter: blur(10px);
   }
 
@@ -165,19 +165,19 @@
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.00)), var(--btn-bg);
     color: var(--text);
     border: 1px solid var(--btn-bd);
-    border-radius: 11px;
+    border-radius: var(--control-radius);
     padding: 8px 10px;
     cursor: pointer;
     font-weight: 650;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+    box-shadow: var(--control-shadow);
   }
   button:hover {
     border-color: var(--btn-bd-hover);
     transform: translateY(-1px);
-    box-shadow: 0 5px 11px rgba(0,0,0,0.16);
+    box-shadow: var(--control-hover-shadow);
   }
-  button:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.16); }
-  button.small { padding: 6px 8px; border-radius: 9px; font-size: 12px; }
+  button:active { transform: translateY(0); box-shadow: var(--control-shadow); }
+  button.small { padding: 6px 8px; border-radius: var(--control-small-radius); font-size: 12px; }
   button:disabled {
     background: var(--btn-disabled-bg);
     border-color: var(--btn-disabled-bd);

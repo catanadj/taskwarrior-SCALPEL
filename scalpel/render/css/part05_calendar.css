@@ -302,15 +302,11 @@
     position: absolute;
     left: 6px;
     right: 6px;
-    border-radius: 12px;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.00)),
-      linear-gradient(180deg, var(--block), var(--block2));
+    border-radius: var(--event-radius);
+    background: var(--event-bg);
     border: 1px solid var(--task-border);
-    border-left: 5px solid var(--evt-accent, rgba(var(--accent-rgb), 0.75));
-    box-shadow:
-      0 8px 14px rgba(0,0,0,0.20),
-      0 1px 0 rgba(255,255,255,0.04) inset;
+    border-left: var(--event-accent-width) solid var(--evt-accent, rgba(var(--accent-rgb), 0.75));
+    box-shadow: var(--event-shadow);
     outline: 1px solid rgba(var(--evt-accent-rgb, var(--accent-rgb)), 0.00);
     outline-offset: 0px;
     transition:
@@ -760,20 +756,6 @@
     position: relative;
     z-index: 1;
   }
-  .evt.warn-overlap .evt-time::after {
-    content: "OVERLAP";
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    border: 1px solid rgba(var(--warn-rgb), 0.40);
-    background: rgba(var(--warn-rgb), 0.10);
-    color: rgba(var(--warn-rgb), 0.98);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 1px 7px;
-  }
-
   .evt.queued-done::after,
   .evt.queued-delete::after {
     position: absolute;

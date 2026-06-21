@@ -1,27 +1,21 @@
 
   .card {
-    background:
-      linear-gradient(165deg, rgba(255,255,255,0.025), rgba(255,255,255,0.00)),
-      var(--panel);
+    background: var(--card-bg);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    box-shadow:
-      0 12px 24px var(--shadow),
-      0 1px 0 rgba(255,255,255,0.04) inset;
+    box-shadow: var(--card-shadow);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    backdrop-filter: blur(9px);
+    backdrop-filter: var(--card-backdrop-filter);
   }
   .card .card-h {
     padding: 11px 13px;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.00)),
-      var(--panel2);
+    background: var(--card-header-bg);
     border-bottom: 1px solid var(--line);
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--heading-letter-spacing);
     text-transform: uppercase;
     font-size: 12px;
     display: flex;
@@ -515,4 +509,3 @@
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-

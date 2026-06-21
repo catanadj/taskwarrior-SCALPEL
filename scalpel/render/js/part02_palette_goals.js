@@ -656,6 +656,10 @@ function buildAddCommandForLocal(uuid, desc) {
   const THEME_EXPORT_KEYS = [
     "--bg","--panel","--panel2","--surface3","--surface4","--cal-surface",
     "--text","--muted","--line","--shadow",
+    "--page-bg","--page-grid-opacity","--page-grid-size","--page-grid-image","--ambient-opacity",
+    "--card-bg","--card-header-bg","--card-shadow","--card-backdrop-filter","--header-shadow","--heading-letter-spacing",
+    "--radius","--control-radius","--control-small-radius","--control-shadow","--control-hover-shadow",
+    "--event-radius","--event-accent-width","--event-bg","--event-shadow",
     "--accent","--accent-rgb","--warn","--warn-rgb","--bad","--bad-rgb",
     "--block","--block2",
     "--task-border","--task-selected",
