@@ -1550,6 +1550,10 @@
       + (previewPicked ? " nautical-picked" : "")
       + (__isExecutionActiveTask(ev.uuid) ? " execution-active-task" : "")
       + (isDimmedTask(t) ? " dimmed" : "");
+    if (hPx < 46) cls += " evt-short";
+    else if (hPx < 84) cls += " evt-medium";
+    else cls += " evt-roomy";
+    if (ev.laneCount >= 3) cls += " evt-narrow";
     if (warnKinds && warnKinds.has("overlap")) cls += " warn-overlap";
 
     const acc = resolveTaskAccent(t);
@@ -1573,7 +1577,6 @@
         : "Right-click for Nautical options";
     } else {
       delete el.dataset.preview;
-      el.removeAttribute("title");
       __nauticalSelectedPreviewUuids.delete(ev && ev.uuid ? String(ev.uuid) : "");
     }
     __applyNauticalSelectionVisual(el, isPreview, previewPicked);
@@ -1584,28 +1587,48 @@
     el.style.width = `calc(${w}% - 12px)`;
 
     const timeStr = `${fmtHm(ev.startMs)}–${fmtHm(ev.dueMs)}`;
+    const startTimeStr = fmtHm(ev.startMs);
     const durLabel = fmtDuration((ev.dueMs - ev.startMs) / 60000);
-    const subtitle = (t.project ? t.project : "") + ((t.tags && t.tags.length) ? ` • ${t.tags.slice(0,3).join(",")}` : "");
+    const projectLabel = String(t.project || "").trim();
+    const tags = Array.isArray(t.tags) ? t.tags.map(x => String(x || "").trim()).filter(Boolean) : [];
+    const visibleTags = tags.slice(0, 2);
+    const extraTagCount = Math.max(0, tags.length - visibleTags.length);
+    const subtitle = projectLabel + (tags.length ? ` • ${tags.join(",")}` : "");
+    const description = String(t.description || "(no description)");
+    if (!isPreview) {
+      const tooltipParts = [description, `${timeStr} · ${durLabel}`];
+      if (subtitle) tooltipParts.push(subtitle);
+      if (t.uuid) tooltipParts.push(String(t.uuid));
+      el.title = tooltipParts.join("\n");
+    }
+    el.setAttribute("aria-label", `${description}, ${timeStr}, ${durLabel}${subtitle ? `, ${subtitle}` : ""}`);
 
     const sig = __eventInnerSig(t, ev, subtitle, timeStr, durLabel, previewPicked);
     if (el.__scalpelInnerSig !== sig) {
       const pickedPill = previewPicked
         ? `<span class="time-pill nautical-picked-pill" style="border-color:rgba(var(--accent-rgb),0.68);background:rgba(var(--accent-rgb),0.28);color:var(--text);font-weight:850;">SELECTED</span>`
         : "";
+      const projectHtml = projectLabel
+        ? `<span class="evt-project" title="Project: ${escapeAttr(projectLabel)}">${escapeHtml(projectLabel)}</span>`
+        : "";
+      const tagsHtml = visibleTags.length
+        ? `<span class="evt-tags" title="Tags: ${escapeAttr(tags.join(", "))}">${visibleTags.map(tag => `<span>#${escapeHtml(tag)}</span>`).join("")}${extraTagCount ? `<span class="evt-tag-more">+${extraTagCount}</span>` : ""}</span>`
+        : "";
+      const eventMetaHtml = (projectHtml || tagsHtml)
+        ? `<div class="evt-bot">${projectHtml}${tagsHtml}</div>`
+        : "";
       el.innerHTML = `
         <div class="evt-sheen" aria-hidden="true"></div>
         <div class="evt-top">
-          <div class="evt-title">${escapeHtml(t.description || "(no description)")}</div>
+          <div class="evt-title">${escapeHtml(description)}</div>
           <div class="evt-time">
+            <span class="time-start">${escapeHtml(startTimeStr)}</span>
             <span class="time-pill time-range">${escapeHtml(timeStr)}</span>
             <span class="time-pill dur-pill">${escapeHtml(durLabel)}</span>
             ${pickedPill}
           </div>
         </div>
-        <div class="evt-bot">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(subtitle)}</div>
-          <code>${escapeHtml((t.uuid||"").slice(0,8))}</code>
-        </div>
+        ${eventMetaHtml}
         <div class="resize" title="Resize (changes due)"></div>
       `;
       el.__scalpelInnerSig = sig;

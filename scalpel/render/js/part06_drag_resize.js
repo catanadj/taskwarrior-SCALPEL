@@ -209,6 +209,9 @@
     const timeNode = el.querySelector(".evt-time .time-range");
     if (timeNode) timeNode.textContent = timeStr;
 
+    const startTimeNode = el.querySelector(".evt-time .time-start");
+    if (startTimeNode) startTimeNode.textContent = fmtHm(startMs);
+
     const durNode = el.querySelector(".evt-time .dur-pill");
     if (durNode) durNode.textContent = durLabel;
   }

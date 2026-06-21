@@ -462,12 +462,14 @@
 
   .evt .evt-title {
     color: var(--task-title-text, var(--text));
-    font-weight: 700;
+    font-weight: 760;
     font-size: 13px;
-    line-height: 1.2;
+    line-height: 1.22;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow-wrap: anywhere;
   }
   .evt .evt-time {
     color: var(--muted);
@@ -483,9 +485,12 @@
     border-radius: 999px;
     padding: 1px 7px;
     font-size: 12px;
-    color: var(--muted);
-    background: rgba(255,255,255,0.04);
+    color: var(--task-body-text);
+    background: rgba(255,255,255,0.06);
   }
+  .evt .evt-time .time-range{ font-weight: 720; }
+  .evt .evt-time .time-start{ display: none; font-weight: 760; }
+  .evt .evt-time .dur-pill{ opacity: 0.82; }
   .evt.user-colored .evt-time .time-pill {
     border-color: rgba(var(--evt-accent-rgb, 99,179,255), 0.30);
     background: rgba(var(--evt-accent-rgb, 99,179,255), 0.08);
@@ -497,13 +502,73 @@
     color: var(--task-body-text);
     font-size: 12px;
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
+    justify-content: flex-start;
+    gap: 6px;
     align-items: center;
     position: relative;
     z-index: 1;
   }
-  .evt .evt-bot code { color: var(--task-code-text); font-size: 12px; }
+  .evt-project,
+  .evt-tags{
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .evt-project{
+    flex: 0 1 auto;
+    max-width: 58%;
+    border-radius: 5px;
+    padding: 1px 5px;
+    background: rgba(var(--evt-accent-rgb, var(--accent-rgb)), 0.13);
+    color: var(--task-body-text);
+    font-weight: 680;
+  }
+  .evt-tags{
+    display: flex;
+    gap: 5px;
+    color: var(--muted);
+  }
+  .evt-tags > span{ overflow: hidden; text-overflow: ellipsis; }
+  .evt-tags .evt-tag-more{ flex: 0 0 auto; color: var(--task-body-text); }
+
+  /* Match visible detail to the actual rendered block height. */
+  .evt.evt-medium .evt-title{ -webkit-line-clamp: 1; }
+  .evt.evt-medium .evt-bot,
+  .evt.evt-narrow .evt-bot{ display: none; }
+  .evt.evt-short .evt-top{
+    height: 100%;
+    box-sizing: border-box;
+    padding: 3px 6px 4px;
+    border-bottom: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .evt.evt-short .evt-title{
+    flex: 1 1 auto;
+    min-width: 0;
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  .evt.evt-short .evt-time{ flex: 0 0 auto; }
+  .evt.evt-short .evt-time .time-start{ display: inline; }
+  .evt.evt-short .evt-time .time-range{
+    display: none;
+  }
+  .evt.evt-short .evt-time .time-start{
+    border: 0;
+    padding: 0;
+    background: transparent;
+    font-size: 11px;
+  }
+  .evt.evt-short .evt-time .dur-pill,
+  .evt.evt-short .evt-bot{ display: none; }
+  .evt.evt-narrow .evt-title{ -webkit-line-clamp: 1; }
+  .evt.evt-narrow .evt-time{ gap: 3px; }
+  .evt.evt-narrow .evt-time .time-pill{ padding-inline: 4px; }
 
   .evt .resize {
     position: absolute;

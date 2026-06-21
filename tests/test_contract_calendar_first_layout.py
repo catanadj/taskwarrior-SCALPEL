@@ -68,6 +68,11 @@ class CalendarFirstLayoutContractTests(unittest.TestCase):
         self.assertIn("translateX(calc(100% + 20px))", layout_css)
         self.assertIn(".layout > section.commands", responsive_css)
 
+    def test_compact_density_does_not_restore_a_commands_grid_column(self) -> None:
+        base_css = read_render_asset("css/part02_base.css")
+        compact_layout = base_css.split("body.compact .layout{", 1)[1].split("}", 1)[0]
+        self.assertNotIn("grid-template-columns", compact_layout)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
