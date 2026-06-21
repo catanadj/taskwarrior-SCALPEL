@@ -6,6 +6,10 @@
   function updateSelectionMeta() {
     const n = selected.size;
     elSelMeta.textContent = n ? `Selected: ${n}` : "";
+    if (elSelectionBar) elSelectionBar.hidden = n < 1;
+    if (elSelectionBarSummary) {
+      elSelectionBarSummary.textContent = n === 1 ? "1 task selected" : `${n} tasks selected`;
+    }
     try {
       if (typeof globalThis.__scalpel_updateActionButtonStates === "function") {
         globalThis.__scalpel_updateActionButtonStates();
@@ -471,6 +475,11 @@
     elLayout.classList.toggle("left-collapsed", effectiveLeft);
     elLayout.classList.toggle("commands-collapsed", effectiveCommands);
     elLayout.classList.toggle("panels-collapsed", effectiveLeft && effectiveCommands);
+    if (elCommandsPanel) {
+      elCommandsPanel.setAttribute("aria-hidden", effectiveCommands ? "true" : "false");
+      elCommandsPanel.toggleAttribute("inert", effectiveCommands);
+    }
+    if (elCommandsDrawerBackdrop) elCommandsDrawerBackdrop.hidden = mobile || effectiveCommands;
     _setPanelToggle(elBtnToggleBacklog, !effectiveLeft, "Backlog");
     _setPanelToggle(elBtnToggleCommands, !effectiveCommands, "Commands");
     if (elBtnTogglePanels) {
@@ -532,6 +541,17 @@
     elBtnToggleCommands.addEventListener("click", () => {
       if (_isMobileTabsMode()) applyMobilePanel("commands", true);
       else applySidePanelState(leftPanelCollapsed, !commandsPanelCollapsed, true);
+    });
+  }
+  if (elBtnCloseCommands) {
+    elBtnCloseCommands.addEventListener("click", () => {
+      if (_isMobileTabsMode()) applyMobilePanel("calendar", true);
+      else applySidePanelState(leftPanelCollapsed, true, true);
+    });
+  }
+  if (elCommandsDrawerBackdrop) {
+    elCommandsDrawerBackdrop.addEventListener("click", () => {
+      applySidePanelState(leftPanelCollapsed, true, true);
     });
   }
   globalThis.__scalpel_setSidePanelVisible = (panel, visible) => {

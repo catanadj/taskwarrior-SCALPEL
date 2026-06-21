@@ -1,3 +1,27 @@
+  .selection-bar{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.14), rgba(var(--accent-rgb), 0.05));
+  }
+  .selection-bar[hidden]{ display: none; }
+  .selection-bar-summary{
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .selection-bar-actions{
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
   .cal-wrap {
     display: grid;
     grid-template-columns: 68px 1fr;
@@ -1455,4 +1479,3 @@ body.theme-paper .note::after{
   .evt.selected:hover{ z-index: var(--task-selected-hover-z, 35); }
   .evt.dragging{ z-index: var(--task-drag-z, 50); }
   .note .nhdr, .note .nbody, .note .nrsz{ position: relative; z-index: 1; }
-

@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import json
+from importlib import import_module
+from types import ModuleType
 from typing import Any, Mapping
 
 from .template import HTML_TEMPLATE
 
+orjson: ModuleType | None
 try:
-    import orjson  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
+    orjson = import_module("orjson")
+except ImportError:  # pragma: no cover
     orjson = None
 
 _DATA_MARKER = "__DATA_JSON__"

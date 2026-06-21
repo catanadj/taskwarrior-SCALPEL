@@ -562,6 +562,8 @@ function buildAddCommandForLocal(uuid, desc) {
   // -----------------------------
   const elMeta = document.getElementById("meta");
   const elSelMeta = document.getElementById("selMeta");
+  const elSelectionBar = document.getElementById("selectionBar");
+  const elSelectionBarSummary = document.getElementById("selectionBarSummary");
   const elCtxMeta = document.getElementById("ctxMeta");
   const elPendingMeta = document.getElementById("pendingMeta");
   const elBtnNotes = document.getElementById("btnNotes");
@@ -1431,6 +1433,9 @@ function buildAddCommandForLocal(uuid, desc) {
   const elBtnTogglePanels = document.getElementById("btnTogglePanels");
   const elBtnToggleBacklog = document.getElementById("btnToggleBacklog");
   const elBtnToggleCommands = document.getElementById("btnToggleCommands");
+  const elBtnCloseCommands = document.getElementById("btnCloseCommands");
+  const elCommandsDrawerBackdrop = document.getElementById("commandsDrawerBackdrop");
+  const elCommandsPanel = document.querySelector("section.commands");
 
   const elMarquee = document.getElementById("marquee");
 

@@ -301,6 +301,21 @@
   };
   globalThis.__scalpel_resetCommandSections = () => resetCommandSections(true);
 
+  function delegateSelectionAction(sourceId, targetId){
+    const source = document.getElementById(sourceId);
+    const target = document.getElementById(targetId);
+    if (!source || !target) return;
+    source.addEventListener("click", () => target.click());
+  }
+  delegateSelectionAction("selectionComplete", "actDone");
+  delegateSelectionAction("selectionDelete", "actDelete");
+  delegateSelectionAction("selectionFocus", "btnExecStartSel");
+  delegateSelectionAction("selectionClear", "btnClearSel");
+  const selectionArrange = document.getElementById("selectionArrange");
+  if (selectionArrange) {
+    selectionArrange.addEventListener("click", () => globalThis.__scalpel_openCommandSection("arrange"));
+  }
+
   // Left panel sections (accordion)
   const LEFT_SECTIONS_KEY = `${viewKey}:leftSections`;
   const LEFT_SECTION_DEFAULTS = { focus: true, palette: true, problems: true };
@@ -2012,6 +2027,9 @@
 
     _setDisabledState(_actionBtn("actDone"), nAny < 1, "Select at least one task.", "Queue complete for selected tasks.");
     _setDisabledState(_actionBtn("actDelete"), nAny < 1, "Select at least one task.", "Queue delete for selected tasks.");
+    _setDisabledState(_actionBtn("selectionComplete"), nAny < 1, "Select at least one task.", "Queue complete for selected tasks.");
+    _setDisabledState(_actionBtn("selectionDelete"), nAny < 1, "Select at least one task.", "Queue delete for selected tasks.");
+    _setDisabledState(_actionBtn("selectionArrange"), nCal < 1, "Select a calendar task first.", "Open arrangement tools.");
     _setDisabledState(_actionBtn("opAlignStart"), nCal < 2, "Select at least two calendar tasks.", "Align start times.");
     _setDisabledState(_actionBtn("opAlignEnd"), nCal < 2, "Select at least two calendar tasks.", "Align end times.");
     _setDisabledState(_actionBtn("opStack"), nCal < 2, "Select at least two calendar tasks.", "Stack selected tasks.");
@@ -2027,6 +2045,7 @@
       "Apply selected command output in live mode."
     );
     _setDisabledState(_actionBtn("btnExecStartSel"), !canStartSelection, "Select a task first.", "Start execution mode from the lead selected task.");
+    _setDisabledState(_actionBtn("selectionFocus"), !canStartSelection, "Select a task first.", "Start execution mode from the lead selected task.");
     _setDisabledState(_actionBtn("btnExecStartNext"), !canStartNext, "No scheduled Next up task in view.", "Start execution mode from Next up.");
     _setDisabledState(_actionBtn("btnExecJump"), !execTask, "No active focus session.", "Jump to the active execution task.");
     _setDisabledState(_actionBtn("btnExecTimew"), !canHttp || !execDay, !canHttp ? "Timewarrior import requires live mode." : "No active session day available.", "Import Timewarrior intervals for the session day.");

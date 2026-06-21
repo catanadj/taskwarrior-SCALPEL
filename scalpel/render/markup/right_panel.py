@@ -1,10 +1,14 @@
 # scalpel/render/markup/right_panel.py
 from __future__ import annotations
 
-MARKUP = r"""<section class="card commands">
+MARKUP = r"""<button class="commands-drawer-backdrop" id="commandsDrawerBackdrop" type="button" aria-label="Close Commands" tabindex="-1" hidden></button>
+  <section class="card commands" aria-label="Commands drawer" aria-hidden="true" inert>
     <div class="card-h">
       <div>Commands</div>
-      <small id="cmdCount"></small>
+      <div class="commands-drawer-heading">
+        <small id="cmdCount"></small>
+        <button class="icon commands-drawer-close" id="btnCloseCommands" type="button" aria-label="Close Commands" title="Close Commands">×</button>
+      </div>
     </div>
     <div class="card-b">
       <div class="rsec" data-rsec="actions">

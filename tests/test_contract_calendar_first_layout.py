@@ -3,8 +3,10 @@ from __future__ import annotations
 import unittest
 
 from scalpel.render.assets import read_render_asset
+from scalpel.render.markup.calendar_panel import MARKUP as CALENDAR_MARKUP
 from scalpel.render.markup.header import MARKUP as HEADER_MARKUP
 from scalpel.render.markup.layout_open import MARKUP as LAYOUT_OPEN_MARKUP
+from scalpel.render.markup.right_panel import MARKUP as RIGHT_PANEL_MARKUP
 
 
 class CalendarFirstLayoutContractTests(unittest.TestCase):
@@ -39,6 +41,32 @@ class CalendarFirstLayoutContractTests(unittest.TestCase):
         self.assertIn(".layout.commands-collapsed", css)
         self.assertIn(".layout.left-collapsed", css)
         self.assertIn(".layout.left-collapsed.commands-collapsed", css)
+
+    def test_contextual_selection_bar_exposes_primary_actions(self) -> None:
+        self.assertIn('id="selectionBar"', CALENDAR_MARKUP)
+        self.assertIn('role="toolbar"', CALENDAR_MARKUP)
+        for control_id in (
+            "selectionComplete",
+            "selectionDelete",
+            "selectionArrange",
+            "selectionFocus",
+            "selectionClear",
+        ):
+            self.assertIn(f'id="{control_id}"', CALENDAR_MARKUP)
+        selection_js = read_render_asset("js/part03_selection_ops.js")
+        init_js = read_render_asset("js/part07_init.js")
+        self.assertIn("elSelectionBar.hidden = n < 1", selection_js)
+        self.assertIn('delegateSelectionAction("selectionComplete", "actDone")', init_js)
+        self.assertIn('__scalpel_openCommandSection("arrange")', init_js)
+
+    def test_commands_use_a_dismissible_overlay_drawer_on_desktop(self) -> None:
+        self.assertIn('id="commandsDrawerBackdrop"', RIGHT_PANEL_MARKUP)
+        self.assertIn('id="btnCloseCommands"', RIGHT_PANEL_MARKUP)
+        layout_css = read_render_asset("css/part03_header_layout.css")
+        responsive_css = read_render_asset("css/part07_modals_misc.css")
+        self.assertIn("position: fixed", layout_css)
+        self.assertIn("translateX(calc(100% + 20px))", layout_css)
+        self.assertIn(".layout > section.commands", responsive_css)
 
 
 if __name__ == "__main__":
