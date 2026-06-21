@@ -1429,6 +1429,8 @@ function buildAddCommandForLocal(uuid, desc) {
 
   const elLayout = document.getElementById("layout");
   const elBtnTogglePanels = document.getElementById("btnTogglePanels");
+  const elBtnToggleBacklog = document.getElementById("btnToggleBacklog");
+  const elBtnToggleCommands = document.getElementById("btnToggleCommands");
 
   const elMarquee = document.getElementById("marquee");
 

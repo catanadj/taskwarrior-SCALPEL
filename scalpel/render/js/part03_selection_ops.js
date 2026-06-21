@@ -411,6 +411,8 @@
   // Panels toggle
   // -----------------------------
   const MOBILE_TAB_KEY = `${viewKey}:mobileTab`;
+  const LEFT_PANEL_KEY = `${viewKey}:leftPanelCollapsed`;
+  const COMMANDS_PANEL_KEY = `${viewKey}:commandsPanelCollapsed`;
   const MOBILE_PANELS = ["left", "calendar", "commands"];
   const mqlMobileTabs = (typeof window !== "undefined" && typeof window.matchMedia === "function")
     ? window.matchMedia("(max-width: 820px)")
@@ -419,6 +421,8 @@
     const raw = String(globalThis.__scalpel_kvGet(MOBILE_TAB_KEY) || "").trim();
     return MOBILE_PANELS.includes(raw) ? raw : "calendar";
   })();
+  let leftPanelCollapsed = false;
+  let commandsPanelCollapsed = true;
 
   function _isMobileTabsMode() {
     return !!(mqlMobileTabs && mqlMobileTabs.matches);
@@ -444,28 +448,54 @@
     const on = _isMobileTabsMode();
     elLayout.classList.toggle("mobile-view", on);
     if (on) {
-      applyPanelsCollapsed(false, false);
+      applySidePanelState(leftPanelCollapsed, commandsPanelCollapsed, false);
       applyMobilePanel(mobilePanel, false);
     } else {
       elLayout.classList.remove("mobile-panel-left", "mobile-panel-calendar", "mobile-panel-commands");
+      applySidePanelState(leftPanelCollapsed, commandsPanelCollapsed, false);
     }
   }
 
-  function applyPanelsCollapsed(collapsed, persist) {
-    const effective = _isMobileTabsMode() ? false : !!collapsed;
-    if (effective) elLayout.classList.add("panels-collapsed");
-    else elLayout.classList.remove("panels-collapsed");
-    elBtnTogglePanels.textContent = _isMobileTabsMode()
-      ? "Panels via tabs"
-      : (effective ? "Show panels" : "Hide panels");
-    if (persist) globalThis.__scalpel_kvSet(panelsKey, effective ? "1" : "0");
+  function _setPanelToggle(button, visible, mobileLabel) {
+    if (!button) return;
+    button.classList.toggle("on", !!visible);
+    button.setAttribute("aria-pressed", visible ? "true" : "false");
+    if (_isMobileTabsMode() && mobileLabel) button.textContent = mobileLabel;
   }
-  (function initPanelsCollapsed() {
-    const saved = globalThis.__scalpel_kvGet(panelsKey);
-    if (saved === "1" || saved === "0") {
-      applyPanelsCollapsed(saved === "1", false);
+  function applySidePanelState(leftCollapsed, commandsCollapsed, persist) {
+    leftPanelCollapsed = !!leftCollapsed;
+    commandsPanelCollapsed = !!commandsCollapsed;
+    const mobile = _isMobileTabsMode();
+    const effectiveLeft = mobile ? false : leftPanelCollapsed;
+    const effectiveCommands = mobile ? false : commandsPanelCollapsed;
+    elLayout.classList.toggle("left-collapsed", effectiveLeft);
+    elLayout.classList.toggle("commands-collapsed", effectiveCommands);
+    elLayout.classList.toggle("panels-collapsed", effectiveLeft && effectiveCommands);
+    _setPanelToggle(elBtnToggleBacklog, !effectiveLeft, "Backlog");
+    _setPanelToggle(elBtnToggleCommands, !effectiveCommands, "Commands");
+    if (elBtnTogglePanels) {
+      elBtnTogglePanels.textContent = mobile
+        ? "Sidebars via tabs"
+        : (effectiveLeft && effectiveCommands ? "Show sidebars" : "Hide sidebars");
+    }
+    if (persist) {
+      globalThis.__scalpel_kvSet(LEFT_PANEL_KEY, leftPanelCollapsed ? "1" : "0");
+      globalThis.__scalpel_kvSet(COMMANDS_PANEL_KEY, commandsPanelCollapsed ? "1" : "0");
+    }
+  }
+  function applyPanelsCollapsed(collapsed, persist) {
+    applySidePanelState(!!collapsed, !!collapsed, persist);
+    if (persist) globalThis.__scalpel_kvSet(panelsKey, collapsed ? "1" : "0");
+  }
+  (function initSidePanels() {
+    const savedLeft = globalThis.__scalpel_kvGet(LEFT_PANEL_KEY);
+    const savedCommands = globalThis.__scalpel_kvGet(COMMANDS_PANEL_KEY);
+    if ((savedLeft === "1" || savedLeft === "0") || (savedCommands === "1" || savedCommands === "0")) {
+      applySidePanelState(savedLeft === "1", savedCommands !== "0", false);
     } else {
-      applyPanelsCollapsed(window.innerWidth < 1100, false);
+      const legacy = globalThis.__scalpel_kvGet(panelsKey);
+      if (legacy === "1" || legacy === "0") applyPanelsCollapsed(legacy === "1", false);
+      else applySidePanelState(false, true, false);
     }
   })();
 
@@ -489,9 +519,30 @@
       applyMobilePanel("calendar", true);
       return;
     }
-    const nowCollapsed = !elLayout.classList.contains("panels-collapsed");
-    applyPanelsCollapsed(nowCollapsed, true);
+    const collapseBoth = !(leftPanelCollapsed && commandsPanelCollapsed);
+    applyPanelsCollapsed(collapseBoth, true);
   });
+  if (elBtnToggleBacklog) {
+    elBtnToggleBacklog.addEventListener("click", () => {
+      if (_isMobileTabsMode()) applyMobilePanel("left", true);
+      else applySidePanelState(!leftPanelCollapsed, commandsPanelCollapsed, true);
+    });
+  }
+  if (elBtnToggleCommands) {
+    elBtnToggleCommands.addEventListener("click", () => {
+      if (_isMobileTabsMode()) applyMobilePanel("commands", true);
+      else applySidePanelState(leftPanelCollapsed, !commandsPanelCollapsed, true);
+    });
+  }
+  globalThis.__scalpel_setSidePanelVisible = (panel, visible) => {
+    const name = String(panel || "");
+    if (_isMobileTabsMode()) {
+      if (visible && MOBILE_PANELS.includes(name)) applyMobilePanel(name, true);
+      return;
+    }
+    if (name === "left") applySidePanelState(!visible, commandsPanelCollapsed, true);
+    if (name === "commands") applySidePanelState(leftPanelCollapsed, !visible, true);
+  };
   (function bindMobileTabs(){
     const tabs = document.querySelectorAll("#mobileTabs [data-mobile-panel]");
     for (const tab of tabs) {
@@ -502,9 +553,6 @@
     }
     const onChange = () => {
       applyMobileTabsMode();
-      const saved = globalThis.__scalpel_kvGet(panelsKey);
-      if (saved === "1" || saved === "0") applyPanelsCollapsed(saved === "1", false);
-      else applyPanelsCollapsed(window.innerWidth < 1100, false);
     };
     if (mqlMobileTabs && typeof mqlMobileTabs.addEventListener === "function") {
       mqlMobileTabs.addEventListener("change", onChange);

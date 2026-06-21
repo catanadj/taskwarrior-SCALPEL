@@ -3,5 +3,5 @@ from __future__ import annotations
 
 MARKUP = r"""
 
-<div class="layout" id="layout">
+<div class="layout commands-collapsed" id="layout">
   """

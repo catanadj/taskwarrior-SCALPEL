@@ -291,7 +291,14 @@
     }
     saveCommandSectionState();
   })();
-  globalThis.__scalpel_openCommandSection = (name) => setCommandSectionOpen(String(name || ""), true, true);
+  globalThis.__scalpel_openCommandSection = (name) => {
+    try {
+      if (typeof globalThis.__scalpel_setSidePanelVisible === "function") {
+        globalThis.__scalpel_setSidePanelVisible("commands", true);
+      }
+    } catch (_) {}
+    setCommandSectionOpen(String(name || ""), true, true);
+  };
   globalThis.__scalpel_resetCommandSections = () => resetCommandSections(true);
 
   // Left panel sections (accordion)
@@ -629,8 +636,8 @@
     },
     {
       id: "toggle-panels",
-      label: "Toggle panels",
-      hint: "Collapse or expand side panels",
+      label: "Toggle sidebars",
+      hint: "Show or hide both sidebars",
       keys: "Layout",
       codes: ["PN"],
       run: () => { try { const b = document.getElementById("btnTogglePanels"); if (b) b.click(); } catch (_) {} },
