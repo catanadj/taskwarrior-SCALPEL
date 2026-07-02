@@ -1515,6 +1515,25 @@
   if (elVwStart) elVwStart.addEventListener("change", () => applyViewWin({ startYmd: elVwStart.value }));
   if (elVwDays) elVwDays.addEventListener("change", () => applyViewWin({ futureDays: Number(elVwDays.value) }));
   if (elVwOverdue) elVwOverdue.addEventListener("change", () => applyViewWin({ overdueDays: Number(elVwOverdue.value) }));
+  function syncCompletedToggle() {
+    if (!elBtnShowCompleted) return;
+    elBtnShowCompleted.hidden = !hasCompletedTasks;
+    elBtnShowCompleted.textContent = showCompletedTasks ? "Completed: On" : "Completed: Off";
+    elBtnShowCompleted.classList.toggle("on", !!showCompletedTasks);
+    elBtnShowCompleted.setAttribute("aria-pressed", showCompletedTasks ? "true" : "false");
+    elBtnShowCompleted.title = hasCompletedTasks
+      ? "Show or hide completed tasks on the calendar"
+      : "No completed tasks were included. Start with --show-completed to export them.";
+  }
+  syncCompletedToggle();
+  if (elBtnShowCompleted) {
+    elBtnShowCompleted.addEventListener("click", () => {
+      if (!hasCompletedTasks) return;
+      showCompletedTasks = !showCompletedTasks;
+      syncCompletedToggle();
+      rerenderAll({ mode: "full", immediate: true });
+    });
+  }
 
   if (elVwPrevDay) elVwPrevDay.addEventListener("click", () => shiftStartDays(-1));
   if (elVwNextDay) elVwNextDay.addEventListener("click", () => shiftStartDays(1));

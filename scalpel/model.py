@@ -14,6 +14,8 @@ class TaskLite:
     tags: tuple[str, ...]
     priority: str
     urgency: Optional[float]
+    status: str
+    end_ms: Optional[int]
 
     scheduled_ms: Optional[int]
     due_ms: Optional[int]
@@ -38,6 +40,9 @@ class Task(TypedDict, total=False):
     tags: list[str]
     priority: str
     urgency: float | None
+    end_ms: int | None
+    completed_end_ms: int | None
+    original_due_ms: int | None
     scheduled_ms: int | None
     due_ms: int | None
     duration: str | None
@@ -72,6 +77,7 @@ class CalendarConfig(TypedDict, total=False):
     view_start_ms: int
     view_key: str
     viewwin_seed: dict[str, Any]
+    show_completed: bool
 
 
 class Payload(TypedDict, total=False):

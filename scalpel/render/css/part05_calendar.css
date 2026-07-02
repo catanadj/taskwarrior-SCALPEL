@@ -439,6 +439,23 @@
     background: rgba(var(--accent-rgb), 0.16);
   }
 
+  .evt.completed-task{
+    --evt-accent: rgba(98, 201, 140, 0.86);
+    --evt-accent-rgb: 98,201,140;
+    opacity: 0.88;
+  }
+  .evt.completed-task .evt-title{
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: rgba(var(--evt-accent-rgb), 0.72);
+  }
+  .evt.completed-task .completed-pill{
+    border-color: rgba(var(--evt-accent-rgb), 0.36);
+    background: rgba(var(--evt-accent-rgb), 0.16);
+    color: var(--task-body-text);
+    font-weight: 850;
+  }
+
   /* Preserve the user-colored neon envelope while also applying the hover ring */
   .evt.user-colored:not(.selected):not(.dragging):hover {
     outline-color: rgba(var(--evt-accent-rgb, var(--accent-rgb)), var(--task-hover-outline-alpha, 0.55));

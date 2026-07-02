@@ -110,7 +110,7 @@ def normalize_task_v1(t: Any, *, tz: dt.tzinfo) -> Task:
 
     out["tags"] = _normalize_tags(out.get("tags"))
 
-    for k in ("due_ms", "scheduled_ms", "start_calc_ms", "end_calc_ms"):
+    for k in ("due_ms", "scheduled_ms", "start_calc_ms", "end_calc_ms", "end_ms", "completed_end_ms", "original_due_ms"):
         if k in out:
             out[k] = _coerce_int(out.get(k))
 

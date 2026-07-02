@@ -178,7 +178,9 @@ function showFatal(msg, err) {
   // Config (safe default)
   const cfg = (DATA && typeof DATA === "object" && DATA.cfg && typeof DATA.cfg === "object") ? DATA.cfg : {};
   let showNauticalPreview = false;
+  let showCompletedTasks = !!(cfg && cfg.show_completed);
   const hasNauticalPreview = (DATA && Array.isArray(DATA.tasks)) ? DATA.tasks.some(t => t && t.nautical_preview) : false;
+  const hasCompletedTasks = (DATA && Array.isArray(DATA.tasks)) ? DATA.tasks.some(t => String(t && t.status || "").toLowerCase() === "completed") : false;
 
   // -----------------------------
   // Utilities
@@ -236,6 +238,7 @@ function showFatal(msg, err) {
   }
   function isTaskVisibleForRender(t) {
     if (!t) return false;
+    if (String(t.status || "").toLowerCase() === "completed" && !showCompletedTasks) return false;
     if (!isNauticalPreviewTask(t)) return true;
     if (!showNauticalPreview) return false;
     return isNauticalPreviewForwardFromSource(t);

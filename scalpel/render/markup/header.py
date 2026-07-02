@@ -62,6 +62,7 @@ MARKUP = r"""<header>
             <button id="btnUndo" class="btn-soft" data-ico="UN" data-key="Ctrl/Cmd+Z" title="Undo last local change (Ctrl/Cmd+Z)">Undo</button>
             <button id="btnRedo" class="btn-soft" data-ico="RD" data-key="Ctrl/Cmd+Shift+Z" title="Redo last undone change (Ctrl/Cmd+Shift+Z)">Redo</button>
             <button id="btnNauticalPreview" class="small toggle btn-soft" data-ico="NA" title="Toggle future Nautical instances">Nautical: Off</button>
+            <button id="btnShowCompleted" class="small toggle btn-soft" data-ico="DN" type="button" aria-pressed="false" title="Show or hide completed tasks included in this payload">Completed: Off</button>
             <button id="btnClearSel" class="btn-soft" data-ico="CL" data-key="Esc">Clear selection</button>
             <button id="btnReset" class="danger" data-ico="RS">Reset view plan</button>
             <button id="btnCommand" class="small btn-soft" data-ico="KC" data-key="Ctrl/Cmd+K" title="Search and commands (Ctrl/Cmd+K)">Search</button>

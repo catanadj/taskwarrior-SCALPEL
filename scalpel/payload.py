@@ -211,6 +211,46 @@ def _apply_interval_fields(
     )
 
 
+def _task_identity(raw: RawTask) -> str:
+    return str(raw.get("uuid") or raw.get("id") or "").strip()
+
+
+def _completed_filter_for(filter_str: str) -> str | None:
+    """Return a conservative completed-task companion filter.
+
+    The default interactive filter is `status:pending`; in that common case we
+    can safely fetch completed tasks with `status:completed`. Arbitrary
+    Taskwarrior filter rewrites are intentionally avoided because their boolean
+    semantics are easy to break.
+    """
+
+    if filter_str.strip() == "status:pending":
+        return "status:completed"
+    return None
+
+
+def _export_tasks_for_view(filter_str: str, *, show_completed: bool) -> list[RawTask]:
+    raw_tasks = run_task_export(filter_str)
+    if not show_completed:
+        return raw_tasks
+
+    completed_filter = _completed_filter_for(filter_str)
+    if not completed_filter:
+        return raw_tasks
+
+    seen = {_task_identity(t) for t in raw_tasks if isinstance(t, dict)}
+    for task in run_task_export(completed_filter):
+        if not isinstance(task, dict):
+            continue
+        ident = _task_identity(task)
+        if ident and ident in seen:
+            continue
+        if ident:
+            seen.add(ident)
+        raw_tasks.append(task)
+    return raw_tasks
+
+
 def _build_nautical_preview_tasks(
     *,
     base_tasks: Sequence[Task],
@@ -422,6 +462,7 @@ def build_payload(
     display_tz: Optional[str] = None,
     plan_overrides: Optional[dict[str, PlanOverride]] = None,
     nautical_hooks_enabled: Optional[bool] = None,
+    show_completed: bool = False,
 ) -> Payload:
     """Build a SCALPEL payload from Taskwarrior export.
 
@@ -439,7 +480,7 @@ def build_payload(
     tz_name = normalize_tz_name(tz)
     display_tz_name = normalize_tz_name(display_tz)
 
-    raw_tasks = run_task_export(filter_str)
+    raw_tasks = _export_tasks_for_view(filter_str, show_completed=bool(show_completed))
     nautical_enabled = _nautical_hooks_enabled(nautical_hooks_enabled)
     _warn_nautical_disabled_if_needed(raw_tasks, enabled=nautical_enabled)
 
@@ -454,15 +495,21 @@ def build_payload(
             "uuid": nt.uuid,
             "id": nt.id,
             "description": nt.description,
+            "status": nt.status,
             "project": nt.project,
             "tags": list(nt.tags),
             "priority": nt.priority,
             "urgency": nt.urgency,
             "scheduled_ms": nt.scheduled_ms,
             "due_ms": nt.due_ms,
+            "end_ms": nt.end_ms,
             "duration": nt.duration_raw,
             "duration_min": nt.duration_min,
         }
+        if nt.status == "completed" and isinstance(nt.end_ms, int):
+            task_out["completed_end_ms"] = nt.end_ms
+            task_out["original_due_ms"] = nt.due_ms
+            task_out["due_ms"] = nt.end_ms
 
         _apply_interval_fields(
             task_out,
@@ -509,6 +556,7 @@ def build_payload(
             tz=tz_name,
             display_tz=display_tz_name,
         ),
+        "show_completed": bool(show_completed),
     }
 
     goals_cfg = load_goals_config(goals_path)

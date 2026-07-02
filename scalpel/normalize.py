@@ -29,13 +29,17 @@ def normalize_task(t: Dict[str, Any]) -> Optional[TaskLite]:
     dur_min = parse_duration_to_minutes(dur_raw_s)
     scheduled_raw = str(t.get("scheduled") or "")
     due_raw = str(t.get("due") or "")
+    end_raw = str(t.get("end") or "")
     scheduled_ms = parse_tw_utc_to_epoch_ms(scheduled_raw)
     due_ms = parse_tw_utc_to_epoch_ms(due_raw)
+    end_ms = parse_tw_utc_to_epoch_ms(end_raw)
     if _obs_enabled():
         if scheduled_raw and scheduled_ms is None:
             eprint(f"[scalpel.normalize] WARN: invalid scheduled timestamp uuid={uuid!r} value={scheduled_raw!r}")
         if due_raw and due_ms is None:
             eprint(f"[scalpel.normalize] WARN: invalid due timestamp uuid={uuid!r} value={due_raw!r}")
+        if end_raw and end_ms is None:
+            eprint(f"[scalpel.normalize] WARN: invalid end timestamp uuid={uuid!r} value={end_raw!r}")
 
     return TaskLite(
         uuid=uuid,
@@ -45,6 +49,8 @@ def normalize_task(t: Dict[str, Any]) -> Optional[TaskLite]:
         tags=tuple(str(x) for x in tags if isinstance(x, str)),
         priority=str(t.get("priority") or ""),
         urgency=t.get("urgency") if isinstance(t.get("urgency"), (int, float)) else None,
+        status=str(t.get("status") or "pending").strip().lower() or "pending",
+        end_ms=end_ms,
         scheduled_ms=scheduled_ms,
         due_ms=due_ms,
         duration_raw=dur_raw_s,

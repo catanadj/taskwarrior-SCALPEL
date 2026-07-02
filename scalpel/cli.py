@@ -79,6 +79,14 @@ def _build_parser(default_out: str) -> argparse.ArgumentParser:
         action="store_true",
         help="Disable nautical anchor/cp preview task expansion for this run",
     )
+    ap.add_argument(
+        "--show-completed",
+        action="store_true",
+        help=(
+            "Include completed Taskwarrior tasks and display them as normal calendar blocks ending at their "
+            "completion time. With the default status:pending filter, this also exports status:completed."
+        ),
+    )
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument(
         "--serve",
@@ -186,6 +194,7 @@ def _build_data(args: argparse.Namespace) -> Payload:
         display_tz=display_tz,
         plan_overrides=plan_overrides,
         nautical_hooks_enabled=not bool(args.no_nautical_hooks),
+        show_completed=bool(getattr(args, "show_completed", False)),
     )
     if plan_result:
         data = apply_plan_result(data, plan_result)

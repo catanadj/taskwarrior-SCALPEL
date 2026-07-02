@@ -1528,6 +1528,7 @@
 
   function __updateEventNode(el, ev, t) {
     const isPreview = !!(t && t.nautical_preview);
+    const isCompleted = String(t && t.status || "").toLowerCase() === "completed";
     const previewPicked = isPreview && __isNauticalPreviewSelected(ev && ev.uuid);
     const startMin = minuteOfDayFromMs(ev.startMs);
     const dueMin = minuteOfDayFromMs(ev.dueMs);
@@ -1547,6 +1548,7 @@
       + (selected.has(ev.uuid) ? " selected" : "")
       + (qk ? (` queued-${qk}`) : "")
       + (isPreview ? " nautical-preview" : "")
+      + (isCompleted ? " completed-task" : "")
       + (previewPicked ? " nautical-picked" : "")
       + (__isExecutionActiveTask(ev.uuid) ? " execution-active-task" : "")
       + (isDimmedTask(t) ? " dimmed" : "");
@@ -1596,12 +1598,12 @@
     const subtitle = projectLabel + (tags.length ? ` • ${tags.join(",")}` : "");
     const description = String(t.description || "(no description)");
     if (!isPreview) {
-      const tooltipParts = [description, `${timeStr} · ${durLabel}`];
+      const tooltipParts = [description, `${timeStr} · ${durLabel}${isCompleted ? " · completed" : ""}`];
       if (subtitle) tooltipParts.push(subtitle);
       if (t.uuid) tooltipParts.push(String(t.uuid));
       el.title = tooltipParts.join("\n");
     }
-    el.setAttribute("aria-label", `${description}, ${timeStr}, ${durLabel}${subtitle ? `, ${subtitle}` : ""}`);
+    el.setAttribute("aria-label", `${description}, ${timeStr}, ${durLabel}${isCompleted ? ", completed" : ""}${subtitle ? `, ${subtitle}` : ""}`);
 
     const sig = __eventInnerSig(t, ev, subtitle, timeStr, durLabel, previewPicked);
     if (el.__scalpelInnerSig !== sig) {
@@ -1622,6 +1624,7 @@
         <div class="evt-top">
           <div class="evt-title">${escapeHtml(description)}</div>
           <div class="evt-time">
+            ${isCompleted ? `<span class="time-pill completed-pill">Done</span>` : ""}
             <span class="time-start">${escapeHtml(startTimeStr)}</span>
             <span class="time-pill time-range">${escapeHtml(timeStr)}</span>
             <span class="time-pill dur-pill">${escapeHtml(durLabel)}</span>
