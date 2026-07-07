@@ -1586,9 +1586,16 @@
 
     const topPx = (min - WORK_START) * pxPerMin;
     const line = document.createElement("div");
-    line.className = "now-line";
+    line.className = "now-line"
+      + (min - WORK_START < 45 ? " near-start" : "")
+      + (WORK_END - min < 45 ? " near-end" : "");
     line.style.top = `${topPx}px`;
-    line.innerHTML = `<div class="now-label">Now ${escapeHtml(fmtHm(nowMs))}</div>`;
+    line.setAttribute("aria-hidden", "true");
+    line.title = `Current time: ${fmtHm(nowMs)}`;
+    line.innerHTML = `
+      <div class="now-dot"></div>
+      <div class="now-label"><span>Now</span><strong>${escapeHtml(fmtHm(nowMs))}</strong></div>
+    `;
     col.appendChild(line);
     __scalpelNowLineNode = line;
   }

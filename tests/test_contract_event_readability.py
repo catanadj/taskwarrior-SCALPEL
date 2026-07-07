@@ -53,6 +53,20 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn("body.calendar-selection-focus .evt.selected", calendar_css)
         self.assertIn("body.calendar-selection-focus .day-col.active-day", calendar_css)
 
+    def test_now_line_is_labelled_and_edge_aware(self) -> None:
+        selection = read_render_asset("js/part03_selection_ops.js")
+        calendar_css = read_render_asset("css/part05_calendar.css")
+
+        self.assertIn("function renderNowLine()", selection)
+        self.assertIn("near-start", selection)
+        self.assertIn("near-end", selection)
+        self.assertIn("now-dot", selection)
+        self.assertIn("Current time:", selection)
+        self.assertIn(".now-line .now-dot", calendar_css)
+        self.assertIn(".now-line .now-label strong", calendar_css)
+        self.assertIn(".now-line.near-start .now-label", calendar_css)
+        self.assertIn(".now-line.near-end .now-label", calendar_css)
+
     def test_overlap_warning_does_not_replace_event_content(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

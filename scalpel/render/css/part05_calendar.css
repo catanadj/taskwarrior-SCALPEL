@@ -312,30 +312,63 @@
   /* Now line */
   .now-line {
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 7px;
+    right: 7px;
     height: 0;
-    border-top: 2px solid var(--now-line);
+    border-top: 2px solid transparent;
+    background:
+      linear-gradient(90deg,
+        rgba(var(--warn-rgb), 0.98),
+        var(--now-line) 52%,
+        rgba(var(--warn-rgb), 0.44)
+      ) 0 -1px / 100% 2px no-repeat;
     box-shadow:
-      0 0 0 1px rgba(var(--warn-rgb), 0.22),
       0 0 8px var(--now-glow),
       0 0 12px rgba(var(--warn-rgb), 0.18);
     pointer-events: none;
-    z-index: 4;
+    z-index: 18;
+  }
+  .now-line .now-dot {
+    position: absolute;
+    left: -5px;
+    top: -5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(var(--warn-rgb), 0.98);
+    box-shadow:
+      0 0 0 3px rgba(var(--warn-rgb), 0.18),
+      0 0 12px rgba(var(--warn-rgb), 0.38);
   }
   .now-line .now-label {
     position: absolute;
     right: 10px;
-    top: -14px;
-    font-size: 13px;
-    font-weight: 700;
+    top: -16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 800;
     color: rgba(var(--warn-rgb), 0.95);
     background: var(--now-label-bg);
     border: 1px solid rgba(var(--warn-rgb),0.40);
     border-radius: 999px;
-    padding: 2px 10px;
-    letter-spacing: 0.2px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+    padding: 3px 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.26);
+  }
+  .now-line .now-label strong{
+    color: var(--text);
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 900;
+  }
+  .now-line.near-start .now-label{
+    top: 5px;
+  }
+  .now-line.near-end .now-label{
+    top: -28px;
   }
 
   /* Marquee */
