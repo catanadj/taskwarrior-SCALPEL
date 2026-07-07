@@ -1844,4 +1844,22 @@
     }catch(e){ /* noop */ }
   }
 
+  function pulseConflictTasks(uuids){
+    try{
+      if (!uuids || !uuids.length) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          for (const u of uuids){
+            const el = document.querySelector(`.evt[data-uuid="${u}"]`);
+            if (!el) continue;
+            el.classList.remove("conflict-pulse");
+            void el.offsetWidth;
+            el.classList.add("conflict-pulse");
+            setTimeout(() => { try{ el.classList.remove("conflict-pulse"); }catch(_){} }, 1100);
+          }
+        });
+      });
+    }catch(e){ /* noop */ }
+  }
+
   // -----------------------------

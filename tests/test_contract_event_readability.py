@@ -83,10 +83,17 @@ class EventReadabilityContractTests(unittest.TestCase):
 
     def test_overlap_warning_does_not_replace_event_content(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
+        drag = read_render_asset("js/part06_drag_resize.js")
         calendar_css = read_render_asset("css/part05_calendar.css")
         self.assertIn("conflict-gutter", rendering)
+        self.assertIn("pulseConflictTasks", rendering)
+        self.assertIn('classList.add("conflict-pulse")', rendering)
+        self.assertIn("pulseConflictTasks(uuids)", drag)
         self.assertIn(".evt .conflict-gutter", calendar_css)
         self.assertIn(".evt.warn-overlap .conflict-gutter", calendar_css)
+        self.assertIn(".evt.conflict-pulse", calendar_css)
+        self.assertIn("@keyframes conflict_task_pulse", calendar_css)
+        self.assertIn("@keyframes conflict_gutter_pulse", calendar_css)
         self.assertNotIn(".evt.warn-overlap::before", calendar_css)
         self.assertNotIn(".evt.warn-overlap .evt-time::after", calendar_css)
         self.assertNotIn('content: "OVERLAP"', calendar_css)

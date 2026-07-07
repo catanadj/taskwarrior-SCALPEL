@@ -263,6 +263,11 @@
     updateSelectionMeta();
     rerenderAll({ mode: "selection" });
     jumpTo(dayIndex, minute);
+    try {
+      if (typeof pulseConflictTasks === "function") {
+        pulseConflictTasks(uuids);
+      }
+    } catch (_) {}
   };
 
   // -----------------------------

@@ -1715,6 +1715,12 @@ async function main() {
     `)
   );
 
+  await waitFor("conflict pulse", () =>
+    evaluate(`
+      (() => document.querySelectorAll('.evt.conflict-pulse').length >= 2)()
+    `)
+  );
+
   try { ws.close(); } catch (_) {}
 }
 
