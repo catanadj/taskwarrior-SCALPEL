@@ -20,6 +20,14 @@ class EventReadabilityContractTests(unittest.TestCase):
         ):
             self.assertIn(class_name, rendering)
         self.assertIn('el.setAttribute("aria-label"', rendering)
+        self.assertIn("__eventTooltipLines", rendering)
+        self.assertIn("__eventAriaLabel", rendering)
+        self.assertIn("__eventWarningLabels", rendering)
+        self.assertIn("Task: ", rendering)
+        self.assertIn("Time: ", rendering)
+        self.assertIn("Status: completed at", rendering)
+        self.assertIn("Warnings: ", rendering)
+        self.assertIn("Double-click to edit", rendering)
         self.assertIn('tooltipParts.join("\\n")', rendering)
         self.assertNotIn('(t.uuid||"").slice(0,8)', rendering)
 

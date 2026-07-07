@@ -1535,6 +1535,46 @@
     ].join("\u001f");
   }
 
+  function __eventWarningLabels(warnKinds) {
+    const labels = [];
+    if (warnKinds && warnKinds.has("overlap")) labels.push("overlap");
+    if (warnKinds && warnKinds.has("out_of_hours")) labels.push("outside workhours");
+    return labels;
+  }
+
+  function __eventTooltipLines(opts) {
+    const o = opts || {};
+    const lines = [
+      `Task: ${String(o.description || "(no description)")}`,
+      o.isCompleted
+        ? `Status: completed at ${String(o.endLabel || "")}`
+        : `Time: ${String(o.timeStr || "")} (${String(o.durLabel || "")})`,
+    ];
+    if (!o.isCompleted && o.startLabel && o.endLabel) {
+      lines.push(`Start: ${String(o.startLabel)} · End: ${String(o.endLabel)}`);
+    }
+    if (o.projectLabel) lines.push(`Project: ${String(o.projectLabel)}`);
+    if (Array.isArray(o.tags) && o.tags.length) lines.push(`Tags: ${o.tags.join(", ")}`);
+    if (Array.isArray(o.warningLabels) && o.warningLabels.length) lines.push(`Warnings: ${o.warningLabels.join(", ")}`);
+    if (o.uuid) lines.push(`UUID: ${String(o.uuid)}`);
+    lines.push("Double-click to edit · drag to move · bottom edge to resize");
+    return lines;
+  }
+
+  function __eventAriaLabel(opts) {
+    const o = opts || {};
+    const parts = [
+      String(o.description || "(no description)"),
+      o.isCompleted
+        ? `completed at ${String(o.endLabel || "")}`
+        : `${String(o.timeStr || "")}, ${String(o.durLabel || "")}`,
+    ];
+    if (o.projectLabel) parts.push(`project ${String(o.projectLabel)}`);
+    if (Array.isArray(o.tags) && o.tags.length) parts.push(`tags ${o.tags.join(", ")}`);
+    if (Array.isArray(o.warningLabels) && o.warningLabels.length) parts.push(`warnings ${o.warningLabels.join(", ")}`);
+    return parts.join(", ");
+  }
+
   function __createEventNode(uuid) {
     const el = document.createElement("div");
     el.dataset.uuid = String(uuid || "");
@@ -1653,6 +1693,7 @@
 
     const timeStr = `${fmtHm(ev.startMs)}–${fmtHm(ev.dueMs)}`;
     const startTimeStr = fmtHm(ev.startMs);
+    const endTimeStr = fmtHm(ev.dueMs);
     const durLabel = fmtDuration((ev.dueMs - ev.startMs) / 60000);
     const projectLabel = String(t.project || "").trim();
     const tags = Array.isArray(t.tags) ? t.tags.map(x => String(x || "").trim()).filter(Boolean) : [];
@@ -1660,13 +1701,32 @@
     const extraTagCount = Math.max(0, tags.length - visibleTags.length);
     const subtitle = projectLabel + (tags.length ? ` • ${tags.join(",")}` : "");
     const description = String(t.description || "(no description)");
+    const warningLabels = __eventWarningLabels(warnKinds);
     if (!isPreview) {
-      const tooltipParts = [description, isCompleted ? `Completed ${fmtHm(ev.dueMs)}` : `${timeStr} · ${durLabel}`];
-      if (subtitle) tooltipParts.push(subtitle);
-      if (t.uuid) tooltipParts.push(String(t.uuid));
+      const tooltipParts = __eventTooltipLines({
+        description,
+        isCompleted,
+        timeStr,
+        durLabel,
+        startLabel: startTimeStr,
+        endLabel: endTimeStr,
+        projectLabel,
+        tags,
+        warningLabels,
+        uuid: t.uuid,
+      });
       el.title = tooltipParts.join("\n");
     }
-    el.setAttribute("aria-label", `${description}, ${isCompleted ? `completed ${fmtHm(ev.dueMs)}` : `${timeStr}, ${durLabel}`}${subtitle ? `, ${subtitle}` : ""}`);
+    el.setAttribute("aria-label", __eventAriaLabel({
+      description,
+      isCompleted,
+      timeStr,
+      durLabel,
+      endLabel: endTimeStr,
+      projectLabel,
+      tags,
+      warningLabels,
+    }));
 
     const sig = __eventInnerSig(t, ev, subtitle, timeStr, durLabel, previewPicked);
     if (el.__scalpelInnerSig !== sig) {
