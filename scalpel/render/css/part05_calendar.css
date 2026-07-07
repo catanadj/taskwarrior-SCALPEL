@@ -664,6 +664,51 @@
   .evt.evt-narrow .evt-title{ -webkit-line-clamp: 1; }
   .evt.evt-narrow .evt-time{ gap: 3px; }
   .evt.evt-narrow .evt-time .time-pill{ padding-inline: 4px; }
+  .evt.evt-crowded{
+    border-left-width: max(var(--event-accent-width), 6px);
+    box-shadow:
+      0 0 0 1px rgba(var(--evt-accent-rgb, var(--accent-rgb)), 0.18) inset,
+      0 5px 10px rgba(0,0,0,0.18);
+  }
+  .evt.evt-crowded .evt-top{
+    min-height: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px 5px;
+    border-bottom: 0;
+    background: linear-gradient(90deg, rgba(var(--evt-accent-rgb, var(--accent-rgb)), 0.10), rgba(0,0,0,0.04));
+  }
+  .evt.evt-crowded .evt-title{
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: unset;
+    font-size: 12px;
+    font-weight: 820;
+    line-height: 1.16;
+  }
+  .evt.evt-crowded .evt-time{
+    margin-top: 2px;
+    gap: 4px;
+  }
+  .evt.evt-crowded .evt-time .time-start{
+    display: inline;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--task-body-text);
+    font-size: 10px;
+    font-weight: 820;
+    letter-spacing: 0.01em;
+  }
+  .evt.evt-crowded .evt-time .time-range,
+  .evt.evt-crowded .evt-time .dur-pill,
+  .evt.evt-crowded .evt-bot{
+    display: none;
+  }
+  .evt.evt-crowded.selected .evt-time .time-range,
+  .evt.evt-crowded:hover .evt-time .time-range{
+    display: inline-flex;
+  }
 
   .evt .resize {
     position: absolute;
@@ -830,25 +875,24 @@
 
   .evt.warn-overlap {
     box-shadow:
-      0 0 0 1px rgba(var(--warn-rgb), 0.22) inset,
-      0 10px 16px rgba(0,0,0,0.22);
+      0 0 0 1px rgba(var(--warn-rgb), 0.16) inset,
+      0 7px 12px rgba(0,0,0,0.20);
   }
-  .evt.warn-overlap::before {
-    content: "";
+  .evt .conflict-gutter{
+    display: none;
     position: absolute;
-    inset: 0;
+    top: 4px;
+    bottom: 4px;
+    right: 3px;
+    width: 4px;
+    border-radius: 999px;
     pointer-events: none;
-    background:
-      repeating-linear-gradient(
-        135deg,
-        rgba(var(--warn-rgb), 0.14),
-        rgba(var(--warn-rgb), 0.14) 6px,
-        rgba(0,0,0,0) 6px,
-        rgba(0,0,0,0) 12px
-      );
-    opacity: 0.9;
-    z-index: 0;
+    background: linear-gradient(180deg, rgba(var(--warn-rgb), 0.96), rgba(var(--bad-rgb), 0.82));
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.16), 0 0 12px rgba(var(--warn-rgb), 0.28);
+    opacity: 0.95;
+    z-index: 2;
   }
+  .evt.warn-overlap .conflict-gutter{ display: block; }
   .evt.warn-overlap .evt-top,
   .evt.warn-overlap .evt-bot,
   .evt.warn-overlap .evt-time {

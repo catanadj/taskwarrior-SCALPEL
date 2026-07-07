@@ -1573,6 +1573,7 @@
     else if (hPx < 84) cls += " evt-medium";
     else cls += " evt-roomy";
     if (ev.laneCount >= 3) cls += " evt-narrow";
+    if (hPx < 68 || ev.laneCount >= 3) cls += " evt-crowded";
     if (warnKinds && warnKinds.has("overlap")) cls += " warn-overlap";
 
     const acc = resolveTaskAccent(t);
@@ -1638,6 +1639,7 @@
         : "";
       el.innerHTML = `
         <div class="evt-sheen" aria-hidden="true"></div>
+        <div class="conflict-gutter" aria-hidden="true"></div>
         <div class="evt-top">
           <div class="evt-title">${escapeHtml(description)}</div>
           <div class="evt-time">

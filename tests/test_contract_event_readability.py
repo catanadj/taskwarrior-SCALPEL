@@ -28,9 +28,12 @@ class EventReadabilityContractTests(unittest.TestCase):
         calendar_css = read_render_asset("css/part05_calendar.css")
         self.assertIn('if (hPx < 46) cls += " evt-short"', rendering)
         self.assertIn('else if (hPx < 84) cls += " evt-medium"', rendering)
+        self.assertIn('cls += " evt-crowded"', rendering)
         self.assertIn(".evt.evt-short", calendar_css)
         self.assertIn(".evt.evt-medium", calendar_css)
         self.assertIn(".evt.evt-narrow", calendar_css)
+        self.assertIn(".evt.evt-crowded", calendar_css)
+        self.assertIn(".evt.evt-crowded .evt-time .time-range", calendar_css)
         self.assertIn("-webkit-line-clamp: 2", calendar_css)
 
     def test_drag_preview_updates_both_time_presentations(self) -> None:
@@ -39,8 +42,12 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('querySelector(".evt-time .time-start")', drag_js)
 
     def test_overlap_warning_does_not_replace_event_content(self) -> None:
+        rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")
-        self.assertIn(".evt.warn-overlap::before", calendar_css)
+        self.assertIn("conflict-gutter", rendering)
+        self.assertIn(".evt .conflict-gutter", calendar_css)
+        self.assertIn(".evt.warn-overlap .conflict-gutter", calendar_css)
+        self.assertNotIn(".evt.warn-overlap::before", calendar_css)
         self.assertNotIn(".evt.warn-overlap .evt-time::after", calendar_css)
         self.assertNotIn('content: "OVERLAP"', calendar_css)
 
