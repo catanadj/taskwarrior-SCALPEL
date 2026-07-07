@@ -155,6 +155,85 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
         self.assertEqual(out, [])
         load_mod.assert_not_called()
 
+    def test_preview_builder_skips_completed_source_tasks(self) -> None:
+        class FakeNautical:
+            DEFAULT_DUE_HOUR = 11
+
+            @staticmethod
+            def validate_anchor_expr_strict(_anchor: str):
+                return [[{"mods": {"t": "09:00"}}]]
+
+            @staticmethod
+            def anchors_between_expr(_dnf, start_excl, end_excl, *, default_seed, seed_base):
+                del start_excl, end_excl, default_seed, seed_base
+                return [dt.date(2026, 1, 2)]
+
+            @staticmethod
+            def atom_matches_on(_atom, _target, _seed_date):
+                return True
+
+            @staticmethod
+            def pick_hhmm_from_dnf_for_date(_dnf, _date, _seed_date):
+                return "09:00"
+
+            @staticmethod
+            def parse_cp_duration(cp_str: str):
+                if cp_str != "PT1D":
+                    return None
+                return dt.timedelta(days=1)
+
+            @staticmethod
+            def coerce_int(value, default: int):
+                try:
+                    return int(value)
+                except Exception:
+                    return default
+
+            @staticmethod
+            def parse_dt_any(_value: str):
+                return None
+
+        base_ms = int(dt.datetime(2026, 1, 1, 8, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        raw_tasks = [
+            {
+                "uuid": "done-1",
+                "description": "Completed source",
+                "status": "completed",
+                "anchor": "tomorrow@09",
+                "cp": "PT1D",
+                "chain": "on",
+                "chainMax": 3,
+                "link": 1,
+                "end": "20260101T080000Z",
+            }
+        ]
+        base_tasks = [
+            {
+                "uuid": "done-1",
+                "description": "Completed source",
+                "status": "completed",
+                "due_ms": base_ms,
+                "end_ms": base_ms,
+                "completed_end_ms": base_ms,
+                "scheduled_ms": None,
+                "duration_min": 30,
+            }
+        ]
+
+        with patch("scalpel.payload._load_nautical_core", return_value=FakeNautical()):
+            out = payload_mod._build_nautical_preview_tasks(
+                base_tasks=base_tasks,
+                raw_tasks=raw_tasks,
+                start_date=dt.date(2026, 1, 1),
+                days=7,
+                tz_name="UTC",
+                default_duration_min=30,
+                max_infer_duration_min=480,
+                nautical_hooks_enabled=True,
+            )
+
+        self.assertEqual(out, [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -275,6 +275,9 @@ def _build_nautical_preview_tasks(
     out: list[Task] = []
 
     for task_out, raw in zip(base_tasks, raw_tasks, strict=False):
+        if str(task_out.get("status") or raw.get("status") or "").strip().lower() == "completed":
+            continue
+
         anchor_expr = str(raw.get("anchor") or "").strip()
 
         anchor_mode = str(raw.get("anchor_mode") or "").strip()
