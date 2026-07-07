@@ -41,6 +41,18 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('querySelector(".evt-time .time-range")', drag_js)
         self.assertIn('querySelector(".evt-time .time-start")', drag_js)
 
+    def test_selected_calendar_tasks_enable_focus_readability_mode(self) -> None:
+        rendering = read_render_asset("js/part04_rendering.js")
+        calendar_css = read_render_asset("css/part05_calendar.css")
+
+        self.assertIn("__syncCalendarSelectionFocusState", rendering)
+        self.assertIn("calendar-selection-focus", rendering)
+        self.assertIn("evNode.dataset.preview !== \"1\"", rendering)
+        self.assertIn("body.calendar-selection-focus .evt:not(.selected)", calendar_css)
+        self.assertIn("body.calendar-selection-focus .evt:not(.selected):hover", calendar_css)
+        self.assertIn("body.calendar-selection-focus .evt.selected", calendar_css)
+        self.assertIn("body.calendar-selection-focus .day-col.active-day", calendar_css)
+
     def test_overlap_warning_does_not_replace_event_content(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

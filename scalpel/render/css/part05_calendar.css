@@ -387,6 +387,29 @@
   .evt.selected:not(.dragging){
     animation: none;
   }
+  body.calendar-selection-focus .evt:not(.selected):not(.dragging):not(.nautical-preview):not(.completed-task){
+    opacity: 0.46;
+    filter: saturate(0.72) brightness(0.88);
+  }
+  body.calendar-selection-focus .evt.completed-task:not(.selected),
+  body.calendar-selection-focus .evt.nautical-preview:not(.selected){
+    opacity: 0.64;
+    filter: saturate(0.82) brightness(0.92);
+  }
+  body.calendar-selection-focus .evt.warn-overlap:not(.selected) .conflict-gutter{
+    opacity: 1;
+    filter: saturate(1.20) brightness(1.05);
+  }
+  body.calendar-selection-focus .evt:not(.selected):hover,
+  body.calendar-selection-focus .evt.selected{
+    opacity: 1;
+    filter: none;
+  }
+  body.calendar-selection-focus .day-col.active-day{
+    background:
+      linear-gradient(180deg, rgba(var(--accent-rgb),0.095), rgba(var(--accent-rgb),0.025)),
+      var(--panel);
+  }
 
   .evt:not(.selected):not(.dragging):hover {
     outline-color: rgba(var(--evt-accent-rgb, var(--accent-rgb)), var(--task-hover-outline-alpha, 0.55));

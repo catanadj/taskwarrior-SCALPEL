@@ -41,6 +41,20 @@
     if (rowNode) rowNode.classList.toggle("selected", !!isSelected);
   }
 
+  function __syncCalendarSelectionFocusState() {
+    let hasVisibleCalendarSelection = false;
+    for (const u of selected) {
+      const evNode = __eventNodeByUuid.get(u);
+      if (evNode && evNode.dataset.preview !== "1") {
+        hasVisibleCalendarSelection = true;
+        break;
+      }
+    }
+    try {
+      document.body.classList.toggle("calendar-selection-focus", hasVisibleCalendarSelection);
+    } catch (_) {}
+  }
+
   function syncSelectionVisuals() {
     const changed = new Set();
     for (const u of __selectedVisualUuids) if (!selected.has(u)) changed.add(u);
@@ -49,6 +63,7 @@
 
     __selectedVisualUuids.clear();
     for (const u of selected) __selectedVisualUuids.add(u);
+    __syncCalendarSelectionFocusState();
   }
 
   function syncExecutionVisuals() {
@@ -1776,6 +1791,7 @@
     __scalpelVisibleEventUuids = new Set(seenUuids);
     __selectedVisualUuids.clear();
     for (const u of selected) __selectedVisualUuids.add(u);
+    __syncCalendarSelectionFocusState();
 
     renderNowLine();
   }
