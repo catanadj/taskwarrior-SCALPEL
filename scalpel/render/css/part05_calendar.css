@@ -255,8 +255,8 @@
     position: absolute;
     left: 0;
     right: 0;
-    border-block: 1px solid rgba(255,255,255,0.035);
-    background: rgba(var(--accent-rgb), 0.035);
+    border-block: 1px solid rgba(255,255,255,0.075);
+    background: rgba(var(--accent-rgb), 0.10);
   }
   .time-band span{
     position: sticky;
@@ -265,20 +265,20 @@
     margin: 6px 8px;
     padding: 2px 7px;
     border-radius: 999px;
-    color: var(--muted);
-    background: rgba(0,0,0,0.12);
-    border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(226,232,240,0.88);
+    background: rgba(2,6,23,0.24);
+    border: 1px solid rgba(255,255,255,0.12);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .time-band-early{ background: rgba(99, 179, 255, 0.045); }
-  .time-band-focus{ background: rgba(98, 201, 140, 0.060); }
-  .time-band-admin{ background: rgba(245, 158, 11, 0.055); }
-  .time-band-deep{ background: rgba(167, 139, 250, 0.070); }
-  .time-band-wrap{ background: rgba(34, 211, 238, 0.050); }
-  .time-band-evening{ background: rgba(148, 163, 184, 0.045); }
+  .time-band-blue{ background: rgba(59, 130, 246, 0.16); }
+  .time-band-green{ background: rgba(34, 197, 94, 0.18); }
+  .time-band-amber{ background: rgba(245, 158, 11, 0.17); }
+  .time-band-violet{ background: rgba(139, 92, 246, 0.19); }
+  .time-band-cyan{ background: rgba(6, 182, 212, 0.17); }
+  .time-band-gray{ background: rgba(100, 116, 139, 0.16); }
   body.theme-light .time-band span,
   body.theme-paper .time-band span{
     background: rgba(255,255,255,0.68);

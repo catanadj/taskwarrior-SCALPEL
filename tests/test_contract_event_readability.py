@@ -85,6 +85,10 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn("TIME_BANDS_KEY", init)
         self.assertIn(".time-bands", css)
         self.assertIn("pointer-events: none", css)
+        self.assertIn("rgba(34, 197, 94, 0.18)", css)
+        self.assertIn("rgba(139, 92, 246, 0.19)", css)
+        self.assertIn(".time-band-green", css)
+        self.assertIn(".time-band-violet", css)
         self.assertIn("bandModal", OVERLAY_MARKUP)
         self.assertIn(".band-edit-row", modal_css)
 
@@ -107,7 +111,11 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn("__scalpel_storeSetJSON(TIME_BANDS_CONFIG_KEY", init)
         self.assertIn("parseBandTimeToMin", selection)
         self.assertIn("formatBandTime", selection)
+        self.assertIn("TIME_BAND_STYLE_OPTIONS", selection)
         self.assertIn("TIME_BAND_STYLE_KEYS", selection)
+        self.assertIn('focus: "green"', selection)
+        self.assertIn("normalizeTimeBandKey", selection)
+        self.assertIn("option.label", init)
 
 
 if __name__ == "__main__":

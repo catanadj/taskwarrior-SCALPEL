@@ -843,15 +843,38 @@
   }
 
   const DEFAULT_TIME_BANDS = [
-    { key: "early", label: "Early", start: 6 * 60, end: 9 * 60 },
-    { key: "focus", label: "Focus", start: 9 * 60, end: 12 * 60 },
-    { key: "admin", label: "Admin", start: 12 * 60, end: 14 * 60 },
-    { key: "deep", label: "Deep", start: 14 * 60, end: 17 * 60 },
-    { key: "wrap", label: "Wrap-up", start: 17 * 60, end: 20 * 60 },
-    { key: "evening", label: "Evening", start: 20 * 60, end: 23 * 60 },
+    { key: "blue", label: "Early", start: 6 * 60, end: 9 * 60 },
+    { key: "green", label: "Focus", start: 9 * 60, end: 12 * 60 },
+    { key: "amber", label: "Admin", start: 12 * 60, end: 14 * 60 },
+    { key: "violet", label: "Deep", start: 14 * 60, end: 17 * 60 },
+    { key: "cyan", label: "Wrap-up", start: 17 * 60, end: 20 * 60 },
+    { key: "gray", label: "Evening", start: 20 * 60, end: 23 * 60 },
   ];
-  const TIME_BAND_STYLE_KEYS = ["early", "focus", "admin", "deep", "wrap", "evening"];
+  const TIME_BAND_STYLE_OPTIONS = [
+    { key: "blue", label: "Blue" },
+    { key: "green", label: "Green" },
+    { key: "amber", label: "Amber" },
+    { key: "violet", label: "Violet" },
+    { key: "cyan", label: "Cyan" },
+    { key: "gray", label: "Gray" },
+  ];
+  const TIME_BAND_STYLE_KEYS = TIME_BAND_STYLE_OPTIONS.map(opt => opt.key);
+  const TIME_BAND_LEGACY_STYLE_KEYS = {
+    early: "blue",
+    focus: "green",
+    admin: "amber",
+    deep: "violet",
+    wrap: "cyan",
+    evening: "gray",
+  };
   let timeBands = DEFAULT_TIME_BANDS.map(b => ({ ...b }));
+
+  function normalizeTimeBandKey(value, fallbackIdx) {
+    const rawKey = String(value || "").trim().toLowerCase();
+    const mapped = TIME_BAND_LEGACY_STYLE_KEYS[rawKey] || rawKey;
+    if (TIME_BAND_STYLE_KEYS.includes(mapped)) return mapped;
+    return TIME_BAND_STYLE_KEYS[fallbackIdx % TIME_BAND_STYLE_KEYS.length];
+  }
 
   function parseBandTimeToMin(value) {
     const s = String(value || "").trim();
@@ -876,8 +899,7 @@
       const label = String(raw.label || "").trim().slice(0, 32);
       const start = Number(raw.start);
       const end = Number(raw.end);
-      const rawKey = String(raw.key || "").trim().toLowerCase();
-      const key = TIME_BAND_STYLE_KEYS.includes(rawKey) ? rawKey : TIME_BAND_STYLE_KEYS[i % TIME_BAND_STYLE_KEYS.length];
+      const key = normalizeTimeBandKey(raw.key, i);
       if (!label || !Number.isFinite(start) || !Number.isFinite(end)) continue;
       const s = clamp(Math.round(start), 0, 1439);
       const e = clamp(Math.round(end), 1, 1440);

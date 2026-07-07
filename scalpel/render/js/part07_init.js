@@ -1588,7 +1588,7 @@
   function newBandDraftRow(band) {
     const b = band || {};
     return {
-      key: TIME_BAND_STYLE_KEYS.includes(String(b.key || "")) ? String(b.key) : "focus",
+      key: normalizeTimeBandKey(b.key, 1),
       label: String(b.label || "New band").trim(),
       start: Number.isFinite(Number(b.start)) ? Number(b.start) : WORK_START,
       end: Number.isFinite(Number(b.end)) ? Number(b.end) : Math.min(WORK_END, WORK_START + 60),
@@ -1608,7 +1608,7 @@
         label: String(node.value || "").trim(),
         start: parseBandTimeToMin(startNode && startNode.value),
         end: parseBandTimeToMin(endNode && endNode.value),
-        key: String((keyNode && keyNode.value) || "focus"),
+        key: normalizeTimeBandKey(keyNode && keyNode.value, rows.length),
       });
     });
     bandDraftRows = rows;
@@ -1646,13 +1646,13 @@
       const style = document.createElement("select");
       style.setAttribute("data-band-idx", String(i));
       style.setAttribute("data-band-kind", "key");
-      for (const key of TIME_BAND_STYLE_KEYS) {
+      for (const option of TIME_BAND_STYLE_OPTIONS) {
         const opt = document.createElement("option");
-        opt.value = key;
-        opt.textContent = key;
+        opt.value = option.key;
+        opt.textContent = option.label;
         style.appendChild(opt);
       }
-      style.value = TIME_BAND_STYLE_KEYS.includes(String(rowData.key || "")) ? String(rowData.key) : "focus";
+      style.value = normalizeTimeBandKey(rowData.key, i);
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -1721,7 +1721,7 @@
       syncBandDraftFromDom();
       const last = bandDraftRows[bandDraftRows.length - 1] || { end: WORK_START };
       const start = clamp(Number(last.end) || WORK_START, WORK_START, WORK_END - 1);
-      bandDraftRows.push(newBandDraftRow({ label: "New band", start, end: Math.min(WORK_END, start + 60), key: "focus" }));
+      bandDraftRows.push(newBandDraftRow({ label: "New band", start, end: Math.min(WORK_END, start + 60), key: "green" }));
       renderBandEditorRows();
     });
   }
