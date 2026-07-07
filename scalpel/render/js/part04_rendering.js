@@ -1427,6 +1427,7 @@
     }
 
     return {
+      taskCount: events.length,
       loadMin: Math.round(loadMin),
       overlapSegments,
       outOfHours,
@@ -1436,6 +1437,29 @@
       firstMinute,
       allUuids,
     };
+  }
+
+  function __dayHeaderSummary(day) {
+    const taskCount = Number(day && day.taskCount) || 0;
+    const loadMin = Number(day && day.loadMin) || 0;
+    const overlaps = Array.isArray(day && day.overlapSegments) ? day.overlapSegments.length : 0;
+    const outOfHours = Array.isArray(day && day.outOfHours) ? day.outOfHours.length : 0;
+    const overloadMin = Number(day && day.overloadMin) || 0;
+    const bits = [
+      `${taskCount} task${taskCount === 1 ? "" : "s"}`,
+      fmtDuration(loadMin),
+    ];
+    if (overlaps) bits.push(`${overlaps} overlap${overlaps === 1 ? "" : "s"}`);
+    if (overloadMin > 0) bits.push(`+${fmtDuration(overloadMin)}`);
+    const text = bits.join(" · ");
+    const titleBits = [
+      `${taskCount} visible scheduled task${taskCount === 1 ? "" : "s"}`,
+      `Planned load ${fmtDuration(loadMin)} of ${fmtDuration(CAL_MINUTES)}`,
+    ];
+    if (overlaps) titleBits.push(`${overlaps} overlap${overlaps === 1 ? "" : "s"}`);
+    if (outOfHours) titleBits.push(`${outOfHours} out-of-hours segment${outOfHours === 1 ? "" : "s"}`);
+    if (overloadMin > 0) titleBits.push(`Overbooked by ${fmtDuration(overloadMin)}`);
+    return { text, title: titleBits.join(" • ") };
   }
 
   function renderDayLoadsAndConflicts(byDay) {
@@ -1464,6 +1488,7 @@
       if (h) {
         const fill = h.querySelector(".loadfill");
         const txt = h.querySelector(".loadtxt");
+        const summary = h.querySelector(".daysummary");
         const warn = h.querySelector(".daywarn");
         const pct = Math.min(200, Math.round(util * 100));
         if (fill) {
@@ -1477,6 +1502,11 @@
         h.classList.toggle("has-out-hours", day.outOfHours.length > 0);
         if (txt) {
           txt.textContent = `${fmtDuration(day.loadMin)} / ${fmtDuration(CAL_MINUTES)}`;
+        }
+        if (summary) {
+          const headerSummary = __dayHeaderSummary(day);
+          summary.textContent = headerSummary.text;
+          summary.title = headerSummary.title;
         }
         if (warn) {
           warn.textContent = day.summaryBits.length ? day.summaryBits.join(" • ") : "Clean";

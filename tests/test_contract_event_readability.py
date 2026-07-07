@@ -67,6 +67,20 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn(".now-line.near-start .now-label", calendar_css)
         self.assertIn(".now-line.near-end .now-label", calendar_css)
 
+    def test_day_headers_include_busy_day_summary(self) -> None:
+        selection = read_render_asset("js/part03_selection_ops.js")
+        rendering = read_render_asset("js/part04_rendering.js")
+        calendar_css = read_render_asset("css/part05_calendar.css")
+
+        self.assertIn("daysummary", selection)
+        self.assertIn("__dayHeaderSummary", rendering)
+        self.assertIn("taskCount: events.length", rendering)
+        self.assertIn("visible scheduled task", rendering)
+        self.assertIn("summary.textContent = headerSummary.text", rendering)
+        self.assertIn("summary.title = headerSummary.title", rendering)
+        self.assertIn(".day-h .daysummary", calendar_css)
+        self.assertIn(".day-h.has-warning .daysummary", calendar_css)
+
     def test_overlap_warning_does_not_replace_event_content(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

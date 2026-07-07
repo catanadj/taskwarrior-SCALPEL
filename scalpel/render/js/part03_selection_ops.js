@@ -1004,6 +1004,7 @@
           <div class="loadbar"><div class="loadfill"></div></div>
           <div class="loadtxt">0m</div>
         </div>
+        <div class="daysummary">0 tasks · 0m</div>
         <div class="daywarn">Clean</div>
         <div class="day-notes"></div>
       `;

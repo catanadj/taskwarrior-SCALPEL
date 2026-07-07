@@ -163,6 +163,16 @@
     white-space: nowrap;
     flex: 0 0 auto;
   }
+  .day-h .daysummary {
+    min-height: 16px;
+    color: var(--task-body-text);
+    font-size: 11px;
+    font-weight: 720;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .day-h .daywarn {
     min-height: 16px;
     color: var(--muted);
@@ -175,6 +185,9 @@
   .day-h.has-warning .daywarn {
     color: rgba(var(--warn-rgb), 0.98);
     font-weight: 700;
+  }
+  .day-h.has-warning .daysummary {
+    color: rgba(var(--warn-rgb), 0.96);
   }
   .day-h.has-warning:not(.today):not(.active-day) {
     background:
