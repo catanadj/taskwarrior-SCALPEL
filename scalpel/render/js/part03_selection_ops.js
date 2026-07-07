@@ -842,7 +842,7 @@
     __positionDayContextMenu(menu, clientX, clientY);
   }
 
-  const TIME_BANDS = [
+  const DEFAULT_TIME_BANDS = [
     { key: "early", label: "Early", start: 6 * 60, end: 9 * 60 },
     { key: "focus", label: "Focus", start: 9 * 60, end: 12 * 60 },
     { key: "admin", label: "Admin", start: 12 * 60, end: 14 * 60 },
@@ -850,6 +850,49 @@
     { key: "wrap", label: "Wrap-up", start: 17 * 60, end: 20 * 60 },
     { key: "evening", label: "Evening", start: 20 * 60, end: 23 * 60 },
   ];
+  const TIME_BAND_STYLE_KEYS = ["early", "focus", "admin", "deep", "wrap", "evening"];
+  let timeBands = DEFAULT_TIME_BANDS.map(b => ({ ...b }));
+
+  function parseBandTimeToMin(value) {
+    const s = String(value || "").trim();
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isInteger(hh) || !Number.isInteger(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return hh * 60 + mm;
+  }
+
+  function formatBandTime(minute) {
+    const m = clamp(Math.round(Number(minute) || 0), 0, 1439);
+    return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+  }
+
+  function normalizeTimeBands(input) {
+    const src = Array.isArray(input) ? input : [];
+    const out = [];
+    for (let i = 0; i < src.length; i++) {
+      const raw = src[i] || {};
+      const label = String(raw.label || "").trim().slice(0, 32);
+      const start = Number(raw.start);
+      const end = Number(raw.end);
+      const rawKey = String(raw.key || "").trim().toLowerCase();
+      const key = TIME_BAND_STYLE_KEYS.includes(rawKey) ? rawKey : TIME_BAND_STYLE_KEYS[i % TIME_BAND_STYLE_KEYS.length];
+      if (!label || !Number.isFinite(start) || !Number.isFinite(end)) continue;
+      const s = clamp(Math.round(start), 0, 1439);
+      const e = clamp(Math.round(end), 1, 1440);
+      if (e <= s) continue;
+      out.push({ key, label, start: s, end: e });
+      if (out.length >= 16) break;
+    }
+    return out;
+  }
+
+  function setTimeBands(next) {
+    const normalized = normalizeTimeBands(next);
+    timeBands = normalized.length ? normalized : DEFAULT_TIME_BANDS.map(b => ({ ...b }));
+    renderTimeBands();
+  }
 
   function renderTimeBandsInColumn(col) {
     if (!col) return;
@@ -861,7 +904,7 @@
     layer.className = "time-bands";
     layer.setAttribute("aria-hidden", "true");
 
-    for (const band of TIME_BANDS) {
+    for (const band of timeBands) {
       const s = Math.max(WORK_START, Number(band.start));
       const e = Math.min(WORK_END, Number(band.end));
       if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;

@@ -64,6 +64,7 @@ MARKUP = r"""<header>
             <button id="btnNauticalPreview" class="small toggle btn-soft" data-ico="NA" title="Toggle future Nautical instances">Nautical: Off</button>
             <button id="btnShowCompleted" class="small toggle btn-soft" data-ico="DN" type="button" aria-pressed="false" title="Show or hide completed tasks included in this payload">Completed: Off</button>
             <button id="btnTimeBands" class="small toggle btn-soft on" data-ico="TB" type="button" aria-pressed="true" title="Show or hide planning bands in the calendar">Bands: On</button>
+            <button id="btnBandEditor" class="small btn-soft" data-ico="BE" type="button" title="Edit planning band titles and times">Edit bands</button>
             <button id="btnClearSel" class="btn-soft" data-ico="CL" data-key="Esc">Clear selection</button>
             <button id="btnReset" class="danger" data-ico="RS">Reset view plan</button>
             <button id="btnCommand" class="small btn-soft" data-ico="KC" data-key="Ctrl/Cmd+K" title="Search and commands (Ctrl/Cmd+K)">Search</button>

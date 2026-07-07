@@ -646,6 +646,7 @@ function buildAddCommandForLocal(uuid, desc) {
   const elVwOverdue = document.getElementById("vwOverdue");
   const elBtnShowCompleted = document.getElementById("btnShowCompleted");
   const elBtnTimeBands = document.getElementById("btnTimeBands");
+  const elBtnBandEditor = document.getElementById("btnBandEditor");
 
   // -----------------------------
   // Theme (built-ins + custom overrides)

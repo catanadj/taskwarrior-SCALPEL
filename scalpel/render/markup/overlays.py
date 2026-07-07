@@ -124,6 +124,38 @@ Review PR #142"></textarea>
   </div>
 </div>
 
+<div class="modal-backdrop" id="bandModal">
+  <div class="modal band-modal">
+    <div class="mh">
+      <div class="t">Planning bands</div>
+      <button class="small btn-soft" id="bandClose">Close</button>
+    </div>
+    <div class="mb">
+      <div class="hint">
+        Edit the background planning sections shown in each day. Times use 24-hour local calendar time.
+        Bands are visual only; they do not affect scheduling, commands, conflicts, or load.
+      </div>
+      <div class="band-edit-head">
+        <div>Title</div>
+        <div>Start</div>
+        <div>End</div>
+        <div>Style</div>
+        <div></div>
+      </div>
+      <div class="band-edit-grid" id="bandRows"></div>
+      <div class="ops">
+        <button class="small btn-soft" id="bandAdd">+ Add band</button>
+      </div>
+      <div class="hint" id="bandStatus"></div>
+    </div>
+    <div class="mf">
+      <button class="small danger" id="bandReset">Reset defaults</button>
+      <div class="grow" aria-hidden="true"></div>
+      <button class="small btn-primary" id="bandSave">Save bands</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="applyModal">
   <div class="modal apply-modal">
     <div class="mh">

@@ -1535,6 +1535,20 @@
     });
   }
   const TIME_BANDS_KEY = "scalpel:timeBands:v1";
+  const TIME_BANDS_CONFIG_KEY = "scalpel:timeBands:config:v1";
+  function readStoredTimeBands() {
+    try {
+      const raw = typeof globalThis.__scalpel_storeGetJSON === "function"
+        ? globalThis.__scalpel_storeGetJSON(TIME_BANDS_CONFIG_KEY, null)
+        : null;
+      const normalized = normalizeTimeBands(raw);
+      return normalized.length ? normalized : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  const storedTimeBands = readStoredTimeBands();
+  if (storedTimeBands) setTimeBands(storedTimeBands);
   try {
     const raw = typeof globalThis.__scalpel_storeGet === "function" ? globalThis.__scalpel_storeGet(TIME_BANDS_KEY, null) : null;
     if (raw === "0" || raw === "false") showTimeBands = false;
@@ -1559,6 +1573,169 @@
       } catch (_) {}
       syncTimeBandsToggle();
       try { renderTimeBands(); } catch (_) {}
+    });
+  }
+
+  const elBandModal = document.getElementById("bandModal");
+  const elBandClose = document.getElementById("bandClose");
+  const elBandRows = document.getElementById("bandRows");
+  const elBandAdd = document.getElementById("bandAdd");
+  const elBandReset = document.getElementById("bandReset");
+  const elBandSave = document.getElementById("bandSave");
+  const elBandStatus = document.getElementById("bandStatus");
+  let bandDraftRows = [];
+
+  function newBandDraftRow(band) {
+    const b = band || {};
+    return {
+      key: TIME_BAND_STYLE_KEYS.includes(String(b.key || "")) ? String(b.key) : "focus",
+      label: String(b.label || "New band").trim(),
+      start: Number.isFinite(Number(b.start)) ? Number(b.start) : WORK_START,
+      end: Number.isFinite(Number(b.end)) ? Number(b.end) : Math.min(WORK_END, WORK_START + 60),
+    };
+  }
+
+  function syncBandDraftFromDom() {
+    if (!elBandRows) return;
+    const rows = [];
+    const labelNodes = elBandRows.querySelectorAll("[data-band-kind='label']");
+    labelNodes.forEach((node) => {
+      const idx = String(node.getAttribute("data-band-idx") || "");
+      const startNode = elBandRows.querySelector(`[data-band-idx="${idx}"][data-band-kind="start"]`);
+      const endNode = elBandRows.querySelector(`[data-band-idx="${idx}"][data-band-kind="end"]`);
+      const keyNode = elBandRows.querySelector(`[data-band-idx="${idx}"][data-band-kind="key"]`);
+      rows.push({
+        label: String(node.value || "").trim(),
+        start: parseBandTimeToMin(startNode && startNode.value),
+        end: parseBandTimeToMin(endNode && endNode.value),
+        key: String((keyNode && keyNode.value) || "focus"),
+      });
+    });
+    bandDraftRows = rows;
+  }
+
+  function renderBandEditorRows() {
+    if (!elBandRows) return;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < bandDraftRows.length; i++) {
+      const rowData = bandDraftRows[i] || {};
+      const row = document.createElement("div");
+      row.className = "band-edit-row";
+
+      const label = document.createElement("input");
+      label.type = "text";
+      label.value = String(rowData.label || "");
+      label.placeholder = "Band title";
+      label.setAttribute("data-band-idx", String(i));
+      label.setAttribute("data-band-kind", "label");
+
+      const start = document.createElement("input");
+      start.type = "time";
+      start.step = "60";
+      start.value = formatBandTime(rowData.start);
+      start.setAttribute("data-band-idx", String(i));
+      start.setAttribute("data-band-kind", "start");
+
+      const end = document.createElement("input");
+      end.type = "time";
+      end.step = "60";
+      end.value = formatBandTime(rowData.end);
+      end.setAttribute("data-band-idx", String(i));
+      end.setAttribute("data-band-kind", "end");
+
+      const style = document.createElement("select");
+      style.setAttribute("data-band-idx", String(i));
+      style.setAttribute("data-band-kind", "key");
+      for (const key of TIME_BAND_STYLE_KEYS) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = key;
+        style.appendChild(opt);
+      }
+      style.value = TIME_BAND_STYLE_KEYS.includes(String(rowData.key || "")) ? String(rowData.key) : "focus";
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "small danger";
+      remove.textContent = "−";
+      remove.title = "Remove band";
+      remove.addEventListener("click", () => {
+        syncBandDraftFromDom();
+        bandDraftRows.splice(i, 1);
+        renderBandEditorRows();
+      });
+
+      row.appendChild(label);
+      row.appendChild(start);
+      row.appendChild(end);
+      row.appendChild(style);
+      row.appendChild(remove);
+      frag.appendChild(row);
+    }
+    elBandRows.textContent = "";
+    elBandRows.appendChild(frag);
+  }
+
+  function openBandEditor() {
+    if (!elBandModal) return;
+    bandDraftRows = timeBands.map(newBandDraftRow);
+    renderBandEditorRows();
+    if (elBandStatus) elBandStatus.textContent = "";
+    elBandModal.style.display = "flex";
+  }
+
+  function closeBandEditor() {
+    if (!elBandModal) return;
+    elBandModal.style.display = "none";
+  }
+
+  function saveBandEditor() {
+    syncBandDraftFromDom();
+    const normalized = normalizeTimeBands(bandDraftRows);
+    if (!normalized.length) {
+      if (elBandStatus) elBandStatus.textContent = "Add at least one valid band with title, start, and end.";
+      return false;
+    }
+    try {
+      if (typeof globalThis.__scalpel_storeSetJSON === "function") {
+        globalThis.__scalpel_storeSetJSON(TIME_BANDS_CONFIG_KEY, normalized);
+      }
+    } catch (_) {}
+    setTimeBands(normalized);
+    if (!showTimeBands) {
+      showTimeBands = true;
+      try {
+        if (typeof globalThis.__scalpel_storeSet === "function") globalThis.__scalpel_storeSet(TIME_BANDS_KEY, "1");
+      } catch (_) {}
+      syncTimeBandsToggle();
+    }
+    if (elStatus) elStatus.textContent = "Planning bands updated.";
+    closeBandEditor();
+    return true;
+  }
+
+  if (elBtnBandEditor) elBtnBandEditor.addEventListener("click", openBandEditor);
+  if (elBandClose) elBandClose.addEventListener("click", closeBandEditor);
+  if (elBandAdd) {
+    elBandAdd.addEventListener("click", () => {
+      syncBandDraftFromDom();
+      const last = bandDraftRows[bandDraftRows.length - 1] || { end: WORK_START };
+      const start = clamp(Number(last.end) || WORK_START, WORK_START, WORK_END - 1);
+      bandDraftRows.push(newBandDraftRow({ label: "New band", start, end: Math.min(WORK_END, start + 60), key: "focus" }));
+      renderBandEditorRows();
+    });
+  }
+  if (elBandReset) {
+    elBandReset.addEventListener("click", () => {
+      bandDraftRows = DEFAULT_TIME_BANDS.map(newBandDraftRow);
+      renderBandEditorRows();
+      if (elBandStatus) elBandStatus.textContent = "Defaults restored in editor. Save to apply.";
+    });
+  }
+  if (elBandSave) elBandSave.addEventListener("click", saveBandEditor);
+  if (elBandModal) {
+    elBandModal.addEventListener("click", (ev) => {
+      if (ev.target === elBandModal) closeBandEditor();
     });
   }
 

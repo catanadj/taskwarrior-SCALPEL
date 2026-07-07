@@ -4,6 +4,7 @@ import unittest
 
 from scalpel.render.assets import read_render_asset
 from scalpel.render.markup.header import MARKUP as HEADER_MARKUP
+from scalpel.render.markup.overlays import MARKUP as OVERLAY_MARKUP
 
 
 class EventReadabilityContractTests(unittest.TestCase):
@@ -73,15 +74,40 @@ class EventReadabilityContractTests(unittest.TestCase):
         palette = read_render_asset("js/part02_palette_goals.js")
         init = read_render_asset("js/part07_init.js")
         css = read_render_asset("css/part05_calendar.css")
+        modal_css = read_render_asset("css/part07_modals_misc.css")
 
         self.assertIn("btnTimeBands", HEADER_MARKUP)
         self.assertIn("elBtnTimeBands", palette)
-        self.assertIn("TIME_BANDS", selection)
+        self.assertIn("DEFAULT_TIME_BANDS", selection)
+        self.assertIn("normalizeTimeBands", selection)
         self.assertIn("renderTimeBandsInColumn", selection)
         self.assertIn('className = "time-bands"', selection)
         self.assertIn("TIME_BANDS_KEY", init)
         self.assertIn(".time-bands", css)
         self.assertIn("pointer-events: none", css)
+        self.assertIn("bandModal", OVERLAY_MARKUP)
+        self.assertIn(".band-edit-row", modal_css)
+
+    def test_calendar_time_band_editor_is_persisted_and_editable(self) -> None:
+        init = read_render_asset("js/part07_init.js")
+        selection = read_render_asset("js/part03_selection_ops.js")
+
+        for expected in (
+            "bandModal",
+            "bandRows",
+            "bandAdd",
+            "bandReset",
+            "bandSave",
+        ):
+            self.assertIn(expected, OVERLAY_MARKUP)
+        self.assertIn("btnBandEditor", HEADER_MARKUP)
+        self.assertIn("TIME_BANDS_CONFIG_KEY", init)
+        self.assertIn("openBandEditor", init)
+        self.assertIn("saveBandEditor", init)
+        self.assertIn("__scalpel_storeSetJSON(TIME_BANDS_CONFIG_KEY", init)
+        self.assertIn("parseBandTimeToMin", selection)
+        self.assertIn("formatBandTime", selection)
+        self.assertIn("TIME_BAND_STYLE_KEYS", selection)
 
 
 if __name__ == "__main__":
