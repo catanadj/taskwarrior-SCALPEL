@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from scalpel.render.assets import read_render_asset
+from scalpel.render.markup.header import MARKUP as HEADER_MARKUP
 
 
 class EventReadabilityContractTests(unittest.TestCase):
@@ -41,6 +42,46 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn(".evt.warn-overlap::before", calendar_css)
         self.assertNotIn(".evt.warn-overlap .evt-time::after", calendar_css)
         self.assertNotIn('content: "OVERLAP"', calendar_css)
+
+    def test_task_editor_exposes_nautical_fields_as_default_rows(self) -> None:
+        rendering = read_render_asset("js/part04_rendering.js")
+        self.assertIn('key: "anchor"', rendering)
+        self.assertIn('label: "anchor"', rendering)
+        self.assertIn('detailsTask.anchor ?? fallbackTask.anchor', rendering)
+        self.assertIn('key: "cp"', rendering)
+        self.assertIn('label: "cp"', rendering)
+        self.assertIn('detailsTask.cp ?? fallbackTask.cp', rendering)
+        self.assertIn('"anchor", "cp"', rendering)
+
+    def test_completed_tasks_render_as_completion_strips_not_planning_blocks(self) -> None:
+        rendering = read_render_asset("js/part04_rendering.js")
+        selection = read_render_asset("js/part03_selection_ops.js")
+        drag = read_render_asset("js/part06_drag_resize.js")
+        css = read_render_asset("css/part05_calendar.css")
+
+        self.assertIn("markerHPx", rendering)
+        self.assertIn('isCompleted ? "8px"', rendering)
+        self.assertIn('layoutOverlapGroups(normalEvents)', rendering)
+        self.assertIn('if (!isCompleted) allByDay[di].push', selection)
+        self.assertIn('String(tt.status || "").toLowerCase() === "completed"', drag)
+        self.assertIn(".evt.completed-task", css)
+        self.assertIn("border-radius: 999px", css)
+        self.assertIn(".evt.completed-task .resize", css)
+
+    def test_calendar_time_bands_are_background_layers_with_toggle(self) -> None:
+        selection = read_render_asset("js/part03_selection_ops.js")
+        palette = read_render_asset("js/part02_palette_goals.js")
+        init = read_render_asset("js/part07_init.js")
+        css = read_render_asset("css/part05_calendar.css")
+
+        self.assertIn("btnTimeBands", HEADER_MARKUP)
+        self.assertIn("elBtnTimeBands", palette)
+        self.assertIn("TIME_BANDS", selection)
+        self.assertIn("renderTimeBandsInColumn", selection)
+        self.assertIn('className = "time-bands"', selection)
+        self.assertIn("TIME_BANDS_KEY", init)
+        self.assertIn(".time-bands", css)
+        self.assertIn("pointer-events: none", css)
 
 
 if __name__ == "__main__":

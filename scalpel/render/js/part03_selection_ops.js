@@ -842,6 +842,46 @@
     __positionDayContextMenu(menu, clientX, clientY);
   }
 
+  const TIME_BANDS = [
+    { key: "early", label: "Early", start: 6 * 60, end: 9 * 60 },
+    { key: "focus", label: "Focus", start: 9 * 60, end: 12 * 60 },
+    { key: "admin", label: "Admin", start: 12 * 60, end: 14 * 60 },
+    { key: "deep", label: "Deep", start: 14 * 60, end: 17 * 60 },
+    { key: "wrap", label: "Wrap-up", start: 17 * 60, end: 20 * 60 },
+    { key: "evening", label: "Evening", start: 20 * 60, end: 23 * 60 },
+  ];
+
+  function renderTimeBandsInColumn(col) {
+    if (!col) return;
+    const old = col.querySelector(".time-bands");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!showTimeBands) return;
+
+    const layer = document.createElement("div");
+    layer.className = "time-bands";
+    layer.setAttribute("aria-hidden", "true");
+
+    for (const band of TIME_BANDS) {
+      const s = Math.max(WORK_START, Number(band.start));
+      const e = Math.min(WORK_END, Number(band.end));
+      if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+
+      const node = document.createElement("div");
+      node.className = `time-band time-band-${band.key}`;
+      node.style.top = `${(s - WORK_START) * pxPerMin}px`;
+      node.style.height = `${Math.max(1, (e - s) * pxPerMin)}px`;
+      node.innerHTML = `<span>${escapeHtml(band.label)}</span>`;
+      layer.appendChild(node);
+    }
+
+    col.insertBefore(layer, col.firstChild || null);
+  }
+
+  function renderTimeBands() {
+    const cols = document.querySelectorAll(".day-col");
+    for (const col of cols) renderTimeBandsInColumn(col);
+  }
+
   function buildCalendarSkeleton() {
     elCal.innerHTML = "";
 
@@ -950,6 +990,7 @@
       col.dataset.dayIndex = String(i);
       if (isWeekendDayMs(dayStarts[i])) col.classList.add("weekend");
       col.innerHTML = `<div class="drop-hint"></div>`;
+      renderTimeBandsInColumn(col);
 
       col.addEventListener("dragover", (ev) => {
         ev.preventDefault();
@@ -1277,16 +1318,17 @@
         const eff = effectiveInterval(t.uuid);
         if (!eff) { backlog.push({ t, hint: "missing due" }); continue; }
 
-        if (startOfLocalDayMs(eff.startMs) !== startOfLocalDayMs(eff.dueMs)) {
+        const isCompleted = String(t.status || "").toLowerCase() === "completed";
+        if (!isCompleted && startOfLocalDayMs(eff.startMs) !== startOfLocalDayMs(eff.dueMs)) {
           problems.push({ t, reason: "computed start crosses day (reduce duration or adjust due)" });
           continue;
         }
 
-        allByDay[di].push({ uuid: t.uuid, startMs: eff.startMs, dueMs: eff.dueMs });
+        if (!isCompleted) allByDay[di].push({ uuid: t.uuid, startMs: eff.startMs, dueMs: eff.dueMs });
 
         const sMin = minuteOfDayFromMs(eff.startMs);
         const dMin = minuteOfDayFromMs(eff.dueMs);
-        if (sMin < WORK_START || dMin > WORK_END) {
+        if (!isCompleted && (sMin < WORK_START || dMin > WORK_END)) {
           backlog.push({ t, hint: "outside workhours" });
           continue;
         }

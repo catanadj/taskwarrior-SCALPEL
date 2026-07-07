@@ -93,6 +93,42 @@ class TestPublicValidateApiContract(unittest.TestCase):
         self.assertEqual(validate_payload(payload), [])
         assert_valid_payload(payload)
 
+    def test_build_payload_preserves_nautical_edit_fields(self) -> None:
+        raw_tasks = [
+            {
+                "uuid": "u1",
+                "description": "Nautical task",
+                "status": "pending",
+                "due": "20260101T100000Z",
+                "anchor": "weekday(Mon)@09:00",
+                "cp": "PT1D",
+            }
+        ]
+        with (
+            patch("scalpel.payload.run_task_export", return_value=raw_tasks),
+            patch("scalpel.payload._load_nautical_core", return_value=None),
+        ):
+            payload = build_payload(
+                filter_str="status:pending",
+                start_date=dt.date(2026, 1, 1),
+                days=1,
+                work_start=480,
+                work_end=1020,
+                snap=10,
+                default_duration_min=10,
+                max_infer_duration_min=480,
+                px_per_min=2.5,
+                goals_path="does-not-exist.json",
+                tz="UTC",
+                display_tz="UTC",
+            )
+
+        task = payload["tasks"][0]
+        self.assertEqual(task["anchor"], "weekday(Mon)@09:00")
+        self.assertEqual(task["cp"], "PT1D")
+        self.assertEqual(validate_payload(payload), [])
+        assert_valid_payload(payload)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

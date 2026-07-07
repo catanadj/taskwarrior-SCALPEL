@@ -22,6 +22,7 @@
     if (!uuid) return;
     const tt = tasksByUuid.get(uuid);
     if (tt && tt.nautical_preview) return;
+    if (tt && String(tt.status || "").toLowerCase() === "completed") return;
     setActiveDayFromUuid(uuid);
 
     // Resize affordance

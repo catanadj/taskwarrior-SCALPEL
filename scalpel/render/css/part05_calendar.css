@@ -244,6 +244,48 @@
   }
   .day-col.dragover .drop-hint { opacity: 1; }
 
+  .time-bands{
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .time-band{
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-block: 1px solid rgba(255,255,255,0.035);
+    background: rgba(var(--accent-rgb), 0.035);
+  }
+  .time-band span{
+    position: sticky;
+    left: 8px;
+    display: inline-block;
+    margin: 6px 8px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    color: var(--muted);
+    background: rgba(0,0,0,0.12);
+    border: 1px solid rgba(255,255,255,0.06);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .time-band-early{ background: rgba(99, 179, 255, 0.045); }
+  .time-band-focus{ background: rgba(98, 201, 140, 0.060); }
+  .time-band-admin{ background: rgba(245, 158, 11, 0.055); }
+  .time-band-deep{ background: rgba(167, 139, 250, 0.070); }
+  .time-band-wrap{ background: rgba(34, 211, 238, 0.050); }
+  .time-band-evening{ background: rgba(148, 163, 184, 0.045); }
+  body.theme-light .time-band span,
+  body.theme-paper .time-band span{
+    background: rgba(255,255,255,0.68);
+    border-color: rgba(15,23,42,0.08);
+    color: rgba(51,65,85,0.72);
+  }
+
   /* Free gap overlays */
   .gap {
     position: absolute;
@@ -442,18 +484,48 @@
   .evt.completed-task{
     --evt-accent: rgba(98, 201, 140, 0.86);
     --evt-accent-rgb: 98,201,140;
-    opacity: 0.88;
+    opacity: 0.92;
+    border-radius: 999px;
+    min-height: 16px;
+    background: linear-gradient(90deg, rgba(var(--evt-accent-rgb), 0.24), rgba(var(--evt-accent-rgb), 0.10)), var(--cal-surface);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.20), 0 0 0 1px rgba(var(--evt-accent-rgb), 0.20) inset;
+    border-left-width: 3px;
+    cursor: pointer;
   }
   .evt.completed-task .evt-title{
     text-decoration: line-through;
     text-decoration-thickness: 1.5px;
     text-decoration-color: rgba(var(--evt-accent-rgb), 0.72);
+    font-size: 11px;
+    -webkit-line-clamp: 1;
+  }
+  .evt.completed-task .evt-top{
+    height: 100%;
+    min-height: 0;
+    padding: 2px 7px;
+    gap: 6px;
+    background: transparent;
+    border-bottom: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+  .evt.completed-task .evt-time{
+    flex: 0 0 auto;
+    font-size: 10px;
+  }
+  .evt.completed-task .evt-time .time-start,
+  .evt.completed-task .evt-time .time-range{
+    display: none;
   }
   .evt.completed-task .completed-pill{
     border-color: rgba(var(--evt-accent-rgb), 0.36);
     background: rgba(var(--evt-accent-rgb), 0.16);
     color: var(--task-body-text);
     font-weight: 850;
+  }
+  .evt.completed-task .evt-bot,
+  .evt.completed-task .resize{
+    display: none;
   }
 
   /* Preserve the user-colored neon envelope while also applying the hover ring */

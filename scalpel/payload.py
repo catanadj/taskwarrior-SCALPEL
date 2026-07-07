@@ -509,6 +509,10 @@ def build_payload(
             "duration": nt.duration_raw,
             "duration_min": nt.duration_min,
         }
+        for uda_key in ("anchor", "cp"):
+            uda_val = t.get(uda_key)
+            if isinstance(uda_val, str) and uda_val.strip():
+                task_out[uda_key] = uda_val.strip()
         if nt.status == "completed" and isinstance(nt.end_ms, int):
             task_out["completed_end_ms"] = nt.end_ms
             task_out["original_due_ms"] = nt.due_ms

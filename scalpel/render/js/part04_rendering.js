@@ -186,6 +186,7 @@
     const builtin = new Set([
       "id", "uuid", "description", "status", "project", "tags", "priority",
       "entry", "modified", "start", "end", "scheduled", "due", "wait", "until",
+      "anchor", "cp",
       "recur", "mask", "imask", "parent", "depends", "annotations", "urgency",
       "scheduled_ms", "due_ms", "duration_min", "local",
       "nautical_preview", "nautical_source_uuid", "nauticalSourceUuid",
@@ -282,6 +283,18 @@
     rows.push({ key: "project", kind: "scalar", label: "project", value: proj });
     rows.push({ key: "priority", kind: "scalar", label: "priority", value: pri });
     rows.push({ key: "tags", kind: "tags", label: "tags", value: tags });
+    rows.push({
+      key: "anchor",
+      kind: "scalar",
+      label: "anchor",
+      value: String(detailsTask.anchor ?? fallbackTask.anchor ?? "").trim(),
+    });
+    rows.push({
+      key: "cp",
+      kind: "scalar",
+      label: "cp",
+      value: String(detailsTask.cp ?? fallbackTask.cp ?? "").trim(),
+    });
 
     const udaEntries = __taskUdaEntries(detailsTask);
     for (const it of udaEntries) rows.push({ key: it.key, kind: "scalar", label: it.key, value: String(it.val || "") });
@@ -518,6 +531,7 @@
       if (keepKeys.has(key)) continue;
       if ([
         "id", "uuid", "description", "status", "project", "tags", "priority",
+        "anchor", "cp",
         "scheduled_ms", "due_ms", "duration", "duration_min", "local",
       ].includes(String(key))) continue;
       if (String(key || "").startsWith("_")) continue;
@@ -1533,12 +1547,15 @@
     const startMin = minuteOfDayFromMs(ev.startMs);
     const dueMin = minuteOfDayFromMs(ev.dueMs);
 
-    const topMin = clamp(startMin, WORK_START, WORK_END);
+    const topMin = isCompleted ? clamp(dueMin, WORK_START, WORK_END) : clamp(startMin, WORK_START, WORK_END);
     const botMin = clamp(dueMin, WORK_START, WORK_END);
     const durMin = Math.max(1, botMin - topMin);
 
-    const topPx = (topMin - WORK_START) * pxPerMin;
-    const hPx = durMin * pxPerMin;
+    const markerHPx = Math.max(16, Math.min(22, 18 * (pxPerMin / 2)));
+    const topPx = isCompleted
+      ? clamp(((topMin - WORK_START) * pxPerMin) - Math.round(markerHPx / 2), 0, Math.max(0, (CAL_MINUTES * pxPerMin) - markerHPx))
+      : (topMin - WORK_START) * pxPerMin;
+    const hPx = isCompleted ? markerHPx : (durMin * pxPerMin);
     const w = 100 / ev.laneCount;
     const leftPct = ev.laneIndex * w;
 
@@ -1585,8 +1602,8 @@
 
     el.style.top = `${topPx}px`;
     el.style.height = `${hPx}px`;
-    el.style.left = `calc(6px + ${leftPct}%)`;
-    el.style.width = `calc(${w}% - 12px)`;
+    el.style.left = isCompleted ? "8px" : `calc(6px + ${leftPct}%)`;
+    el.style.width = isCompleted ? "calc(100% - 16px)" : `calc(${w}% - 12px)`;
 
     const timeStr = `${fmtHm(ev.startMs)}–${fmtHm(ev.dueMs)}`;
     const startTimeStr = fmtHm(ev.startMs);
@@ -1598,12 +1615,12 @@
     const subtitle = projectLabel + (tags.length ? ` • ${tags.join(",")}` : "");
     const description = String(t.description || "(no description)");
     if (!isPreview) {
-      const tooltipParts = [description, `${timeStr} · ${durLabel}${isCompleted ? " · completed" : ""}`];
+      const tooltipParts = [description, isCompleted ? `Completed ${fmtHm(ev.dueMs)}` : `${timeStr} · ${durLabel}`];
       if (subtitle) tooltipParts.push(subtitle);
       if (t.uuid) tooltipParts.push(String(t.uuid));
       el.title = tooltipParts.join("\n");
     }
-    el.setAttribute("aria-label", `${description}, ${timeStr}, ${durLabel}${isCompleted ? ", completed" : ""}${subtitle ? `, ${subtitle}` : ""}`);
+    el.setAttribute("aria-label", `${description}, ${isCompleted ? `completed ${fmtHm(ev.dueMs)}` : `${timeStr}, ${durLabel}`}${subtitle ? `, ${subtitle}` : ""}`);
 
     const sig = __eventInnerSig(t, ev, subtitle, timeStr, durLabel, previewPicked);
     if (el.__scalpelInnerSig !== sig) {
@@ -1627,12 +1644,12 @@
             ${isCompleted ? `<span class="time-pill completed-pill">Done</span>` : ""}
             <span class="time-start">${escapeHtml(startTimeStr)}</span>
             <span class="time-pill time-range">${escapeHtml(timeStr)}</span>
-            <span class="time-pill dur-pill">${escapeHtml(durLabel)}</span>
+            ${isCompleted ? "" : `<span class="time-pill dur-pill">${escapeHtml(durLabel)}</span>`}
             ${pickedPill}
           </div>
         </div>
         ${eventMetaHtml}
-        <div class="resize" title="Resize (changes due)"></div>
+        ${isCompleted ? "" : `<div class="resize" title="Resize (changes due)"></div>`}
       `;
       el.__scalpelInnerSig = sig;
     }
@@ -1656,9 +1673,12 @@
             startMs: item.startMs,
             dueMs: item.dueMs,
           });
-          const ev = eventByUuid.get(item.uuid);
-          if (ev) byDay[di].push(ev);
         }
+      }
+      for (const ev of eventByUuid.values()) {
+        const di = dayIndexFromMs(ev.dueMs);
+        if (di === null) continue;
+        byDay[di].push(ev);
       }
     } else {
       for (const ev of eventByUuid.values()) {
@@ -1688,7 +1708,17 @@
 
       renderGapsForDay(i, col, byDayAll[i]);
 
-      const laidOut = layoutOverlapGroups(byDay[i] || []);
+      try { renderTimeBandsInColumn(col); } catch (e) { /* ignore */ }
+
+      const normalEvents = (byDay[i] || []).filter(ev => {
+        const t = tasksByUuid.get(ev && ev.uuid);
+        return String(t && t.status || "").toLowerCase() !== "completed";
+      });
+      const completedEvents = (byDay[i] || []).filter(ev => {
+        const t = tasksByUuid.get(ev && ev.uuid);
+        return String(t && t.status || "").toLowerCase() === "completed";
+      });
+      const laidOut = layoutOverlapGroups(normalEvents);
 
       for (const ev of laidOut) {
         const t = tasksByUuid.get(ev.uuid);
@@ -1699,6 +1729,21 @@
           __eventNodeByUuid.set(ev.uuid, el);
         }
         __updateEventNode(el, ev, t);
+        col.appendChild(el);
+        seenUuids.add(ev.uuid);
+      }
+      completedEvents.sort((a, b) => (a.dueMs - b.dueMs) || String(a.uuid).localeCompare(String(b.uuid)));
+      for (let ci = 0; ci < completedEvents.length; ci++) {
+        const ev = completedEvents[ci];
+        const t = tasksByUuid.get(ev.uuid);
+        if (!t) continue;
+        let el = __eventNodeByUuid.get(ev.uuid);
+        if (!el) {
+          el = __createEventNode(ev.uuid);
+          __eventNodeByUuid.set(ev.uuid, el);
+        }
+        __updateEventNode(el, { ...ev, laneIndex: 0, laneCount: 1 }, t);
+        el.style.setProperty("--completed-stack", String(ci % 3));
         col.appendChild(el);
         seenUuids.add(ev.uuid);
       }

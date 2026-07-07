@@ -40,6 +40,8 @@ class Task(TypedDict, total=False):
     tags: list[str]
     priority: str
     urgency: float | None
+    anchor: str | None
+    cp: str | None
     end_ms: int | None
     completed_end_ms: int | None
     original_due_ms: int | None

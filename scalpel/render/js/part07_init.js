@@ -1534,6 +1534,33 @@
       rerenderAll({ mode: "full", immediate: true });
     });
   }
+  const TIME_BANDS_KEY = "scalpel:timeBands:v1";
+  try {
+    const raw = typeof globalThis.__scalpel_storeGet === "function" ? globalThis.__scalpel_storeGet(TIME_BANDS_KEY, null) : null;
+    if (raw === "0" || raw === "false") showTimeBands = false;
+    else if (raw === "1" || raw === "true") showTimeBands = true;
+  } catch (_) {}
+  function syncTimeBandsToggle() {
+    if (!elBtnTimeBands) return;
+    elBtnTimeBands.textContent = showTimeBands ? "Bands: On" : "Bands: Off";
+    elBtnTimeBands.classList.toggle("on", !!showTimeBands);
+    elBtnTimeBands.setAttribute("aria-pressed", showTimeBands ? "true" : "false");
+    elBtnTimeBands.title = showTimeBands ? "Hide planning bands in the calendar" : "Show planning bands in the calendar";
+  }
+  syncTimeBandsToggle();
+  try { renderTimeBands(); } catch (_) {}
+  if (elBtnTimeBands) {
+    elBtnTimeBands.addEventListener("click", () => {
+      showTimeBands = !showTimeBands;
+      try {
+        if (typeof globalThis.__scalpel_storeSet === "function") {
+          globalThis.__scalpel_storeSet(TIME_BANDS_KEY, showTimeBands ? "1" : "0");
+        }
+      } catch (_) {}
+      syncTimeBandsToggle();
+      try { renderTimeBands(); } catch (_) {}
+    });
+  }
 
   if (elVwPrevDay) elVwPrevDay.addEventListener("click", () => shiftStartDays(-1));
   if (elVwNextDay) elVwNextDay.addEventListener("click", () => shiftStartDays(1));
