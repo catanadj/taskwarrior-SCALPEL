@@ -466,6 +466,35 @@
     button.setAttribute("aria-pressed", visible ? "true" : "false");
     if (_isMobileTabsMode() && mobileLabel) button.textContent = mobileLabel;
   }
+  function _isCommandsDrawerOpen() {
+    return !_isMobileTabsMode() && !commandsPanelCollapsed;
+  }
+  function _focusCommandsDrawerClose() {
+    if (!_isCommandsDrawerOpen() || !elBtnCloseCommands) return;
+    try {
+      requestAnimationFrame(() => {
+        if (_isCommandsDrawerOpen()) elBtnCloseCommands.focus({ preventScroll: true });
+      });
+    } catch (_) {
+      try { elBtnCloseCommands.focus(); } catch (_) {}
+    }
+  }
+  function _focusCommandsToggle() {
+    if (!elBtnToggleCommands) return;
+    try { elBtnToggleCommands.focus({ preventScroll: true }); }
+    catch (_) {
+      try { elBtnToggleCommands.focus(); } catch (_) {}
+    }
+  }
+  function _closeCommandsDrawer(restoreFocus, persist) {
+    if (_isMobileTabsMode()) {
+      applyMobilePanel("calendar", persist !== false);
+      return;
+    }
+    if (commandsPanelCollapsed) return;
+    applySidePanelState(leftPanelCollapsed, true, persist !== false);
+    if (restoreFocus) _focusCommandsToggle();
+  }
   function applySidePanelState(leftCollapsed, commandsCollapsed, persist) {
     leftPanelCollapsed = !!leftCollapsed;
     commandsPanelCollapsed = !!commandsCollapsed;
@@ -540,20 +569,30 @@
   if (elBtnToggleCommands) {
     elBtnToggleCommands.addEventListener("click", () => {
       if (_isMobileTabsMode()) applyMobilePanel("commands", true);
-      else applySidePanelState(leftPanelCollapsed, !commandsPanelCollapsed, true);
+      else {
+        const opening = commandsPanelCollapsed;
+        applySidePanelState(leftPanelCollapsed, !commandsPanelCollapsed, true);
+        if (opening) _focusCommandsDrawerClose();
+      }
     });
   }
   if (elBtnCloseCommands) {
     elBtnCloseCommands.addEventListener("click", () => {
-      if (_isMobileTabsMode()) applyMobilePanel("calendar", true);
-      else applySidePanelState(leftPanelCollapsed, true, true);
+      _closeCommandsDrawer(true, true);
     });
   }
   if (elCommandsDrawerBackdrop) {
     elCommandsDrawerBackdrop.addEventListener("click", () => {
-      applySidePanelState(leftPanelCollapsed, true, true);
+      _closeCommandsDrawer(true, true);
     });
   }
+  document.addEventListener("keydown", (ev) => {
+    if (String(ev && ev.key || "") !== "Escape") return;
+    if (!_isCommandsDrawerOpen()) return;
+    _closeCommandsDrawer(true, true);
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+  }, true);
   globalThis.__scalpel_setSidePanelVisible = (panel, visible) => {
     const name = String(panel || "");
     if (_isMobileTabsMode()) {

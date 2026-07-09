@@ -62,11 +62,19 @@ class CalendarFirstLayoutContractTests(unittest.TestCase):
     def test_commands_use_a_dismissible_overlay_drawer_on_desktop(self) -> None:
         self.assertIn('id="commandsDrawerBackdrop"', RIGHT_PANEL_MARKUP)
         self.assertIn('id="btnCloseCommands"', RIGHT_PANEL_MARKUP)
+        selection_js = read_render_asset("js/part03_selection_ops.js")
         layout_css = read_render_asset("css/part03_header_layout.css")
         responsive_css = read_render_asset("css/part07_modals_misc.css")
         self.assertIn("position: fixed", layout_css)
         self.assertIn("translateX(calc(100% + 20px))", layout_css)
         self.assertIn(".layout > section.commands", responsive_css)
+        self.assertIn("function _isCommandsDrawerOpen()", selection_js)
+        self.assertIn("function _focusCommandsDrawerClose()", selection_js)
+        self.assertIn("function _focusCommandsToggle()", selection_js)
+        self.assertIn("function _closeCommandsDrawer(restoreFocus, persist)", selection_js)
+        self.assertIn('String(ev && ev.key || "") !== "Escape"', selection_js)
+        self.assertIn("ev.stopImmediatePropagation()", selection_js)
+        self.assertIn("_focusCommandsDrawerClose()", selection_js)
 
     def test_compact_density_does_not_restore_a_commands_grid_column(self) -> None:
         base_css = read_render_asset("css/part02_base.css")
