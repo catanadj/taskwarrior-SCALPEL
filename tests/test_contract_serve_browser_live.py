@@ -147,6 +147,72 @@ def _make_conflict_payload(generated_at: str) -> dict[str, Any]:
     return payload
 
 
+def _make_dense_visual_payload(generated_at: str) -> dict[str, Any]:
+    payload = _make_payload(generated_at)
+    payload["cfg"].update(
+        {
+            "work_start_min": 540,
+            "work_end_min": 1020,
+            "show_completed": False,
+        }
+    )
+    payload["tasks"] = [
+        {
+            "id": 101,
+            "uuid": "dense101-1111-2222-3333-abcdefabcdef",
+            "description": "Dense visual block one",
+            "status": "pending",
+            "project": "visual",
+            "scheduled_ms": 1767258000000,
+            "due_ms": 1767259800000,
+            "duration_min": 30,
+        },
+        {
+            "id": 102,
+            "uuid": "dense102-1111-2222-3333-abcdefabcdef",
+            "description": "Dense visual block two",
+            "status": "pending",
+            "project": "visual",
+            "scheduled_ms": 1767258300000,
+            "due_ms": 1767260100000,
+            "duration_min": 30,
+        },
+        {
+            "id": 103,
+            "uuid": "dense103-1111-2222-3333-abcdefabcdef",
+            "description": "Dense visual block three",
+            "status": "pending",
+            "project": "visual",
+            "scheduled_ms": 1767258600000,
+            "due_ms": 1767260400000,
+            "duration_min": 30,
+        },
+        {
+            "id": 104,
+            "uuid": "dense104-1111-2222-3333-abcdefabcdef",
+            "description": "Dense visual block four",
+            "status": "pending",
+            "project": "visual",
+            "scheduled_ms": 1767258900000,
+            "due_ms": 1767260700000,
+            "duration_min": 30,
+        },
+        {
+            "id": 105,
+            "uuid": "dense105-1111-2222-3333-abcdefabcdef",
+            "description": "Completed dense visual marker",
+            "status": "completed",
+            "project": "visual",
+            "scheduled_ms": 1767261600000,
+            "due_ms": 1767263400000,
+            "duration_min": 30,
+            "end_ms": 1767263400000,
+        },
+    ]
+    payload["meta"] = {"generated_at": generated_at}
+    return payload
+
+
 def _make_replan_payload(generated_at: str) -> dict[str, Any]:
     payload = _make_payload(generated_at)
     payload["cfg"]["work_start_min"] = 540
@@ -1732,6 +1798,178 @@ main().catch((err) => {
     _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
 
 
+def _run_cdp_dense_calendar_visual_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
+    script = r"""
+const port = String(process.env.SCALPEL_CDP_PORT || "");
+const pageUrl = String(process.env.SCALPEL_PAGE_URL || "");
+
+async function httpJson(path, init = {}) {
+  const resp = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status} for ${path}: ${txt}`);
+  }
+  return await resp.json();
+}
+
+async function openPageTarget(url) {
+  return await httpJson(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+}
+
+async function main() {
+  const target = await openPageTarget(pageUrl);
+  if (!target.webSocketDebuggerUrl) throw new Error("missing webSocketDebuggerUrl");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let seq = 0;
+  const pending = new Map();
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(String(ev.data || ""));
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    }
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = (err) => reject(err);
+  });
+
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  const evaluate = async (expression) => {
+    const out = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (out.exceptionDetails) return null;
+    return out.result ? out.result.value : null;
+  };
+
+  const waitFor = async (label, fn, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await fn();
+      } catch (_) {
+        last = null;
+      }
+      if (last) return last;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`timeout waiting for ${label}; last=${JSON.stringify(last)}`);
+  };
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+
+  await waitFor("dense calendar cards", () =>
+    evaluate(`
+      (() => {
+        const crowded = document.querySelectorAll('.evt.evt-crowded').length;
+        const overlap = document.querySelectorAll('.evt.warn-overlap .conflict-gutter').length;
+        const bands = document.querySelectorAll('.day-col .time-bands .time-band').length;
+        return crowded >= 4 && overlap >= 2 && bands >= 1;
+      })()
+    `)
+  );
+
+  await waitFor("completed hidden by default", () =>
+    evaluate(`(() => document.querySelectorAll('.evt.completed-task').length === 0)()`)
+  );
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnShowCompleted');
+      if (!btn || btn.hidden) throw new Error('completed toggle unavailable');
+      btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("completed strip visible after toggle", () =>
+    evaluate(`
+      (() => {
+        const el = document.querySelector('.evt.completed-task');
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return rect.width > 12 &&
+          rect.height >= 12 &&
+          rect.height <= 30 &&
+          style.borderRadius.includes('999');
+      })()
+    `)
+  );
+
+  const widthBefore = await evaluate(`
+    (() => {
+      const cal = document.getElementById('calendar');
+      return cal ? Math.round(cal.getBoundingClientRect().width) : 0;
+    })()
+  `);
+  if (!widthBefore || widthBefore < 200) throw new Error(`unexpected calendar width before drawer: ${widthBefore}`);
+
+  await evaluate(`
+    (() => {
+      const btn = document.getElementById('btnToggleCommands');
+      if (!btn) throw new Error('commands toggle unavailable');
+      btn.click();
+      return true;
+    })()
+  `);
+
+  await waitFor("commands drawer open without calendar shrink", async () => {
+    const state = await evaluate(`
+      (() => {
+        const cal = document.getElementById('calendar');
+        const panel = document.querySelector('section.commands');
+        const backdrop = document.getElementById('commandsDrawerBackdrop');
+        const focused = document.activeElement && document.activeElement.id;
+        const width = cal ? Math.round(cal.getBoundingClientRect().width) : 0;
+        return {
+          width,
+          panelOpen: !!panel && panel.getAttribute('aria-hidden') === 'false',
+          backdropVisible: !!backdrop && !backdrop.hidden,
+          focusClose: focused === 'btnCloseCommands',
+        };
+      })()
+    `);
+    return state &&
+      state.panelOpen &&
+      state.backdropVisible &&
+      state.focusClose &&
+      Math.abs(Number(state.width) - Number(widthBefore)) <= 1;
+  });
+
+  try { ws.close(); } catch (_) {}
+}
+
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : String(err));
+  process.exit(1);
+});
+"""
+    _run_cdp_node_script(node_bin=node_bin, devtools_port=devtools_port, page_url=page_url, script=script)
+
+
 def _run_cdp_replan_actions_contract(*, node_bin: str, devtools_port: int, page_url: str) -> None:
     script = r"""
 const port = String(process.env.SCALPEL_CDP_PORT || "");
@@ -2525,6 +2763,12 @@ class _ConflictServeHarness(_BrowserServeHarness):
 
 
 @dataclass
+class _DenseVisualServeHarness(_BrowserServeHarness):
+    def _payload_for(self, count: int) -> dict[str, Any]:
+        return _make_dense_visual_payload(f"gen-{count}")
+
+
+@dataclass
 class _ReplanServeHarness(_BrowserServeHarness):
     def _payload_for(self, count: int) -> dict[str, Any]:
         return _make_replan_payload(f"gen-{count}")
@@ -2703,6 +2947,24 @@ class TestServeBrowserLiveContract(unittest.TestCase):
             try:
                 with _HeadlessChromium(chromium_bin) as browser:
                     _run_cdp_conflict_warnings_contract(
+                        node_bin=node_bin,
+                        devtools_port=browser.port,
+                        page_url=harness.base_url + "/?token=abc123",
+                    )
+            finally:
+                harness.stop()
+
+    def test_live_browser_dense_calendar_visual_states(self) -> None:
+        chromium_bin = shutil.which("chromium")
+        node_bin = shutil.which("node")
+        if not chromium_bin or not node_bin:
+            raise unittest.SkipTest("chromium/node not available")
+
+        with tempfile.TemporaryDirectory() as td:
+            harness = _DenseVisualServeHarness(Path(td)).start()
+            try:
+                with _HeadlessChromium(chromium_bin) as browser:
+                    _run_cdp_dense_calendar_visual_contract(
                         node_bin=node_bin,
                         devtools_port=browser.port,
                         page_url=harness.base_url + "/?token=abc123",
