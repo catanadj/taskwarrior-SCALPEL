@@ -1,94 +1,26 @@
-<img width="1220" height="252" alt="SCALPEL banner" src="https://github.com/user-attachments/assets/0c87aec3-ca3c-4a4e-9b94-dce3c9c88689" />
-
-![SCALPEL planning UI screenshot](https://github.com/user-attachments/assets/516dc7fb-ff6e-4754-a996-7805533763db)
-
 # SCALPEL
 
-## Mission-grade personal planning with Taskwarrior + calendar.
+Taskwarrior planning UI with a calendar-first workflow.
 
-### **"When you plan that your plans may be interrupted or disturbed, you gain steadiness."**
+SCALPEL exports Taskwarrior tasks into a local browser planner. You can drag, resize, add draft tasks, queue actions, review generated `task ...` commands, then either copy them or apply them through the live local server after confirmation.
 
-Using standard calendar tools (Google Calendar and the like) you just set your schedule and then try your best to follow it but in real world as they say "no plan survives contact with the enemy" and surely the act of planning for alternative timelines/contingencies helps but how exactly can this be put in practice and with what tools?
-
-I am sure that the commanders in the military have such tools but I could not find anything similar for individual/civilian use, especially not open source and local.
-
-This project is my answer to that gap. 
-
-In the current stage of development is not much different than a standard calendar application but in its advance form is going to be much more capable. 
-
-Please support its development.
-
-You can do so [here](https://paypal.me/catanadj) or [here](https://github.com/sponsors/catanadj) . Thank you.
-
+![SCALPEL planning UI screenshot](https://github.com/user-attachments/assets/516dc7fb-ff6e-4754-a996-7805533763db)
 
 ## Status
 
 Stable `1.0.0` release line.
 
-- Core payload/schema/rendering interfaces are versioned and contract-tested.
-- Replay/validation/filtering is part of the supported workflow.
-- Planner/AI helpers (stub + optional LM Studio integration) are layered on top of the stable payload pipeline.
+- Payload, schema, rendering, replay, and validation paths are contract-tested.
+- Live mode is the normal day-to-day workflow.
+- `--once` remains available for render-only / copy-only use.
+- AI/planner helpers are optional layers on top of the stable payload pipeline.
 
-- A visual planning surface without giving up CLI workflows
-- A reproducible pipeline (payload JSON + replay rendering)
-- A safe way to test schedule changes before applying them in Taskwarrior
-- Optional AI-assisted planning on top of a stable payload/render contract
-
-Important:
-- `scalpel --once` remains a render/copy workflow.
-- Live mode can now apply queued Taskwarrior commands directly, but only after explicit preview, per-command selection, and confirmation.
-
-## Use
-
-1. Run `scalpel` to export your Taskwarrior tasks and open a planning page in your browser.
-2. Drag/resize tasks, queue adds/completes/deletes, and shape the schedule visually.
-3. Copy the generated `task ... modify` / action commands, apply them directly in live mode, or export a plan JSON for later replay/apply.
-
-## Product Highlights
-
-### Interactive planning UI
-
-- Multi-day calendar with configurable work hours and vertical scale
-- Drag/resize scheduling with snap-to-grid behavior
-- Selection-driven planning actions
-- Replanning actions for selected tasks and active day (`Next free slot`, `Rebalance day`)
-- Queue actions for selected tasks: complete, delete, add placeholders
-- Local placeholders can be edited like normal task drafts before they materialize into `task add ...`
-- Undo/redo for local plan edits, queued commands, placeholder drafts, and notes (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`)
-- Copy command output for shell execution
-- Live apply flow with preview, per-command selection, and explicit confirmation
-- Live planning warnings for overlaps, out-of-hours tasks, and overbooked days
-- Execution/focus mode with a persisted current task, jump/resume controls, and session-day Timewarrior import
-- Export/import plan JSON (`scalpel.plan.v1`)
-- Notes panel and unified search / command center (`Ctrl/Cmd+K`) across tasks, notes, days, queued changes, imported intervals, and commands
-- Goal/project/tag color mapping and theme customization
-- Optional AI scheduling modal (works with the plan-result flow)
-
-### CLI-first, replayable workflow
-
-- Live Taskwarrior export -> payload -> HTML (`scalpel`)
-- HTML -> extract embedded payload JSON (`scalpel-validate-payload --from-html`)
-- Filter payloads with query syntax (`scalpel-filter-payload`)
-- Re-render from payload JSON (`scalpel-render-payload`)
-- Validate and upgrade payloads across schema versions (never downgrades)
-
-### Planning + AI tooling
-
-- Deterministic planner ops (`align-starts`, `align-ends`, `stack`, `distribute`, `nudge`) via `scalpel-plan-ops`
-- Stub AI planner for deterministic local testing (`scalpel-ai-plan-stub`)
-- Optional LM Studio local model integration (`scalpel-ai-plan-lmstudio`)
-- Plan validation/apply tools (`scalpel-validate-plan-result`, `scalpel-apply-plan-result`)
-
-## Installation
-
-Requirements:
+## Requirements
 
 - Python `>=3.11`
-- Taskwarrior installed on `PATH` for the main live-export command (`scalpel`)
+- Taskwarrior on `PATH` for live export and live apply
 
-Taskwarrior setup (`~/.taskrc`):
-
-SCALPEL expects a `duration` UDA so generated commands like `duration:10min` round-trip cleanly.
+Recommended Taskwarrior UDA:
 
 ```ini
 uda.duration.type=duration
@@ -96,19 +28,21 @@ uda.duration.label=duration
 uda.duration.default=PT10M
 ```
 
-Install from PyPI:
+## Install
+
+From PyPI:
 
 ```bash
 python3 -m pip install taskwarrior-scalpel
 ```
 
-Or from a local checkout:
+From a local checkout:
 
 ```bash
 python3 -m pip install .
 ```
 
-Developer setup (editable install + lint/typecheck tooling):
+Developer setup:
 
 ```bash
 ./scripts/scalpel_dev.sh setup
@@ -120,67 +54,74 @@ Names:
 - Python module: `scalpel`
 - Main CLI: `scalpel`
 
-## Quick Start
-
-Generate an interactive planning page from your live Taskwarrior data:
-
-```bash
-scalpel --out build/scalpel_schedule.html
-```
-
-Common options:
-
-- `--filter "status:pending +work"`: Taskwarrior filter passed to `task export`
-- `--start YYYY-MM-DD`: start date of the view
-- `--days N`: number of days to show
-- `--workhours HH:MM-HH:MM`: visible planning window
-- `--tz` / `--display-tz`: bucketing vs display timezone
-- `--plan-overrides FILE.json` / `--plan-result FILE.json`: apply changes before render
-- `--once`: render the HTML once and exit without starting the live server
-- `--serve [--host 127.0.0.1 --port 8765]`: live mode (now the default runtime; kept for compatibility)
-- `--allow-remote --serve-token TOKEN`: explicitly allow non-loopback live mode with endpoint auth
-
-## Common Workflows
-
-### 1) Daily planning from live Taskwarrior
+## Quick start
 
 ```bash
 scalpel --filter "status:pending" --days 7 --out build/scalpel.html
 ```
 
-Then:
+Then use the browser UI to:
 
-- Adjust the schedule in the browser
-- Either apply the reviewed command set directly in live mode, or copy it
-- Review generated changes before confirming
-- Run them manually in your shell if you prefer the copy workflow
+- drag or resize scheduled tasks
+- queue add / complete / delete actions
+- review planning warnings for overlaps, out-of-hours tasks, and overbooked days
+- copy generated commands or apply them directly in live mode
+- refresh from Taskwarrior without restarting the process
 
-That command now runs in live mode by default and keeps the local server available for refresh/task/timew actions.
-
-Explicit compatibility form:
+Common options:
 
 ```bash
-scalpel --serve --out build/scalpel.html
+scalpel \
+  --filter "status:pending +work" \
+  --start 2026-07-19 \
+  --days 7 \
+  --workhours 09:00-17:00 \
+  --out build/scalpel.html
 ```
 
-Use **Refresh data** in the UI (or call `POST /refresh`) to regenerate from Taskwarrior without restarting `scalpel`.
-In live mode, right-click a day header to open **Day actions** and load Timewarrior intervals as timed notes for that day (or for a different day via prompt).
-Live mode keeps a sidecar UI-state store next to the output HTML and exposes it through `GET/POST /client-state`, so serve-backed calendar preferences survive refreshes and server restarts.
-Use **Undo** / **Redo** from the overflow actions menu or `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` to revert or reapply local planning changes without touching Taskwarrior until you explicitly apply them.
-Day headers now surface live planning warnings, and the right-hand **Planning warnings** card groups overlaps, out-of-hours tasks, and overbooked days with direct select/jump actions.
-Use **Next free slot** to push selected tasks into the next available opening, or **Rebalance day** to pack the active day back inside workhours when the total duration fits.
+Useful flags:
 
-For remote/LAN use, `--allow-remote` is required and must be paired with `--serve-token` (or `SCALPEL_SERVE_TOKEN`). The printed URL includes `?token=...` and the server sets an auth cookie for follow-up UI/API calls.
+- `--once`: render HTML and exit; no live server
+- `--no-open`: do not open the browser automatically
+- `--show-completed`: include completed tasks in the payload
+- `--no-nautical-hooks`: disable Nautical preview expansion
+- `--tz` / `--display-tz`: control day bucketing and timestamp display
+- `--plan-overrides FILE.json`: apply local plan overrides before rendering
+- `--plan-result FILE.json`: apply planner/AI result before rendering
 
-Serve observability:
+Remote/LAN live mode requires explicit auth:
 
-- Set `SCALPEL_OBS_LOG=1` to emit structured serve events to stderr (auth denials, refresh/timew success/failure).
-- `GET /metrics` returns lightweight in-memory counters for requests/auth failures/refresh/timew operations (token-protected when auth is enabled).
-- `GET /health?metrics=1` includes `auth_required` and the same counter snapshot.
+```bash
+scalpel --allow-remote --serve-token "$TOKEN" --host 0.0.0.0 --out build/scalpel.html
+```
 
-### 2) Reproducible payload + replay workflow
+## Daily workflow
 
-Useful for debugging, sharing, testing, and offline iteration.
+1. Start SCALPEL:
+
+   ```bash
+   scalpel --filter "status:pending" --days 7 --out build/scalpel.html
+   ```
+
+2. Plan in the browser:
+
+   - drag / resize tasks
+   - select tasks and use arrangement actions
+   - use `Next free slot` or `Rebalance day`
+   - add local placeholder tasks
+   - use `Ctrl/Cmd+K` for search and commands
+   - use `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` for undo / redo
+
+3. Commit changes to Taskwarrior:
+
+   - copy the generated commands and run them manually, or
+   - use live apply, select commands, preview, and confirm
+
+Live mode exposes local endpoints for refresh, task lookup, Timewarrior import, client-state persistence, health, and metrics. Non-loopback access requires `--allow-remote` plus a serve token.
+
+## Replayable payload workflow
+
+Use this for debugging, sharing, testing, and offline iteration.
 
 ```bash
 scalpel --once --no-open --out build/scalpel.html
@@ -189,16 +130,31 @@ scalpel-filter-payload --in build/payload.json --q "project:work -blocked" --out
 scalpel-render-payload --in build/work.json --out build/work.html
 ```
 
-### 3) AI-assisted planning (local-first)
+Query examples:
 
-Deterministic stub planner flow:
+```bash
+scalpel-filter-payload --in build/payload.json --q "project:work +focus -blocked" --out build/focus.json
+scalpel-filter-payload --in build/payload.json --q "day:2026-07-19 desc~meeting" --out build/meetings.json
+```
+
+Supported query forms include `uuid:`, `project:`, `status:`, `day:YYYY-MM-DD`, `+tag`, `-tag`, `desc:substring`, `desc~regex`, and bare description tokens.
+
+## Planner / AI workflow
+
+Deterministic local stub:
 
 ```bash
 scalpel --once --no-open --out build/scalpel.html
 scalpel-validate-payload --from-html build/scalpel.html --write-json build/payload.json
 
-# build/selected.json contains a JSON array of selected task UUIDs
-scalpel-ai-plan-stub --in build/payload.json --selected build/selected.json --prompt "align starts" --out build/plan.json --plan-schema v2
+# build/selected.json is a JSON array of selected task UUIDs.
+scalpel-ai-plan-stub \
+  --in build/payload.json \
+  --selected build/selected.json \
+  --prompt "align starts" \
+  --out build/plan.json \
+  --plan-schema v2
+
 scalpel-apply-plan-result --in build/payload.json --plan build/plan.json --out build/payload_planned.json
 scalpel-render-payload --in build/payload_planned.json --out build/scalpel_planned.html
 ```
@@ -215,40 +171,11 @@ scalpel-ai-plan-lmstudio \
   --model your-model-name
 ```
 
-<details>
-<summary><strong>Advanced: Query Language (Payload Filtering)</strong></summary>
+Deterministic planner operations are also available through `scalpel-plan-ops`.
 
-<br />
+## Installed commands
 
-`scalpel-filter-payload` uses the SCALPEL query language (`scalpel.query_lang`).
-
-Supported filters include:
-
-- `uuid:<id>`
-- `project:<name>[,<name>...]`
-- `status:<status>[,<status>...]`
-- `day:YYYY-MM-DD`
-- `+tag` / `tag:tag1,tag2`
-- `-tag` (exclude tag)
-- `desc:substring`
-- `desc~regex` / `desc!~regex`
-- Bare tokens (description substring match, case-insensitive)
-
-Examples:
-
-```bash
-scalpel-filter-payload --in build/payload.json --q "project:work +focus -blocked" --out build/focus.json
-scalpel-filter-payload --in build/payload.json --q "day:2026-02-26 desc~meeting" --out build/meetings.json
-```
-
-</details>
-
-<details>
-<summary><strong>Advanced: Tooling Commands (Installed)</strong></summary>
-
-<br />
-
-Core workflow:
+Core:
 
 - `scalpel`
 - `scalpel-render-payload`
@@ -260,7 +187,7 @@ Core workflow:
 - `scalpel-ai-plan-stub`
 - `scalpel-ai-plan-lmstudio`
 
-Engineering/support:
+Engineering:
 
 - `scalpel-doctor`
 - `scalpel-check`
@@ -271,87 +198,62 @@ Engineering/support:
 - `scalpel-ddmin-shrink`
 - `scalpel-bench`
 
-</details>
+## Public Python API
 
-<details>
-<summary><strong>Advanced: Public Python API (Stable Surface)</strong></summary>
-
-<br />
-
-Import from `scalpel.api` (preferred) or `import scalpel` (re-export).
-
-Contract-tested public API includes:
-
-- `load_payload_from_json(...)`
-- `load_payload_from_html(...)`
-- `normalize_payload(...)`
-- `iter_tasks(...)`
-- `task_by_uuid(...)`
-- `tasks_by_status(...)`
-- `tasks_by_project(...)`
-- `tasks_by_tag(...)`
-- `tasks_by_day(...)`
-- `filter_payload(...)`
-
-Example:
+Use `scalpel.api` for the stable public API.
 
 ```python
 from scalpel.api import load_payload_from_html, tasks_by_day
 
 payload = load_payload_from_html("build/scalpel.html")
-today = tasks_by_day(payload, "2026-02-26")
+today = tasks_by_day(payload, "2026-07-19")
 print(len(today))
 ```
 
-</details>
+Contract-tested functions include payload loading, normalization, task iteration, task lookup by UUID/status/project/tag/day, and payload filtering.
 
-<details>
-<summary><strong>Advanced: Timezones</strong></summary>
+## Timezones
 
-<br />
+SCALPEL separates:
 
-SCALPEL separates two timezone concerns:
+- bucketing timezone: `--tz` / `SCALPEL_TZ`
+- display timezone: `--display-tz` / `SCALPEL_DISPLAY_TZ`
 
-- Bucketing timezone (`--tz` / `SCALPEL_TZ`): controls day boundaries, `day_key`, and view-window anchoring.
-- Display timezone (`--display-tz` / `SCALPEL_DISPLAY_TZ`): controls timestamp formatting in the HTML UI and generated command text.
+Use local defaults for interactive planning. Use UTC for deterministic fixtures and CI.
 
-Typical usage:
-
-- Interactive local use: `--tz local --display-tz local` (defaults)
-- Deterministic CI/fixtures: `--tz UTC` and choose display (`local` or `UTC`)
-
-</details>
-
-<details>
-<summary><strong>Advanced: Nautical Hooks (Optional)</strong></summary>
-
-<br />
+## Nautical hooks
 
 Nautical preview task expansion is enabled by default.
 
 - Disable per run: `scalpel --no-nautical-hooks`
-- Control default via env: `SCALPEL_ENABLE_NAUTICAL_HOOKS=0|1`
+- Control default: `SCALPEL_ENABLE_NAUTICAL_HOOKS=0|1`
 
-When enabled, SCALPEL first checks for a `nautical_core` package in `~/.task/nautical_core/` and `~/.task/hooks/nautical_core/`, then falls back to legacy single-file artefacts and normal Python imports before generating anchor/CP preview tasks.
+SCALPEL checks for `nautical_core` under `~/.task/nautical_core/` and `~/.task/hooks/nautical_core/`, then falls back to legacy artefacts and normal Python imports.
 
-</details>
-
-<details>
-<summary><strong>Advanced: Docs / References</strong></summary>
-
-<br />
-
-- `docs/AI_FLOW.md`
-- `docs/AI_INTERFACE.md`
-- `docs/PLANNER_CORE.md`
-- `docs/SCHEMA_EVOLUTION_PROTOCOL.md`
-- `docs/PACKAGING_RELEASE_CHECKLIST.md`
-
-Golden fixture maintenance:
+## Development checks
 
 ```bash
+./scripts/scalpel_dev.sh test
+scalpel-check
 scalpel-gen-fixtures --check
+```
+
+Update golden fixtures:
+
+```bash
 scalpel-gen-fixtures --write
 ```
 
-</details>
+## Docs
+
+- [AI flow](docs/AI_FLOW.md)
+- [AI interface](docs/AI_INTERFACE.md)
+- [Planner core](docs/PLANNER_CORE.md)
+- [Schema evolution protocol](docs/SCHEMA_EVOLUTION_PROTOCOL.md)
+- [Packaging release checklist](docs/PACKAGING_RELEASE_CHECKLIST.md)
+- [Security](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Support
+
+If SCALPEL is useful to you, you can support development through [GitHub Sponsors](https://github.com/sponsors/catanadj) or [PayPal](https://paypal.me/catanadj).
