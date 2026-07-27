@@ -54,6 +54,15 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('kind: "full"', init)
         self.assertIn('kind: "selection"', init)
 
+    def test_mobile_calendar_keeps_day_columns_usable_and_touch_targets_large_enough(self) -> None:
+        calendar_css = read_render_asset("css/part05_calendar.css")
+        modal_css = read_render_asset("css/part07_modals_misc.css")
+        self.assertIn("min-width: calc(var(--days) * 156px)", modal_css)
+        self.assertIn("grid-template-columns: repeat(var(--days), minmax(156px, 1fr))", modal_css)
+        self.assertIn("min-height: 44px", modal_css)
+        self.assertIn(".modal button", modal_css)
+        self.assertIn("overflow-x: hidden", modal_css)
+
     def test_event_detail_levels_follow_rendered_height(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

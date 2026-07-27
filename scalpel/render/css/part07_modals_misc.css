@@ -413,6 +413,7 @@
     .layout.panels-collapsed { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
   }
   @media (max-width: 820px) {
+    body{ overflow-x: hidden; }
     body{ padding-bottom: 66px; }
     #btnToggleBacklog,
     #btnToggleCommands{ display: none; }
@@ -452,6 +453,18 @@
     }
     .layout .card.commands{ grid-column: auto; }
     .layout .card{ min-height: 300px; }
+    .calendar .time-col{ width: 56px; }
+    .calendar .days-header,
+    .calendar .days-body{
+      min-width: calc(var(--days) * 156px);
+      width: max-content;
+    }
+    .calendar .days-header,
+    .calendar .days-body{
+      grid-template-columns: repeat(var(--days), minmax(156px, 1fr));
+    }
+    .calendar .day-h{ padding: 7px 8px; gap: 5px; }
+    .calendar .evt{ min-width: 0; }
     .selection-bar{
       align-items: stretch;
       flex-direction: column;
@@ -484,6 +497,7 @@
       color: var(--muted);
       border-radius: 10px;
       padding: 7px 8px;
+      min-height: 44px;
       font-size: 12px;
       font-weight: 760;
       text-align: center;
@@ -520,6 +534,10 @@
       flex-direction: column;
       align-items: stretch;
     }
+    .modal button,
+    .modal input,
+    .modal select,
+    .modal textarea{ min-height: 40px; }
     .modal .field.wide,
     .modal .field.med,
     .modal .field.short{
