@@ -31,6 +31,21 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('tooltipParts.join("\\n")', rendering)
         self.assertNotIn('(t.uuid||"").slice(0,8)', rendering)
 
+    def test_calendar_tasks_and_modals_are_keyboard_accessible(self) -> None:
+        rendering = read_render_asset("js/part04_rendering.js")
+        core = read_render_asset("js/part01_core.js")
+        notes = read_render_asset("js/part08_notes.js")
+        self.assertIn('el.setAttribute("role", "button")', rendering)
+        self.assertIn('el.addEventListener("keydown"', rendering)
+        self.assertIn('el.tabIndex = isPreview ? -1 : 0', rendering)
+        self.assertIn('aria-modal="true"', OVERLAY_MARKUP)
+        self.assertEqual(OVERLAY_MARKUP.count('role="dialog"'), 10)
+        self.assertEqual(OVERLAY_MARKUP.count('aria-labelledby='), 10)
+        self.assertIn('document.addEventListener("keydown", (ev) =>', core)
+        self.assertIn('document.addEventListener("focusin", (ev) =>', core)
+        self.assertIn('aria-pressed', OVERLAY_MARKUP)
+        self.assertIn("b.setAttribute('aria-pressed'", notes)
+
     def test_event_detail_levels_follow_rendered_height(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

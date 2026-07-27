@@ -1064,6 +1064,7 @@ function _pulseEl(el){
         const bc = _sanitizeColorKey(bcRaw);
         const isOn = (bc === ck) || (!ck && !String(bcRaw||""));
         b.classList.toggle('on', isOn);
+        b.setAttribute('aria-pressed', isOn ? 'true' : 'false');
       });
     }catch(_){ }
   }

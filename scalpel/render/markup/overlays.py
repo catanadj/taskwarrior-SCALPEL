@@ -4,10 +4,10 @@ from __future__ import annotations
 MARKUP = r"""<div id="marquee"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<div class="modal-backdrop" id="helpModal">
-  <div class="modal help-modal">
+<div class="modal-backdrop" id="helpModal" aria-hidden="true" inert>
+  <div class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Help and shortcuts</div>
+      <div class="t" id="helpModalTitle">Help and shortcuts</div>
       <button class="small btn-soft" id="helpClose">Close</button>
     </div>
     <div class="mb">
@@ -47,11 +47,11 @@ MARKUP = r"""<div id="marquee"></div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="commandModal">
-  <div class="modal command-modal">
+<div class="modal-backdrop" id="commandModal" aria-hidden="true" inert>
+  <div class="modal command-modal" role="dialog" aria-modal="true" aria-labelledby="commandModalTitle" tabindex="-1">
     <div class="mh">
       <div class="cmdk-head">
-        <div class="t">Search + commands</div>
+        <div class="t" id="commandModalTitle">Search + commands</div>
         <div class="cmdk-legend" aria-label="Unified search categories and command codes">
           <span class="cmdk-chip"><span class="k">Task</span>Edit / jump</span>
           <span class="cmdk-chip"><span class="k">Note</span>Open note</span>
@@ -72,10 +72,10 @@ MARKUP = r"""<div id="marquee"></div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="addModal">
-  <div class="modal">
+<div class="modal-backdrop" id="addModal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Add tasks</div>
+      <div class="t" id="addModalTitle">Add tasks</div>
       <button class="small btn-soft" id="addClose">Close</button>
     </div>
     <div class="mb">
@@ -93,8 +93,8 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="taskEditModal">
-  <div class="modal task-edit-modal">
+<div class="modal-backdrop" id="taskEditModal" aria-hidden="true" inert>
+  <div class="modal task-edit-modal" role="dialog" aria-modal="true" aria-labelledby="taskEditTitle" tabindex="-1">
     <div class="mh">
       <div class="t" id="taskEditTitle">Edit task</div>
       <button class="small btn-soft" id="taskEditClose">Close</button>
@@ -124,10 +124,10 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="bandModal">
-  <div class="modal band-modal">
+<div class="modal-backdrop" id="bandModal" aria-hidden="true" inert>
+  <div class="modal band-modal" role="dialog" aria-modal="true" aria-labelledby="bandModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Planning bands</div>
+      <div class="t" id="bandModalTitle">Planning bands</div>
       <button class="small btn-soft" id="bandClose">Close</button>
     </div>
     <div class="mb">
@@ -156,10 +156,10 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="applyModal">
-  <div class="modal apply-modal">
+<div class="modal-backdrop" id="applyModal" aria-hidden="true" inert>
+  <div class="modal apply-modal" role="dialog" aria-modal="true" aria-labelledby="applyModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Apply queued changes</div>
+      <div class="t" id="applyModalTitle">Apply queued changes</div>
       <button class="small btn-soft" id="applyClose">Close</button>
     </div>
     <div class="mb">
@@ -183,8 +183,8 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="noteModal">
-  <div class="modal">
+<div class="modal-backdrop" id="noteModal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle" tabindex="-1">
     <div class="mh">
       <div class="t" id="noteModalTitle">Note</div>
       <button class="small btn-soft" id="noteClose">Close</button>
@@ -203,15 +203,15 @@ Review PR #142"></textarea>
       <div class="notecolor">
         <div class="clbl">Color</div>
         <div class="cpal" id="noteColors">
-          <button class="csw none" data-color="" title="No color">None</button>
-          <button class="csw c1" data-color="c1" title="Yellow"></button>
-          <button class="csw c2" data-color="c2" title="Blue"></button>
-          <button class="csw c3" data-color="c3" title="Green"></button>
-          <button class="csw c4" data-color="c4" title="Red"></button>
-          <button class="csw c5" data-color="c5" title="Purple"></button>
-          <button class="csw c6" data-color="c6" title="Teal"></button>
-          <button class="csw c7" data-color="c7" title="Gray"></button>
-          <button class="csw c8" data-color="c8" title="Pink"></button>
+          <button class="csw none" data-color="" title="No color" aria-label="No color" aria-pressed="false">None</button>
+          <button class="csw c1" data-color="c1" title="Yellow" aria-label="Yellow" aria-pressed="false"></button>
+          <button class="csw c2" data-color="c2" title="Blue" aria-label="Blue" aria-pressed="false"></button>
+          <button class="csw c3" data-color="c3" title="Green" aria-label="Green" aria-pressed="false"></button>
+          <button class="csw c4" data-color="c4" title="Red" aria-label="Red" aria-pressed="false"></button>
+          <button class="csw c5" data-color="c5" title="Purple" aria-label="Purple" aria-pressed="false"></button>
+          <button class="csw c6" data-color="c6" title="Teal" aria-label="Teal" aria-pressed="false"></button>
+          <button class="csw c7" data-color="c7" title="Gray" aria-label="Gray" aria-pressed="false"></button>
+          <button class="csw c8" data-color="c8" title="Pink" aria-label="Pink" aria-pressed="false"></button>
         </div>
       </div>
 
@@ -254,10 +254,10 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="aiPlanModal">
-  <div class="modal">
+<div class="modal-backdrop" id="aiPlanModal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aiPlanModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">AI plan</div>
+      <div class="t" id="aiPlanModalTitle">AI plan</div>
       <button class="small btn-soft" id="aiPlanClose">Close</button>
     </div>
     <div class="mb">
@@ -281,10 +281,10 @@ Review PR #142"></textarea>
   </div>
 </div>
 
-<div class="modal-backdrop" id="themeModal">
-  <div class="modal">
+<div class="modal-backdrop" id="themeModal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Theme manager</div>
+      <div class="t" id="themeModalTitle">Theme manager</div>
       <button class="small btn-soft" id="themeClose">Close</button>
     </div>
     <div class="mb">
@@ -323,10 +323,10 @@ Review PR #142"></textarea>
     </div>
   </div>
 </div>
-<div class="modal-backdrop" id="themeEditModal">
-  <div class="modal">
+<div class="modal-backdrop" id="themeEditModal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="themeEditModalTitle" tabindex="-1">
     <div class="mh">
-      <div class="t">Theme editor</div>
+      <div class="t" id="themeEditModalTitle">Theme editor</div>
       <button class="small btn-soft" id="themeEditClose">Close</button>
     </div>
     <div class="mb">

@@ -1578,6 +1578,13 @@
   function __createEventNode(uuid) {
     const el = document.createElement("div");
     el.dataset.uuid = String(uuid || "");
+    el.setAttribute("role", "button");
+    el.tabIndex = 0;
+    el.addEventListener("keydown", (ev2) => {
+      if (ev2.key !== "Enter" && ev2.key !== " ") return;
+      ev2.preventDefault();
+      el.click();
+    });
     el.addEventListener("contextmenu", (ev2) => {
       if (el.dataset.preview !== "1") return;
       const u = el.dataset.uuid;
@@ -1675,6 +1682,7 @@
     }
 
     el.className = cls;
+    el.tabIndex = isPreview ? -1 : 0;
     if (isPreview) {
       el.dataset.preview = "1";
       el.title = __nauticalSelectionMode

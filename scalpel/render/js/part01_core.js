@@ -881,3 +881,52 @@ startYmd: ymdFromMs(cfg.view_start_ms),
     if (changed) __scalpelInvalidateTimeCaches("effective");
   }
   loadEdits();
+
+  // Keep modal focus contained even though the individual modal controllers
+  // open and close their backdrops from different render fragments.
+  try {
+    const modalFocusable = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const modalVisible = (backdrop) => backdrop && !backdrop.hidden && backdrop.style.display !== "none" && getComputedStyle(backdrop).display !== "none";
+    const visibleModal = () => Array.from(document.querySelectorAll(".modal-backdrop")).reverse().find(modalVisible) || null;
+    const focusInside = (backdrop) => {
+      const dialog = backdrop && backdrop.querySelector('[role="dialog"]');
+      const target = dialog && (dialog.querySelector(modalFocusable) || dialog);
+      if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
+    };
+    const syncBackdrop = (backdrop) => {
+      const open = modalVisible(backdrop);
+      backdrop.setAttribute("aria-hidden", open ? "false" : "true");
+      if (open) backdrop.removeAttribute("inert");
+      else backdrop.setAttribute("inert", "");
+      if (open && !backdrop.__scalpelFocusOrigin) {
+        const active = document.activeElement;
+        backdrop.__scalpelFocusOrigin = active && active !== document.body && !backdrop.contains(active) ? active : null;
+        setTimeout(() => { if (modalVisible(backdrop) && !backdrop.contains(document.activeElement)) focusInside(backdrop); }, 0);
+      } else if (!open && backdrop.__scalpelFocusOrigin) {
+        const origin = backdrop.__scalpelFocusOrigin;
+        backdrop.__scalpelFocusOrigin = null;
+        if (origin.isConnected && typeof origin.focus === "function") setTimeout(() => origin.focus({ preventScroll: true }), 0);
+      }
+    };
+    const syncAll = () => document.querySelectorAll(".modal-backdrop").forEach(syncBackdrop);
+    syncAll();
+    new MutationObserver((records) => {
+      for (const record of records) if (record.target.classList && record.target.classList.contains("modal-backdrop")) syncBackdrop(record.target);
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["style", "hidden"] });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Tab") return;
+      const backdrop = visibleModal();
+      if (!backdrop) return;
+      const dialog = backdrop.querySelector('[role="dialog"]');
+      if (!dialog) return;
+      const items = Array.from(dialog.querySelectorAll(modalFocusable)).filter((node) => node.offsetParent !== null);
+      if (!items.length) { ev.preventDefault(); dialog.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+    }, true);
+    document.addEventListener("focusin", (ev) => {
+      const backdrop = visibleModal();
+      if (backdrop && !backdrop.contains(ev.target)) focusInside(backdrop);
+    }, true);
+  } catch (_) {}
