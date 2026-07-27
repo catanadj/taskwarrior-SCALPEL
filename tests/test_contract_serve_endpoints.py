@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from typing import Any, Callable
 
+from scalpel.serve_apply import ApplyExecutionResult
 from scalpel.serve_endpoints import (
     handle_apply_post,
     handle_client_state_get,
@@ -188,6 +189,52 @@ class ServeEndpointContractTests(unittest.TestCase):
             obs_inc=recorder.increment,
         )
         self.assertEqual(recorder.responses[-1][0], 400)
+
+    def test_apply_endpoint_replays_idempotently_and_rejects_key_reuse(self) -> None:
+        recorder = EndpointRecorder()
+        calls = 0
+        result: ApplyExecutionResult = {
+            "ok": True,
+            "applied": 1,
+            "selected": 1,
+            "commands": [],
+            "stopped_after_index": None,
+        }
+        cache: dict[str, tuple[str, ApplyExecutionResult]] = {}
+        lock = threading.Lock()
+
+        def execute(*_args: Any, **_kwargs: Any) -> ApplyExecutionResult:
+            nonlocal calls
+            calls += 1
+            return result
+
+        body = {"confirm": True, "commands": ["task 12345678 done"], "selected": [0]}
+        for _ in range(2):
+            handle_apply_post(
+                body=body,
+                execute_apply=execute,
+                send_json=recorder.send,
+                obs_inc=recorder.increment,
+                idempotency_key="apply-key-1",
+                request_fingerprint="fingerprint-a",
+                receipt_cache=cache,
+                receipt_lock=lock,
+            )
+        self.assertEqual(calls, 1)
+        self.assertEqual(recorder.responses[-1][0], 200)
+
+        handle_apply_post(
+            body={**body, "selected": []},
+            execute_apply=execute,
+            send_json=recorder.send,
+            obs_inc=recorder.increment,
+            idempotency_key="apply-key-1",
+            request_fingerprint="fingerprint-b",
+            receipt_cache=cache,
+            receipt_lock=lock,
+        )
+        self.assertEqual(recorder.responses[-1][0], 409)
+        self.assertEqual(calls, 1)
 
 
 if __name__ == "__main__":

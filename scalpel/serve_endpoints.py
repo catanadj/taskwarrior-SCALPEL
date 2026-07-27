@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 from typing import Any, cast
 
+from .serve_apply import ApplyExecutionResult
 from .serve_support import client_state_snapshot, obs_log, payload_generated_at, write_client_state
 from .serve_types import ExecuteApplyFn, ObsIncFn, RenderOnceFn, SendJsonFn, ServeState, TaskLookupFn, TimewExportFn
 
@@ -149,12 +150,19 @@ def handle_client_state_post(
         return
     delete_keys = [str(item) for item in delete_raw]
     with state_lock:
+        previous = dict(state.client_state)
         for key, value in values.items():
             state.client_state[str(key)] = value
         for key in delete_keys:
             state.client_state.pop(key, None)
         snapshot = client_state_snapshot(state)
-        write_client_state(state_file, snapshot)
+        try:
+            write_client_state(state_file, snapshot)
+        except (OSError, TypeError, ValueError) as ex:
+            state.client_state.clear()
+            state.client_state.update(previous)
+            send_json(500, {"ok": False, "error": f"Failed to persist client state: {ex}"})
+            return
     send_json(200, {"ok": True, "state": snapshot})
 
 
@@ -164,13 +172,17 @@ def handle_apply_post(
     execute_apply: ExecuteApplyFn,
     send_json: SendJsonFn,
     obs_inc: ObsIncFn,
+    idempotency_key: str | None = None,
+    request_fingerprint: str | None = None,
+    receipt_cache: dict[str, tuple[str, ApplyExecutionResult]] | None = None,
+    receipt_lock: threading.Lock | None = None,
 ) -> None:
     if not isinstance(body, dict):
         send_json(400, {"ok": False, "error": "JSON body must be an object."})
         return
     commands = body.get("commands")
     selected = body.get("selected")
-    if not bool(body.get("confirm")):
+    if body.get("confirm") is not True:
         send_json(400, {"ok": False, "error": "Field 'confirm' must be true."})
         return
     if not isinstance(commands, list):
@@ -182,8 +194,28 @@ def handle_apply_post(
     if not commands:
         send_json(400, {"ok": False, "error": "No commands supplied for apply."})
         return
+
+    def _execute() -> ApplyExecutionResult:
+        return execute_apply(commands, selected=cast(list[object] | None, selected))
+
     try:
-        result = execute_apply(commands, selected=cast(list[object] | None, selected))
+        if idempotency_key and request_fingerprint and receipt_cache is not None and receipt_lock is not None:
+            with receipt_lock:
+                prior = receipt_cache.get(idempotency_key)
+                if prior is not None:
+                    prior_fingerprint, prior_result = prior
+                    if prior_fingerprint != request_fingerprint:
+                        send_json(409, {"ok": False, "error": "Idempotency key was reused for a different request."})
+                        return
+                    obs_inc("apply_replay_total")
+                    result = prior_result
+                else:
+                    result = _execute()
+                    receipt_cache[idempotency_key] = (request_fingerprint, result)
+                    while len(receipt_cache) > 128:
+                        receipt_cache.pop(next(iter(receipt_cache)))
+        else:
+            result = _execute()
     except SystemExit as ex:
         obs_inc("apply_error_total")
         obs_log("serve.apply_error", error=str(ex))

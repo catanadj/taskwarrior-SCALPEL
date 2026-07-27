@@ -158,12 +158,14 @@
   let __applySelected = new Set();
   let __applyResultByIndex = new Map();
   let __applyLastSelected = new Set();
+  let __applyRequestKey = null;
   let __applyStopped = false;
   let __applyStoppedAfterIndex = null;
 
   function _resetApplyRunState() {
     __applyResultByIndex = new Map();
     __applyLastSelected = new Set();
+    __applyRequestKey = null;
     __applyStopped = false;
     __applyStoppedAfterIndex = null;
   }
@@ -370,10 +372,19 @@
     if (elApplyConfirm) elApplyConfirm.disabled = true;
     if (elApplyStatus) elApplyStatus.textContent = "Applying queued commands...";
     __applyLastSelected = new Set(selected);
+    if (!__applyRequestKey) {
+      __applyRequestKey = (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
+        ? globalThis.crypto.randomUUID()
+        : `apply-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
     try {
       const res = await fetch("/apply", {
         method: "POST",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "Idempotency-Key": __applyRequestKey,
+        },
         credentials: "same-origin",
         cache: "no-store",
         body: JSON.stringify({
@@ -398,6 +409,7 @@
       }
 
       _clearPendingStateAfterApply();
+      __applyRequestKey = null;
       try {
         if (typeof globalThis.__scalpel_kvFlush === "function") {
           await globalThis.__scalpel_kvFlush();

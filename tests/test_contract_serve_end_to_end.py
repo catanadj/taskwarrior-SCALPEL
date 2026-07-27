@@ -310,6 +310,7 @@ class TestServeEndToEndContract(unittest.TestCase):
                             "selected": [1],
                             "confirm": True,
                         },
+                        headers={"Idempotency-Key": "apply-test-1"},
                     ) as resp:
                         body = json.loads(resp.read().decode("utf-8"))
                 self.assertTrue(body["ok"])

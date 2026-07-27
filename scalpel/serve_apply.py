@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 from typing import Collection, TypedDict
 
 from .process import CommandFailedError, CommandNotFoundError, CommandTimeoutError, run_checked
+
+_TASK_ID_RE = re.compile(r"^(?:\d+|[0-9a-fA-F-]{8,64})$")
+_MAX_APPLY_COMMANDS = 256
+_MAX_APPLY_LINE_LENGTH = 4096
 
 
 class ApplyPreviewEntry(TypedDict):
@@ -53,12 +58,16 @@ def _parse_task_command_line(index: int, line: object) -> ApplyPreviewEntry:
     raw = str(line or "").strip()
     if not raw:
         _bad_apply_request(f"Command {index + 1} is empty.")
+    if len(raw) > _MAX_APPLY_LINE_LENGTH:
+        _bad_apply_request(f"Command {index + 1} exceeds the {_MAX_APPLY_LINE_LENGTH}-character limit.")
     try:
         argv = shlex.split(raw, posix=True)
     except ValueError as ex:
         _bad_apply_request(f"Command {index + 1} could not be parsed: {ex}")
     if not argv or argv[0] != "task":
         _bad_apply_request(f"Command {index + 1} must start with `task`.")
+    if any(part.lower().startswith("rc.") or part.startswith("--") for part in argv[1:]):
+        _bad_apply_request(f"Command {index + 1} contains a disallowed Taskwarrior option.")
 
     kind = ""
     if len(argv) >= 3 and argv[1] == "add":
@@ -72,6 +81,9 @@ def _parse_task_command_line(index: int, line: object) -> ApplyPreviewEntry:
             f"Command {index + 1} must be one of: `task add ...`, `task <id> modify ...`, `task <id> done`, `task <id> delete`."
         )
 
+    if kind in {"done", "delete", "modify"} and not _TASK_ID_RE.fullmatch(argv[1]):
+        _bad_apply_request(f"Command {index + 1} must target a task UUID or numeric ID.")
+
     return {
         "index": index,
         "kind": kind,
@@ -81,6 +93,8 @@ def _parse_task_command_line(index: int, line: object) -> ApplyPreviewEntry:
 
 
 def preview_apply_commands(lines: Collection[object]) -> list[ApplyPreviewEntry]:
+    if len(lines) > _MAX_APPLY_COMMANDS:
+        _bad_apply_request(f"At most {_MAX_APPLY_COMMANDS} commands may be applied at once.")
     return [_parse_task_command_line(idx, line) for idx, line in enumerate(lines)]
 
 

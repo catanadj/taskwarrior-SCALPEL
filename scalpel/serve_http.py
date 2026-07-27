@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import hmac
 import json
 import re
@@ -269,11 +270,19 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                 self._send_json(400, {"ok": False, "error": "Invalid JSON body."})
                 return
             if path == "/apply":
+                idempotency_key = str(self.headers.get("Idempotency-Key") or "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", idempotency_key):
+                    self._send_json(400, {"ok": False, "error": "A valid Idempotency-Key header is required."})
+                    return
                 handle_apply_post(
                     body=body,
                     execute_apply=context.execute_apply,
                     send_json=self._send_json,
                     obs_inc=context.obs_inc,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=hashlib.sha256(raw).hexdigest(),
+                    receipt_cache=context.state.apply_receipts,
+                    receipt_lock=context.state_lock,
                 )
                 return
             handle_client_state_post(

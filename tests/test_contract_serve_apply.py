@@ -13,6 +13,21 @@ class TestServeApplyContract(unittest.TestCase):
             serve_apply.preview_apply_commands(["echo nope"])
         self.assertIn("must start with `task`", str(ctx.exception))
 
+    def test_preview_rejects_config_overrides_and_broad_targets(self) -> None:
+        for line, expected in (
+            ("task rc.data.location=/tmp/other done", "disallowed Taskwarrior option"),
+            ("task status:pending done", "UUID or numeric ID"),
+        ):
+            with self.subTest(line=line):
+                with self.assertRaises(SystemExit) as ctx:
+                    serve_apply.preview_apply_commands([line])
+                self.assertIn(expected, str(ctx.exception))
+
+    def test_preview_rejects_unbounded_command_batches(self) -> None:
+        with self.assertRaises(SystemExit) as ctx:
+            serve_apply.preview_apply_commands(["task 12345678 done"] * 257)
+        self.assertIn("At most 256", str(ctx.exception))
+
     def test_execute_adds_confirmation_override_and_succeeds(self) -> None:
         seen: list[list[str]] = []
 

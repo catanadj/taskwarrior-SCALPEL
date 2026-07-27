@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, TypedDict
@@ -41,6 +41,7 @@ class ServeConfig:
 class ServeState:
     payload: Payload
     client_state: dict[str, Any]
+    apply_receipts: dict[str, tuple[str, ApplyExecutionResult]] = field(default_factory=dict)
 
 
 RenderOnceFn = Callable[[argparse.Namespace, str], Payload]
