@@ -159,10 +159,15 @@ class TestServeEndToEndContract(unittest.TestCase):
                     html = resp.read().decode("utf-8", errors="replace")
                     self.assertEqual(resp.status, 200)
                     self.assertIn("Set-Cookie", str(resp.headers))
+                    self.assertIn("SameSite=Strict", str(resp.headers))
+                    self.assertEqual(resp.headers.get("X-Content-Type-Options"), "nosniff")
+                    self.assertEqual(resp.headers.get("X-Frame-Options"), "DENY")
+                    self.assertEqual(resp.headers.get("Referrer-Policy"), "no-referrer")
                     self.assertIn("__scalpel_kvGet", html)
                     self.assertIn("/client-state", html)
                     self.assertIn("navigator.sendBeacon", html)
                     self.assertIn("pagehide", html)
+                    self.assertIn("history.replaceState", html)
 
                 with _request_json(opener, harness.base_url + "/payload") as resp:
                     payload = json.loads(resp.read().decode("utf-8"))
@@ -222,6 +227,45 @@ class TestServeEndToEndContract(unittest.TestCase):
                 self.assertEqual(state_again["state"]["scalpel.viewwin.global"]["futureDays"], 9)
             finally:
                 harness2.stop()
+
+    def test_live_server_rejects_cross_origin_and_unbounded_json_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            opener = build_opener(HTTPCookieProcessor(CookieJar()))
+            harness = _ServeHarness(Path(td), token="abc123").start()
+            try:
+                with opener.open(harness.base_url + "/?token=abc123", timeout=5):
+                    pass
+
+                with self.assertRaises(HTTPError) as ctx:
+                    _request_json(
+                        opener,
+                        harness.base_url + "/client-state",
+                        method="POST",
+                        body={"values": {"safe": True}},
+                        headers={"Origin": "https://attacker.invalid"},
+                    )
+                self.assertEqual(ctx.exception.code, 403)
+
+                with self.assertRaises(HTTPError) as ctx:
+                    _request_json(
+                        opener,
+                        harness.base_url + "/client-state",
+                        method="POST",
+                        body={"values": {"safe": True}},
+                        headers={"Content-Type": "text/plain"},
+                    )
+                self.assertEqual(ctx.exception.code, 415)
+
+                with self.assertRaises(HTTPError) as ctx:
+                    _request_json(
+                        opener,
+                        harness.base_url + "/client-state",
+                        method="POST",
+                        body={"values": {"large": "x" * (1024 * 1024)}},
+                    )
+                self.assertEqual(ctx.exception.code, 413)
+            finally:
+                harness.stop()
 
     def test_apply_endpoint_executes_selected_commands(self) -> None:
         with tempfile.TemporaryDirectory() as td:

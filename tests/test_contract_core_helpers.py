@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import tempfile
@@ -43,6 +44,16 @@ class ServeHelperContractTests(unittest.TestCase):
         self.assertFalse(serve._is_loopback_host("example.com"))
         self.assertEqual(serve._first_query_value("/task?uuid=abc%20123", "uuid"), "abc 123")
 
+    def test_loopback_serve_config_generates_a_token(self) -> None:
+        args = argparse.Namespace(host="127.0.0.1", port=0, serve_token="", allow_remote=False)
+        generated = serve._build_serve_config(args, "build/schedule.html")
+        explicit = serve._build_serve_config(
+            argparse.Namespace(host="127.0.0.1", port=0, serve_token="chosen-token", allow_remote=False),
+            "build/schedule.html",
+        )
+        self.assertGreaterEqual(len(generated.required_token), 32)
+        self.assertEqual(explicit.required_token, "chosen-token")
+
     def test_payload_timestamp_and_script_injection_fallbacks(self) -> None:
         self.assertEqual(serve._payload_generated_at({"generated_at": "now"}), "now")
         self.assertEqual(serve._payload_generated_at({"meta": {"generated_at": "then"}}), "then")
@@ -50,6 +61,7 @@ class ServeHelperContractTests(unittest.TestCase):
         escaped = serve._escape_script_json({"value": "</script>"})
         self.assertNotIn("</script>", escaped)
         self.assertIn("__scalpel_serverKvStore", serve._inject_serve_bootstrap("<body></body>", {}))
+        self.assertIn("history.replaceState", serve._inject_serve_bootstrap("<body></body>", {}))
         self.assertTrue(serve._inject_serve_bootstrap("plain", {}).endswith("plain"))
 
     def test_client_state_round_trip_and_invalid_inputs(self) -> None:

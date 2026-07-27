@@ -4,6 +4,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import secrets
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlsplit
@@ -138,10 +139,13 @@ def build_serve_config(args: argparse.Namespace, out_path: str) -> ServeConfig:
     if not is_loopback_host(host) and not bool(getattr(args, "allow_remote", False)):
         raise SystemExit("Refusing non-loopback --host without --allow-remote.")
 
-    required_token_raw = str(getattr(args, "serve_token", "") or "").strip()
-    required_token = required_token_raw or None
-    if not is_loopback_host(host) and required_token is None:
+    required_token = str(getattr(args, "serve_token", "") or "").strip()
+    if not is_loopback_host(host) and not required_token:
         raise SystemExit("Remote --serve requires --serve-token (or SCALPEL_SERVE_TOKEN).")
+    if not required_token:
+        # A live server can apply Taskwarrior changes.  Even loopback instances
+        # need a secret so an unrelated web page cannot issue write requests.
+        required_token = secrets.token_urlsafe(32)
 
     out_file = Path(out_path)
     return ServeConfig(

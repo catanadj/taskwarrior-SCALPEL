@@ -32,7 +32,7 @@ class TaskExportLookupResult(TypedDict):
 class ServeConfig:
     host: str
     port: int
-    required_token: str | None
+    required_token: str
     out_file: Path
     route_file: str
 

@@ -16,6 +16,13 @@ def _serve_bootstrap_script(client_state: dict[str, Any]) -> str:
         '  "use strict";\n'
         "  const g = (typeof globalThis !== 'undefined') ? globalThis : window;\n"
         "  if (!g) return;\n"
+        "  try {\n"
+        "    const url = new URL(window.location.href);\n"
+        "    if (url.searchParams.has('token')) {\n"
+        "      url.searchParams.delete('token');\n"
+        "      window.history.replaceState(null, '', url.pathname + url.search + url.hash);\n"
+        "    }\n"
+        "  } catch (_) {}\n"
         f"  const boot = {boot_json};\n"
         "  const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);\n"
         "  const store = (g.__scalpel_serverKvStore && typeof g.__scalpel_serverKvStore === 'object') ? g.__scalpel_serverKvStore : Object.assign({}, boot);\n"

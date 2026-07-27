@@ -114,7 +114,7 @@ def serve(
     ) -> ApplyExecutionResult:
         return execute_apply_commands(lines, selected=selected)
 
-    _obs_log("serve.started", host=cfg.host, port=cfg.port, auth_required=cfg.required_token is not None)
+    _obs_log("serve.started", host=cfg.host, port=cfg.port, auth_required=True)
 
     handler = make_handler(
         HttpContext(
@@ -136,12 +136,9 @@ def serve(
 
     server = server_factory((cfg.host, cfg.port), handler)
     actual_host, actual_port = server.server_address[:2]
-    if cfg.required_token is None:
-        serve_url = _format_http_url(str(actual_host), int(actual_port), "/")
-    else:
-        serve_url = _format_http_url(
-            str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}"
-        )
+    serve_url = _format_http_url(
+        str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}"
+    )
     print(serve_url)
 
     if not getattr(args, "no_open", False) and browser_open is not None:

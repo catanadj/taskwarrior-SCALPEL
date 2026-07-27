@@ -120,7 +120,7 @@ def _build_parser(default_out: str) -> argparse.ArgumentParser:
     ap.add_argument(
         "--serve-token",
         default=os.getenv("SCALPEL_SERVE_TOKEN", ""),
-        help="Bearer/token for serve endpoints (required when --allow-remote is used).",
+        help="Bearer/token for serve endpoints (generated automatically for local live mode; required for --allow-remote).",
     )
     ap.add_argument("--no-open", action="store_true", help="Do not open the generated HTML in a browser")
     return ap

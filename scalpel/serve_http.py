@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import re
 import sys
@@ -21,6 +22,8 @@ from .serve_endpoints import (
 )
 from .serve_support import client_state_snapshot, first_query_value, obs_log
 from .serve_types import ExecuteApplyFn, RenderOnceFn, ServeConfig, ServeState, TaskLookupFn, TimewExportFn
+
+_MAX_JSON_BODY_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -68,12 +71,19 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
             return ""
 
         def _is_authorized(self) -> bool:
-            if config.required_token is None:
-                return True
             return any(
-                token and token == config.required_token
+                token and hmac.compare_digest(token, config.required_token)
                 for token in (self._query_token(), self._header_token(), self._cookie_token())
             )
+
+        def _is_same_origin_write(self) -> bool:
+            """Allow command-line clients but reject cross-site browser writes."""
+            origin = str(self.headers.get("Origin") or "").strip()
+            if not origin:
+                return True
+            origin_parts = urlsplit(origin)
+            host = str(self.headers.get("Host") or "").strip().lower()
+            return bool(origin_parts.netloc and host and origin_parts.netloc.lower() == host)
 
         def _deny_unauthorized(self, path: str) -> None:
             context.obs_inc("auth_failures_total", path=path)
@@ -90,10 +100,14 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
-            if set_auth_cookie and config.required_token is not None:
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+            if set_auth_cookie:
                 self.send_header(
                     "Set-Cookie",
-                    f"scalpel_token={config.required_token}; Path=/; HttpOnly; SameSite=Lax",
+                    f"scalpel_token={config.required_token}; Path=/; HttpOnly; SameSite=Strict",
                 )
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -104,10 +118,14 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
             self.send_response(code)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
-            if set_auth_cookie and config.required_token is not None:
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+            if set_auth_cookie:
                 self.send_header(
                     "Set-Cookie",
-                    f"scalpel_token={config.required_token}; Path=/; HttpOnly; SameSite=Lax",
+                    f"scalpel_token={config.required_token}; Path=/; HttpOnly; SameSite=Strict",
                 )
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -134,7 +152,7 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                     self._send_json(500, {"ok": False, "error": f"Failed reading HTML: {ex}"})
                     return
                 html = context.inject_bootstrap(html, client_state)
-                set_cookie = config.required_token is not None and self._query_token() == config.required_token
+                set_cookie = bool(self._query_token()) and hmac.compare_digest(self._query_token(), config.required_token)
                 self._send_html(200, html, set_auth_cookie=set_cookie)
                 return
 
@@ -184,18 +202,21 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                 return
 
             if path == "/metrics":
-                if config.required_token is not None and not self._is_authorized():
+                if not self._is_authorized():
                     self._deny_unauthorized(path)
                     return
                 self._send_json(200, {"ok": True, "metrics": context.obs_metrics()})
                 return
 
             if path == "/health":
+                if not self._is_authorized():
+                    self._deny_unauthorized(path)
+                    return
                 include_metrics = first_query_value(self.path, "metrics").lower() in {"1", "true", "yes", "on"}
                 response: dict[str, Any] = {"ok": True}
                 if include_metrics:
                     response.update(
-                        auth_required=config.required_token is not None,
+                        auth_required=True,
                         metrics=context.obs_metrics(),
                     )
                 self._send_json(200, response)
@@ -213,6 +234,10 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
             if not self._is_authorized():
                 self._deny_unauthorized(path)
                 return
+            if not self._is_same_origin_write():
+                context.obs_inc("cross_origin_write_denied_total", path=path)
+                self._send_json(403, {"ok": False, "error": "Cross-origin write requests are not allowed."})
+                return
             if path == "/refresh":
                 handle_refresh_endpoint(
                     args=context.args,
@@ -225,10 +250,18 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                     obs_inc=context.obs_inc,
                 )
                 return
+            content_type = str(self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+            if content_type != "application/json":
+                self._send_json(415, {"ok": False, "error": "Content-Type must be application/json."})
+                return
             try:
-                content_length = int(self.headers.get("Content-Length") or "0")
+                content_length = int(self.headers.get("Content-Length") or "")
             except (TypeError, ValueError):
-                content_length = 0
+                self._send_json(400, {"ok": False, "error": "Content-Length must be a valid integer."})
+                return
+            if content_length < 0 or content_length > _MAX_JSON_BODY_BYTES:
+                self._send_json(413, {"ok": False, "error": "JSON request body is too large."})
+                return
             try:
                 raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
                 body = json.loads(raw.decode("utf-8", errors="replace"))

@@ -89,7 +89,7 @@ Useful flags:
 - `--plan-overrides FILE.json`: apply local plan overrides before rendering
 - `--plan-result FILE.json`: apply planner/AI result before rendering
 
-Remote/LAN live mode requires explicit auth:
+Live mode always creates a per-process access token. The printed startup URL exchanges it for a same-site browser cookie and then removes it from browser history. Remote/LAN use additionally requires an explicit token and should only be used behind TLS (or through an SSH tunnel):
 
 ```bash
 scalpel --allow-remote --serve-token "$TOKEN" --host 0.0.0.0 --out build/scalpel.html
