@@ -46,6 +46,14 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('aria-pressed', OVERLAY_MARKUP)
         self.assertIn("b.setAttribute('aria-pressed'", notes)
 
+    def test_frontend_render_telemetry_is_bounded_and_opt_in(self) -> None:
+        init = read_render_asset("js/part07_init.js")
+        self.assertIn("__scalpelPerfSnapshot", init)
+        self.assertIn("__scalpelPerfReset", init)
+        self.assertIn("__scalpelPerfSamples.length > 30", init)
+        self.assertIn('kind: "full"', init)
+        self.assertIn('kind: "selection"', init)
+
     def test_event_detail_levels_follow_rendered_height(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

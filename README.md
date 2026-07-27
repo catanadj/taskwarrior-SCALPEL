@@ -198,6 +198,10 @@ Engineering:
 - `scalpel-ddmin-shrink`
 - `scalpel-bench`
 
+For browser render timing, open the generated calendar and inspect
+`__scalpelPerfSnapshot()` in DevTools. It reports the last 30 full or selection
+rerenders; call `__scalpelPerfReset()` before a focused measurement.
+
 ## Public Python API
 
 Use `scalpel.api` for the stable public API.

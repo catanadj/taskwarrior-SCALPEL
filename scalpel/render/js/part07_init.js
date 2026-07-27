@@ -1,6 +1,27 @@
 // Controls / rerender
   // -----------------------------
+  // Bounded browser timing telemetry for diagnosing large-calendar slowdowns.
+  const __scalpelPerfSamples = [];
+  const __scalpelPerfNow = () => {
+    try { if (globalThis.performance && typeof globalThis.performance.now === "function") return globalThis.performance.now(); } catch (_) {}
+    return Date.now();
+  };
+  const __scalpelPerfRecord = (sample) => {
+    try {
+      __scalpelPerfSamples.push({ ...sample, at: Date.now() });
+      if (__scalpelPerfSamples.length > 30) __scalpelPerfSamples.splice(0, __scalpelPerfSamples.length - 30);
+    } catch (_) {}
+  };
+  try {
+    globalThis.__scalpelPerfSnapshot = () => ({
+      samples: __scalpelPerfSamples.slice(),
+      last: __scalpelPerfSamples.length ? { ...__scalpelPerfSamples[__scalpelPerfSamples.length - 1] } : null,
+    });
+    globalThis.__scalpelPerfReset = () => { __scalpelPerfSamples.length = 0; };
+  } catch (_) {}
+
   function rerenderFull() {
+    const perfStart = __scalpelPerfNow();
     const { events, backlog, problems, allByDay } = classifyTasks(elQ.value);
     renderGoalsFromEvents(events, backlog);
     renderPaletteFromEvents(events);
@@ -26,15 +47,18 @@
     // keep now line fresh
     try { renderNowLine(); } catch (e) { console.error("NowLine render failed", e); }
     try { renderNextUp(); } catch (e) { console.error("NextUp render failed", e); }
+    __scalpelPerfRecord({ kind: "full", ms: Number((__scalpelPerfNow() - perfStart).toFixed(2)), tasks: (DATA.tasks || []).length, events: events.length, backlog: backlog.length });
   }
 
   function rerenderSelectionOnly() {
+    const perfStart = __scalpelPerfNow();
     try { if (typeof syncSelectionVisuals === "function") syncSelectionVisuals(); } catch (_) {}
     try { if (typeof syncExecutionVisuals === "function") syncExecutionVisuals(); } catch (_) {}
     updateSelectionMeta();
     try { renderExecutionSession(); } catch (_) {}
     try { updatePendingMeta(); } catch (_) {}
     try { if (lastDayVis) renderDayBalance(activeDayIndex, lastDayVis); } catch (_) {}
+    __scalpelPerfRecord({ kind: "selection", ms: Number((__scalpelPerfNow() - perfStart).toFixed(2)), selected: selected.size });
   }
 
   var RERENDER_INPUT_DEBOUNCE_MS = 110;
