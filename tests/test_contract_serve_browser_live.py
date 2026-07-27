@@ -497,6 +497,56 @@ async function main() {
 
   await evaluate(`
     (() => {
+      const origin = document.getElementById('btnRefresh');
+      if (origin) origin.focus();
+      const help = document.getElementById('btnHelp');
+      if (help) help.click();
+      return true;
+    })()
+  `);
+  await waitFor("accessible help dialog", () => evaluate(`
+    (() => {
+      const backdrop = document.getElementById('helpModal');
+      const dialog = backdrop && backdrop.querySelector('[role="dialog"]');
+      const active = document.activeElement;
+      return !!(
+        backdrop && backdrop.style.display === 'flex' &&
+        backdrop.getAttribute('aria-hidden') === 'false' &&
+        dialog && dialog.getAttribute('aria-modal') === 'true' &&
+        active && dialog.contains(active)
+      );
+    })()
+  `));
+  const focusContained = await evaluate(`
+    (() => {
+      const outside = document.getElementById('btnRefresh');
+      if (outside) outside.focus();
+      const backdrop = document.getElementById('helpModal');
+      return !!(backdrop && backdrop.contains(document.activeElement));
+    })()
+  `);
+  if (!focusContained) throw new Error('modal allowed focus to escape');
+  await evaluate(`document.getElementById('helpClose')?.click()`);
+  await waitFor("modal close and focus release", () => evaluate(`
+    (() => {
+      const backdrop = document.getElementById('helpModal');
+      return !!(backdrop && backdrop.style.display === 'none' && document.activeElement && !backdrop.contains(document.activeElement));
+    })()
+  `));
+
+  const taskKeyboard = await evaluate(`
+    (() => {
+      const task = document.querySelector('.evt[data-uuid]');
+      if (!task) return true;
+      task.focus();
+      task.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      return true;
+    })()
+  `);
+  if (!taskKeyboard) throw new Error('calendar task keyboard activation failed');
+
+  await evaluate(`
+    (() => {
       const more = document.getElementById('btnMoreActions');
       if (more) more.click();
       const btn = document.getElementById('btnNotes');

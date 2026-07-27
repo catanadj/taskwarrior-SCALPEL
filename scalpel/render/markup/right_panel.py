@@ -161,7 +161,7 @@ MARKUP = r"""<button class="commands-drawer-backdrop" id="commandsDrawerBackdrop
           <div class="space-10" aria-hidden="true"></div>
           <pre id="commands"></pre>
           <div class="space-10" aria-hidden="true"></div>
-          <div class="hint" id="status"></div>
+          <div class="hint" id="status" role="status" aria-live="polite" aria-atomic="true"></div>
         </div>
       </div>
     </div>

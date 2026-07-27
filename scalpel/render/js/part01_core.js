@@ -162,7 +162,11 @@ try { if (typeof globalThis !== "undefined" && !globalThis.__scalpel_phase) glob
 function showFatal(msg, err) {
     try {
       const s = document.getElementById("status");
-      if (s) s.textContent = msg + (err ? " " + String(err) : "");
+      if (s) {
+        s.textContent = msg + (err ? " " + String(err) : "");
+        s.classList.add("status-error");
+        s.setAttribute("role", "alert");
+      }
       console.error(msg, err);
     } catch (_) {}
   }
@@ -905,7 +909,8 @@ startYmd: ymdFromMs(cfg.view_start_ms),
       } else if (!open && backdrop.__scalpelFocusOrigin) {
         const origin = backdrop.__scalpelFocusOrigin;
         backdrop.__scalpelFocusOrigin = null;
-        if (origin.isConnected && typeof origin.focus === "function") setTimeout(() => origin.focus({ preventScroll: true }), 0);
+        backdrop.__scalpelLastFocusOrigin = origin;
+        if (origin.isConnected && typeof origin.focus === "function") origin.focus({ preventScroll: true });
       }
     };
     const syncAll = () => document.querySelectorAll(".modal-backdrop").forEach(syncBackdrop);
@@ -928,5 +933,15 @@ startYmd: ymdFromMs(cfg.view_start_ms),
     document.addEventListener("focusin", (ev) => {
       const backdrop = visibleModal();
       if (backdrop && !backdrop.contains(ev.target)) focusInside(backdrop);
+    }, true);
+    document.addEventListener("click", (ev) => {
+      const backdrop = ev.target && ev.target.closest ? ev.target.closest(".modal-backdrop") : null;
+      if (!backdrop) return;
+      setTimeout(() => {
+        if (modalVisible(backdrop)) return;
+        const origin = backdrop.__scalpelLastFocusOrigin;
+        backdrop.__scalpelLastFocusOrigin = null;
+        if (origin && origin.isConnected && typeof origin.focus === "function") origin.focus({ preventScroll: true });
+      }, 0);
     }, true);
   } catch (_) {}

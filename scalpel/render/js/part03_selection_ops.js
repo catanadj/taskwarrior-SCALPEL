@@ -988,6 +988,7 @@
 
   function buildCalendarSkeleton() {
     elCal.innerHTML = "";
+    elCal.setAttribute("aria-busy", "true");
 
     const timeCol = document.createElement("div");
     timeCol.className = "time-col";
@@ -1176,6 +1177,13 @@
 
     daysCol.appendChild(header);
     daysCol.appendChild(body);
+
+    const empty = document.createElement("div");
+    empty.className = "calendar-empty empty-state";
+    empty.id = "calendarEmpty";
+    empty.setAttribute("role", "status");
+    empty.hidden = true;
+    daysCol.appendChild(empty);
 
     elCal.appendChild(timeCol);
     elCal.appendChild(daysCol);

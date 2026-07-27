@@ -63,6 +63,23 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn(".modal button", modal_css)
         self.assertIn("overflow-x: hidden", modal_css)
 
+    def test_calendar_loading_empty_and_error_states_are_communicated(self) -> None:
+        calendar_markup = read_render_asset("markup/calendar_panel.py")
+        right_panel = read_render_asset("markup/right_panel.py")
+        selection = read_render_asset("js/part03_selection_ops.js")
+        rendering = read_render_asset("js/part04_rendering.js")
+        core = read_render_asset("js/part01_core.js")
+        css = read_render_asset("css/part05_calendar.css")
+        self.assertIn('aria-busy="true"', calendar_markup)
+        self.assertIn('id="calendarLoading"', calendar_markup)
+        self.assertIn('role="status"', right_panel)
+        self.assertIn('aria-atomic="true"', right_panel)
+        self.assertIn('id = "calendarEmpty"', selection)
+        self.assertIn('No tasks match', rendering)
+        self.assertIn('No tasks yet. Add a task to start planning.', rendering)
+        self.assertIn('status-error', core)
+        self.assertIn('.calendar-empty', css)
+
     def test_event_detail_levels_follow_rendered_height(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
         calendar_css = read_render_asset("css/part05_calendar.css")

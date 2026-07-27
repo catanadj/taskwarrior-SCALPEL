@@ -17,6 +17,8 @@ MARKUP = r"""<section class="card calendar">
       </div>
     </div>
     <div class="card-b" style="padding:0">
-      <div class="cal-wrap" id="calendar"></div>
+      <div class="cal-wrap" id="calendar" aria-busy="true">
+        <div class="calendar-loading" id="calendarLoading" role="status" aria-live="polite">Loading calendar…</div>
+      </div>
     </div>
   </section>"""

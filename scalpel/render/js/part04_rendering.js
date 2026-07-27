@@ -1771,6 +1771,17 @@
   }
 
   function renderCalendar(events, allByDay) {
+    const calendarRoot = document.getElementById("calendar");
+    if (calendarRoot) calendarRoot.setAttribute("aria-busy", "false");
+    const emptyState = document.getElementById("calendarEmpty");
+    if (emptyState) {
+      const query = String((elQ && elQ.value) || "").trim();
+      const taskCount = Array.isArray(DATA && DATA.tasks) ? DATA.tasks.length : 0;
+      emptyState.textContent = query
+        ? `No tasks match “${query}”.`
+        : (taskCount ? "No tasks fall within this calendar window." : "No tasks yet. Add a task to start planning.");
+      emptyState.hidden = Array.isArray(events) && events.length > 0;
+    }
     const byDay = Array.from({length: DAYS}, () => []);
     const byDayAll = Array.from({length: DAYS}, () => []);
     const eventByUuid = new Map();

@@ -1265,6 +1265,23 @@
     background: rgba(var(--accent-rgb),0.06);
     color: var(--text);
   }
+  .calendar-empty{
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    top: 24%;
+    transform: translateX(-50%);
+    width: min(360px, calc(100% - 32px));
+    text-align: center;
+    pointer-events: none;
+  }
+  .calendar-loading{
+    position: absolute;
+    inset: 20% 16px auto;
+    z-index: 8;
+    text-align: center;
+    color: var(--muted);
+  }
 
   /* Commands */
   pre {

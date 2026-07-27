@@ -556,6 +556,11 @@
         }catch(_){ }
 
         elBtnRefresh.disabled = true;
+        if (elStatus) {
+          elStatus.classList.remove("status-error");
+          elStatus.classList.add("status-loading");
+          elStatus.setAttribute("role", "status");
+        }
         elStatus.textContent = "Refreshing data...";
         try{
           const res = await fetch("/refresh", {
@@ -568,13 +573,18 @@
           if (!res.ok || !body || body.ok !== true) {
             const reason = (body && body.error) ? String(body.error) : `HTTP ${res.status}`;
             elStatus.textContent = `Refresh failed: ${reason}`;
+            elStatus.classList.add("status-error");
+            elStatus.setAttribute("role", "alert");
             return;
           }
           elStatus.textContent = "Data refreshed. Reloading...";
           setTimeout(() => location.reload(), 40);
         } catch (e) {
           elStatus.textContent = `Refresh failed: ${String((e && e.message) || e || "network error")}`;
+          elStatus.classList.add("status-error");
+          elStatus.setAttribute("role", "alert");
         } finally {
+          if (elStatus) elStatus.classList.remove("status-loading");
           elBtnRefresh.disabled = false;
         }
       });
