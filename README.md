@@ -232,7 +232,7 @@ Nautical preview task expansion is enabled by default.
 - Disable per run: `scalpel --no-nautical-hooks`
 - Control default: `SCALPEL_ENABLE_NAUTICAL_HOOKS=0|1`
 
-SCALPEL checks for `nautical_core` under `~/.task/nautical_core/` and `~/.task/hooks/nautical_core/`, then falls back to legacy artefacts and normal Python imports.
+SCALPEL queries Nautical through its [versioned JSON command API](https://catanadj.github.io/taskwarrior-nautical/tools/query-api/); install the `nautical` executable and keep it on `PATH` (or at `~/.task/nautical`).
 
 ## Development checks
 

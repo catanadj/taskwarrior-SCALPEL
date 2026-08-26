@@ -74,7 +74,6 @@ class TestPublicValidateApiContract(unittest.TestCase):
     def test_build_payload_output_validates(self) -> None:
         with (
             patch("scalpel.payload.run_task_export", return_value=[]),
-            patch("scalpel.payload._load_nautical_core", return_value=None),
         ):
             payload = build_payload(
                 filter_str="status:pending",
@@ -106,7 +105,7 @@ class TestPublicValidateApiContract(unittest.TestCase):
         ]
         with (
             patch("scalpel.payload.run_task_export", return_value=raw_tasks),
-            patch("scalpel.payload._load_nautical_core", return_value=None),
+            patch("scalpel.payload._query_nautical_occurrences", return_value={}),
         ):
             payload = build_payload(
                 filter_str="status:pending",

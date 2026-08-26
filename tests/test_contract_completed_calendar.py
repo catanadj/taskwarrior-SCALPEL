@@ -41,7 +41,7 @@ class TestCompletedCalendarContract(unittest.TestCase):
 
         with (
             patch("scalpel.payload.run_task_export", side_effect=fake_export),
-            patch("scalpel.payload._load_nautical_core", return_value=None),
+            patch("scalpel.payload._query_nautical_occurrences", return_value={}),
         ):
             payload = build_payload(
                 filter_str="status:pending",

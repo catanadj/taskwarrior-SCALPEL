@@ -21,21 +21,6 @@ class PayloadHelperContractTests(unittest.TestCase):
         self.assertTrue(payload._raw_tasks_may_need_nautical([{"anchor": " daily "}]))
         self.assertFalse(payload._raw_tasks_may_need_nautical([{}, {"anchor": " "}]))
 
-    def test_time_helpers_handle_valid_and_invalid_values(self) -> None:
-        self.assertEqual(payload._parse_hhmm_str("09:30"), (9, 30))
-        self.assertIsNone(payload._parse_hhmm_str("24:00"))
-        self.assertIsNone(payload._parse_hhmm_str("bad"))
-        self.assertEqual(payload._local_hhmm_from_ms(0, dt.timezone.utc), (0, 0))
-        self.assertIsNone(payload._local_hhmm_from_ms(None, dt.timezone.utc))
-
-        hour = dt.timedelta(hours=1)
-        self.assertEqual(
-            payload._cp_next_due_ms(base_end_ms=0, base_due_ms=None, td=hour, tzinfo=dt.timezone.utc),
-            3_600_000,
-        )
-        self.assertIsNone(payload._cp_next_due_ms(base_end_ms=None, base_due_ms=None, td=hour, tzinfo=dt.timezone.utc))
-
-
 class ServeHelperContractTests(unittest.TestCase):
     def test_url_host_and_query_helpers(self) -> None:
         self.assertEqual(serve._format_http_url("0.0.0.0", 8080, "status"), "http://127.0.0.1:8080/status")
