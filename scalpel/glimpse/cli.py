@@ -6,6 +6,8 @@ import json
 import os
 import shutil
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from pathlib import Path
 
 from ..api import load_payload_from_json
@@ -32,6 +34,23 @@ def _output_width(requested: int) -> int:
     return shutil.get_terminal_size(fallback=(80, 24)).columns
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def _version() -> str:
+    try:
+        return package_version("taskwarrior-scalpel")
+    except PackageNotFoundError:
+        return "source"
+
+
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
     if value is None or value.strip().lower() == "today":
         return fallback
@@ -46,16 +65,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="scalpel-glimpse (agenda)",
+        version=f"scalpel-glimpse {_version()}",
     )
     parser.add_argument("--payload", type=Path, help="Read an existing SCALPEL payload JSON")
     parser.add_argument("--filter", default="status:pending", help="Taskwarrior filter (default: status:pending)")
     parser.add_argument("--start", help="View start date YYYY-MM-DD or today (default: today)")
-    parser.add_argument("--days", type=int, default=7, help="Number of days to show (default: 7)")
+    parser.add_argument("--days", type=_positive_int, default=7, help="Number of days to show (default: 7)")
     parser.add_argument("--workhours", default="06:00-23:00", help="Work hours, for example 06:00-23:00")
-    parser.add_argument("--default-duration", type=int, default=10)
-    parser.add_argument("--max-infer-duration", type=int, default=480)
-    parser.add_argument("--snap", type=int, default=10)
+    parser.add_argument("--default-duration", type=_positive_int, default=10)
+    parser.add_argument("--max-infer-duration", type=_positive_int, default=480)
+    parser.add_argument("--snap", type=_positive_int, default=10)
     parser.add_argument("--px-per-min", type=float, default=2.0)
     parser.add_argument("--tz", default="local", help="Bucketing timezone")
     parser.add_argument("--display-tz", default="local", help="Display timezone")

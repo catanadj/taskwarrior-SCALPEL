@@ -81,6 +81,12 @@ class GlimpseCliContractTests(unittest.TestCase):
         args = build_parser().parse_args(["--plain"])
         self.assertTrue(args.no_color)
 
+    def test_numeric_planning_options_reject_non_positive_values(self) -> None:
+        parser = build_parser()
+        for option in ("--days", "--default-duration", "--max-infer-duration", "--snap"):
+            with self.assertRaises(SystemExit):
+                parser.parse_args([option, "0"])
+
     def test_default_width_uses_terminal_columns(self) -> None:
         with patch("scalpel.glimpse.cli.shutil.get_terminal_size", return_value=os.terminal_size((120, 24))):
             output = io.StringIO()
