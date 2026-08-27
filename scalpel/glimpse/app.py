@@ -101,6 +101,8 @@ def _detail_annotations(snapshot: GlimpseSnapshot, task_index: int) -> tuple[str
 
 def _read_search_query(window: curses.window, height: int, width: int) -> str:
     """Read a search query while guaranteeing terminal echo restoration."""
+    if height < 1 or width <= 9:
+        return ""
     curses.echo()
     try:
         window.addstr(height - 1, 0, "Search: ")
@@ -181,7 +183,14 @@ def run_interactive(
                 window.addnstr(height - 1, 0, body, max(0, width - 1), curses.A_REVERSE)
             except curses.error:
                 pass
-            key = window.get_wch()
+            try:
+                key = window.get_wch()
+            except curses.error:
+                # A resize can invalidate the pending read. Redraw using the
+                # new dimensions on the next loop iteration.
+                continue
+            if key in {curses.KEY_RESIZE, "KEY_RESIZE"}:
+                continue
             if isinstance(key, str):
                 if key == "/":
                     query = _read_search_query(window, height, width)

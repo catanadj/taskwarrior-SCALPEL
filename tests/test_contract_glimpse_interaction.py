@@ -51,6 +51,16 @@ class GlimpseInteractionContractTests(unittest.TestCase):
         echo.assert_called_once()
         noecho.assert_called_once()
 
+    def test_search_input_is_safe_on_narrow_terminals(self) -> None:
+        with patch("scalpel.glimpse.app.curses.echo") as echo, patch("scalpel.glimpse.app.curses.noecho") as noecho:
+            self.assertEqual(_read_search_query(object(), 1, 9), "")  # type: ignore[arg-type]
+        echo.assert_not_called()
+        noecho.assert_not_called()
+
+    def test_resize_key_does_not_change_navigation_state(self) -> None:
+        state = GlimpseState(day_offset=2, selected=3)
+        self.assertEqual(update_state(state, "KEY_RESIZE"), state)
+
     def test_interrupt_is_left_to_curses_wrapper_for_cleanup(self) -> None:
         snapshot = GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", ())
         with patch("scalpel.glimpse.app.curses.wrapper", side_effect=KeyboardInterrupt):
