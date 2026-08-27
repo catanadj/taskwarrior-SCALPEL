@@ -15,4 +15,12 @@ def search_tasks(tasks: tuple[GlimpseTask, ...], query: str) -> tuple[GlimpseTas
 
 
 def search_snapshot(snapshot: GlimpseSnapshot, query: str) -> GlimpseSnapshot:
-    return GlimpseSnapshot(snapshot.start_date, snapshot.days, snapshot.timezone_name, search_tasks(snapshot.tasks, query))
+    return GlimpseSnapshot(
+        snapshot.start_date,
+        snapshot.days,
+        snapshot.timezone_name,
+        search_tasks(snapshot.tasks, query),
+        snapshot.work_start_min,
+        snapshot.work_end_min,
+        snapshot.bands,
+    )

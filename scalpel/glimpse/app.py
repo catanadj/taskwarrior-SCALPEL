@@ -5,6 +5,7 @@ import datetime as dt
 from dataclasses import dataclass, replace
 from typing import Callable, Literal
 
+from ..util.tz import resolve_tz
 from .details import task_details
 from .model import GlimpseSnapshot
 from .render import render_agenda, render_day, render_week
@@ -60,10 +61,28 @@ def _content(snapshot: GlimpseSnapshot, state: GlimpseState, width: int) -> str:
     snapshot = search_snapshot(snapshot, state.query)
     day = snapshot.start_date + dt.timedelta(days=state.day_offset)
     if state.view == "day":
-        return render_day(snapshot, day=day, width=width, color=False)
+        return render_day(snapshot, day=day, width=width, color=False, highlight_query=state.query)
     if state.view == "week":
-        return render_week(snapshot, week_start=day, width=width, color=False)
-    return render_agenda(snapshot, width=width, color=False)
+        return render_week(snapshot, week_start=day, width=width, color=False, highlight_query=state.query)
+    return render_agenda(snapshot, width=width, color=False, highlight_query=state.query)
+
+
+def _detail_annotations(snapshot: GlimpseSnapshot, task_index: int) -> tuple[str, ...]:
+    task = snapshot.tasks[task_index]
+    start = task.start_ms
+    end = task.end_ms or (start + (task.duration_min or 0) * 60_000 if start is not None else None)
+    conflict = any(
+        other.uuid != task.uuid and other.start_ms is not None and other.end_ms is not None and start is not None and end is not None
+        and start < other.end_ms and other.start_ms < end
+        for other in snapshot.tasks
+    )
+    notes = ["Overlaps another task." if conflict else "No overlap detected."]
+    if start is not None:
+        day_start = int(dt.datetime.fromtimestamp(start / 1000, tz=resolve_tz(snapshot.timezone_name)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+        minute = int((start - day_start) / 60_000)
+        if minute < snapshot.work_start_min or minute >= snapshot.work_end_min:
+            notes.append("Starts outside configured work hours.")
+    return tuple(notes)
 
 
 def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnapshot] | None = None) -> None:
@@ -88,7 +107,9 @@ def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnap
                 filtered = search_snapshot(snapshot, state.query)
                 if filtered.tasks:
                     detail_index = min(state.selected, len(filtered.tasks) - 1)
-                    content = task_details(filtered.tasks[detail_index], width=max(32, width - 4)).splitlines()
+                    selected_task = filtered.tasks[detail_index]
+                    original_index = next(index for index, item in enumerate(snapshot.tasks) if item.uuid == selected_task.uuid)
+                    content = task_details(selected_task, width=max(32, width - 4), timezone_name=snapshot.timezone_name, annotations=_detail_annotations(snapshot, original_index)).splitlines()
                 else:
                     content = ["No matching task selected."]
             elif state.help_visible:

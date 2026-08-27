@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+import datetime as dt
+from collections.abc import Sequence
+
 from .model import GlimpseTask
 
 
-def task_details(task: GlimpseTask, *, width: int = 72) -> str:
+def _format_time(timestamp_ms: int | None, timezone_name: str) -> str:
+    if timestamp_ms is None:
+        return "—"
+    try:
+        from ..util.tz import resolve_tz
+        return dt.datetime.fromtimestamp(timestamp_ms / 1000, tz=resolve_tz(timezone_name)).strftime("%Y-%m-%d %H:%M %Z")
+    except (OverflowError, OSError, ValueError):
+        return "invalid time"
+
+
+def task_details(task: GlimpseTask, *, width: int = 72, timezone_name: str = "UTC", annotations: Sequence[str] = ()) -> str:
     """Return a readable, width-bounded detail panel for one task."""
     width = max(32, int(width))
     lines = [
@@ -14,9 +27,10 @@ def task_details(task: GlimpseTask, *, width: int = 72) -> str:
         f"Project      {task.project or '—'}",
         f"Tags         {', '.join(task.tags) or '—'}",
         f"UUID         {task.uuid}",
-        f"Scheduled    {task.scheduled_ms if task.scheduled_ms is not None else '—'}",
-        f"Due          {task.due_ms if task.due_ms is not None else '—'}",
+        f"Scheduled    {_format_time(task.scheduled_ms, timezone_name)}",
+        f"Due          {_format_time(task.due_ms, timezone_name)}",
         f"Duration     {task.duration_min if task.duration_min is not None else '—'} min",
         f"Nautical     {'preview' if task.nautical_preview else '—'}",
     ]
+    lines.extend(f"Note         {annotation}" for annotation in annotations)
     return "\n".join(line if len(line) <= width else line[: width - 1] + "…" for line in lines)

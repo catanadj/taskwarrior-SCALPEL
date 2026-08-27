@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 from collections import defaultdict
 from typing import Sequence
 
@@ -9,6 +10,12 @@ from .model import GlimpseBand, GlimpseSnapshot, GlimpseTask
 from .style import AgendaStyle, style_for
 
 
+def _highlight(value: str, query: str, *, ascii_only: bool = False) -> str:
+    needle = query.strip()
+    if not needle:
+        return value
+    left, right = ("[", "]") if ascii_only else ("⟦", "⟧")
+    return re.sub(re.escape(needle), lambda match: f"{left}{match.group(0)}{right}", value, flags=re.IGNORECASE)
 def _truncate(value: str, width: int) -> str:
     if width <= 0:
         return ""
@@ -96,14 +103,14 @@ def _marker(task: GlimpseTask, *, overlap: bool, style: AgendaStyle, ascii_only:
     return f"{style.magenta}{regular_glyph}{style.reset}"
 
 
-def _row(task: GlimpseTask, *, overlap: bool, timezone: dt.tzinfo, width: int, style: AgendaStyle, ascii_only: bool = False) -> str:
+def _row(task: GlimpseTask, *, overlap: bool, timezone: dt.tzinfo, width: int, style: AgendaStyle, ascii_only: bool = False, highlight_query: str = "") -> str:
     time = _local_time(_task_start(task), timezone)
     marker = _marker(task, overlap=overlap, style=style, ascii_only=ascii_only)
     duration = _format_duration(task.duration_min)
     project = f"  {task.project}" if task.project else ""
     suffix = f"{duration:>7}{project}"
     description_width = max(8, width - 14 - len(suffix))
-    description = _truncate(task.description or "(untitled)", description_width)
+    description = _truncate(_highlight(task.description or "(untitled)", highlight_query, ascii_only=ascii_only), description_width)
     return f"  {time} {marker} {description:<{description_width}}{suffix}".rstrip()
 
 
@@ -114,6 +121,7 @@ def render_agenda(
     color: bool = False,
     now_ms: int | None = None,
     ascii_only: bool = False,
+    highlight_query: str = "",
 ) -> str:
     """Render a deterministic, width-bounded read-only agenda."""
     width = max(40, int(width))
@@ -133,7 +141,7 @@ def render_agenda(
             lines.append(f"  {style.dim}No tasks scheduled.{style.reset}")
         else:
             for task in tasks:
-                lines.append(_row(task, overlap=task.uuid in overlap_ids, timezone=timezone, width=width, style=style, ascii_only=ascii_only))
+                lines.append(_row(task, overlap=task.uuid in overlap_ids, timezone=timezone, width=width, style=style, ascii_only=ascii_only, highlight_query=highlight_query))
                 if isinstance(task.duration_min, int) and task.duration_min > 0:
                     total_minutes += task.duration_min
                 conflicts += int(task.uuid in overlap_ids)
@@ -154,6 +162,7 @@ def render_day(
     color: bool = False,
     now_ms: int | None = None,
     ascii_only: bool = False,
+    highlight_query: str = "",
 ) -> str:
     """Render one day as a compact, hourly terminal timeline."""
     width = max(40, int(width))
@@ -202,7 +211,7 @@ def render_day(
             lane_prefix = f"L{lane + 1} " if width >= 72 else ""
             outside = start is not None and (start < day_start + snapshot.work_start_min * 60_000 or start >= day_start + snapshot.work_end_min * 60_000)
             suffix = " [outside work hours]" if outside else ""
-            description = _truncate((task.description or "(untitled)") + suffix, max(8, width - 22 - len(lane_prefix)))
+            description = _truncate(_highlight((task.description or "(untitled)") + suffix, highlight_query, ascii_only=ascii_only), max(8, width - 22 - len(lane_prefix)))
             bar = "#" if ascii_only else "█"
             lines.append(f"     {lane_prefix}{marker} {bar * bar_width} {description}")
     lines.append("")
@@ -223,6 +232,7 @@ def render_week(
     width: int = 120,
     color: bool = False,
     ascii_only: bool = False,
+    highlight_query: str = "",
 ) -> str:
     """Render seven days as a compact calendar, stacking days when narrow."""
     width = max(40, int(width))
@@ -247,7 +257,7 @@ def render_week(
                 lines.append(f"  {style.dim}—{style.reset}")
             else:
                 for task in tasks:
-                    lines.append(_row(task, overlap=task.uuid in overlaps, timezone=timezone, width=width, style=style, ascii_only=ascii_only))
+                    lines.append(_row(task, overlap=task.uuid in overlaps, timezone=timezone, width=width, style=style, ascii_only=ascii_only, highlight_query=highlight_query))
             lines.append("")
         return "\n".join(lines).rstrip()
 
@@ -267,7 +277,7 @@ def render_week(
             task = tasks[row_index]
             marker = "!" if task.uuid in overlaps and ascii_only else "⚠" if task.uuid in overlaps else "@" if task.nautical_preview and ascii_only else "⚓" if task.nautical_preview else "x" if task.status.lower() == "completed" and ascii_only else "✓" if task.status.lower() == "completed" else "."
             time = _local_time(_task_start(task), timezone)
-            cell = _truncate(f"{time} {marker} {task.description or '(untitled)'}", column_width)
+            cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}", column_width)
             cells.append(cell.ljust(column_width))
         lines.append("  " + "  ".join(cells).rstrip())
     return "\n".join(lines)

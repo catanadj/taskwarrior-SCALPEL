@@ -21,10 +21,11 @@ class GlimpseDetailsContractTests(unittest.TestCase):
         self.assertEqual(len(search_snapshot(snapshot, "missing").tasks), 0)
 
     def test_details_are_readable_and_width_bounded(self) -> None:
-        output = task_details(self.task, width=32)
+        output = task_details(self.task, width=72, timezone_name="UTC", annotations=("Overlaps another task.",))
         self.assertIn("Write report", output)
         self.assertIn("Nautical     preview", output)
-        self.assertTrue(all(len(line) <= 32 for line in output.splitlines()))
+        self.assertIn("Overlaps another task.", output)
+        self.assertTrue(all(len(line) <= 72 for line in output.splitlines()))
 
     def test_enter_and_escape_toggle_details(self) -> None:
         opened = update_state(GlimpseState(), "\n")
