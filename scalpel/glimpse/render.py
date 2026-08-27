@@ -185,3 +185,59 @@ def render_day(
         f"{conflicts} conflict{'s' if conflicts != 1 else ''}{style.reset}"
     )
     return "\n".join(lines)
+
+
+def render_week(
+    snapshot: GlimpseSnapshot,
+    *,
+    week_start: dt.date | None = None,
+    width: int = 120,
+    color: bool = False,
+) -> str:
+    """Render seven days as a compact calendar, stacking days when narrow."""
+    width = max(40, int(width))
+    selected_start = week_start or snapshot.start_date
+    timezone = resolve_tz(snapshot.timezone_name)
+    style = style_for(color=color)
+    days = [selected_start + dt.timedelta(days=offset) for offset in range(7)]
+    groups = _day_tasks(snapshot)
+    day_tasks = [groups.get(day.isoformat(), []) for day in days]
+    day_overlaps = [_overlap_ids(tasks) for tasks in day_tasks]
+    lines = [f"{style.bold}SCALPEL · Week · {selected_start.isoformat()}{style.reset}", ""]
+
+    if width < 100:
+        for day, tasks, overlaps in zip(days, day_tasks, day_overlaps, strict=True):
+            conflict_count = len(overlaps) // 2
+            lines.append(
+                f"{style.bold}{day.strftime('%a %d %b')} "
+                f"{style.dim}({len(tasks)} task{'s' if len(tasks) != 1 else ''}, "
+                f"{conflict_count} conflict{'s' if conflict_count != 1 else ''}){style.reset}"
+            )
+            if not tasks:
+                lines.append(f"  {style.dim}—{style.reset}")
+            else:
+                for task in tasks:
+                    lines.append(_row(task, overlap=task.uuid in overlaps, timezone=timezone, width=width, style=style))
+            lines.append("")
+        return "\n".join(lines).rstrip()
+
+    column_width = max(4, (width - 14) // 7)
+    header = "  " + "  ".join(
+        _truncate(f"{day.strftime('%a')} {day.day:02d}", column_width).ljust(column_width) for day in days
+    )
+    lines.append(header.rstrip())
+    lines.append("  " + "  ".join("─" * column_width for _ in days))
+    max_rows = max((len(tasks) for tasks in day_tasks), default=0)
+    for row_index in range(max_rows or 1):
+        cells: list[str] = []
+        for tasks, overlaps in zip(day_tasks, day_overlaps, strict=True):
+            if row_index >= len(tasks):
+                cells.append("".ljust(column_width))
+                continue
+            task = tasks[row_index]
+            marker = "⚠" if task.uuid in overlaps else "⚓" if task.nautical_preview else "✓" if task.status.lower() == "completed" else "·"
+            time = _local_time(_task_start(task), timezone)
+            cell = _truncate(f"{time} {marker} {task.description or '(untitled)'}", column_width)
+            cells.append(cell.ljust(column_width))
+        lines.append("  " + "  ".join(cells).rstrip())
+    return "\n".join(lines)
