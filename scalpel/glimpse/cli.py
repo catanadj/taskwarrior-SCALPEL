@@ -134,14 +134,15 @@ def main(argv: list[str] | None = None) -> int:
             run_interactive(snapshot, refresh=refresh)  # type: ignore[arg-type]
             return 0
         color = color_enabled(requested=False if args.no_color else None)
+        now_ms = int(dt.datetime.now().timestamp() * 1000)
         if args.view == "day":
             selected_day = _parse_date(args.date, fallback=start_date)
             print(render_day(snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=int(dt.datetime.now().timestamp() * 1000)))
         elif args.view == "week":
             selected_day = _parse_date(args.date, fallback=start_date)
-            print(render_week(snapshot, week_start=selected_day, width=args.width, color=color, ascii_only=args.ascii))
+            print(render_week(snapshot, week_start=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
         else:
-            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii))
+            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
         return 0
     except (OSError, ValueError, TypeError, ProcessError, json.JSONDecodeError) as exc:
         print(f"scalpel-glimpse: {exc}", file=sys.stderr)

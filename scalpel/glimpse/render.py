@@ -136,7 +136,8 @@ def render_agenda(
         day = snapshot.start_date + dt.timedelta(days=offset)
         day_key = day.isoformat()
         tasks = groups.get(day_key, [])
-        lines.append(f"{style.bold}{day.strftime('%a %d %b')}{style.reset}")
+        today_marker = " · today" if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ""
+        lines.append(f"{style.bold}{day.strftime('%a %d %b')}{today_marker}{style.reset}")
         if not tasks:
             lines.append(f"  {style.dim}No tasks scheduled.{style.reset}")
         else:
@@ -145,6 +146,9 @@ def render_agenda(
                 if isinstance(task.duration_min, int) and task.duration_min > 0:
                     total_minutes += task.duration_min
                 conflicts += int(task.uuid in overlap_ids)
+        if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day:
+            current_time = dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).strftime("%H:%M")
+            lines.append(f"  {style.dim}Current time: {current_time}{style.reset}")
         lines.append("")
     lines.append(
         f"{style.dim}Planned {_format_duration(total_minutes) or '0m'} · "
@@ -233,6 +237,7 @@ def render_week(
     color: bool = False,
     ascii_only: bool = False,
     highlight_query: str = "",
+    now_ms: int | None = None,
 ) -> str:
     """Render seven days as a compact calendar, stacking days when narrow."""
     width = max(40, int(width))
@@ -249,7 +254,7 @@ def render_week(
         for day, tasks, overlaps in zip(days, day_tasks, day_overlaps, strict=True):
             conflict_count = len(overlaps) // 2
             lines.append(
-                f"{style.bold}{day.strftime('%a %d %b')} "
+                f"{style.bold}{day.strftime('%a %d %b')}{' · today' if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ''} "
                 f"{style.dim}({len(tasks)} task{'s' if len(tasks) != 1 else ''}, "
                 f"{conflict_count} conflict{'s' if conflict_count != 1 else ''}){style.reset}"
             )
@@ -263,7 +268,7 @@ def render_week(
 
     column_width = max(4, (width - 14) // 7)
     header = "  " + "  ".join(
-        _truncate(f"{day.strftime('%a')} {day.day:02d}", column_width).ljust(column_width) for day in days
+        _truncate(f"{day.strftime('%a')} {day.day:02d}{' *' if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ''}", column_width).ljust(column_width) for day in days
     )
     lines.append(header.rstrip())
     lines.append("  " + "  ".join(("-" if ascii_only else "─") * column_width for _ in days))

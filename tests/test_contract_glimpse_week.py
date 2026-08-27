@@ -16,6 +16,11 @@ class GlimpseWeekContractTests(unittest.TestCase):
         self.assertIn("Monday…", output)
         self.assertLessEqual(max(len(line) for line in output.splitlines()), 120)
 
+    def test_week_view_marks_today(self) -> None:
+        now = int(dt.datetime(2026, 8, 26, 9, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        output = render_week(GlimpseSnapshot(dt.date(2026, 8, 24), 7, "UTC", ()), width=120, now_ms=now)
+        self.assertIn("Wed 26 *", output)
+
     def test_week_view_stacks_days_when_narrow(self) -> None:
         tasks = (
             GlimpseTask("a", "Monday review", "pending", "2026-08-24", 1, None, 1, 1, 30, None, (), False),

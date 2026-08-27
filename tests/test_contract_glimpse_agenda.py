@@ -60,6 +60,12 @@ class GlimpseAgendaContractTests(unittest.TestCase):
         output = render_agenda(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,)), highlight_query="report")
         self.assertIn("⟦report⟧", output)
 
+    def test_agenda_marks_today_and_current_time(self) -> None:
+        now = int(dt.datetime(2026, 8, 27, 14, 5, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        output = render_agenda(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", ()), now_ms=now)
+        self.assertIn("Thu 27 Aug · today", output)
+        self.assertIn("Current time: 14:05", output)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
