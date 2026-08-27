@@ -15,6 +15,8 @@ class GlimpseInteractionContractTests(unittest.TestCase):
         self.assertEqual(day.view, "day")
         self.assertEqual(moved.day_offset, 1)
         self.assertEqual(selected.selected, 1)
+        self.assertEqual(update_state(selected, "w").selected, 1)
+        self.assertEqual(update_state(selected, "a").selected, 1)
         self.assertEqual(update_state(selected, "t").day_offset, 0)
 
     def test_refresh_requests_a_reload_and_closes_details(self) -> None:

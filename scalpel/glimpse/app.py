@@ -37,11 +37,11 @@ def update_state(state: GlimpseState, key: str) -> GlimpseState:
     if key in {"\x1b", "KEY_EXIT"}:
         return replace(state, details_visible=False, help_visible=False)
     if key in {"a", "A"}:
-        return replace(state, view="agenda", selected=0)
+        return replace(state, view="agenda")
     if key in {"d", "D"}:
-        return replace(state, view="day", selected=0)
+        return replace(state, view="day")
     if key in {"w", "W"}:
-        return replace(state, view="week", selected=0)
+        return replace(state, view="week")
     if key in {"h", "KEY_LEFT"}:
         return replace(state, day_offset=state.day_offset - 1, selected=0)
     if key in {"l", "KEY_RIGHT"}:
