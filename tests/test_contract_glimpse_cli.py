@@ -81,6 +81,21 @@ class GlimpseCliContractTests(unittest.TestCase):
         args = build_parser().parse_args(["--plain"])
         self.assertTrue(args.no_color)
 
+    def test_color_can_be_forced_and_conflicts_with_plain_mode(self) -> None:
+        self.assertTrue(build_parser().parse_args(["--color"]).color)
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["--color", "--plain"])
+
+    def test_forced_color_survives_redirected_output(self) -> None:
+        output = io.StringIO()
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("scalpel.glimpse.cli.build_payload", return_value=_payload()),
+            redirect_stdout(output),
+        ):
+            self.assertEqual(main(["--color"]), 0)
+        self.assertIn("\x1b[", output.getvalue())
+
     def test_numeric_planning_options_reject_non_positive_values(self) -> None:
         parser = build_parser()
         for option in ("--days", "--default-duration", "--max-infer-duration", "--snap"):

@@ -86,8 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--width", type=int, default=0, help="Maximum output width (default: terminal width, or 80 when piped)"
     )
-    parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
-    parser.add_argument("--plain", dest="no_color", action="store_true", help="Alias for --no-color")
+    color_group = parser.add_mutually_exclusive_group()
+    color_group.add_argument("--color", action="store_true", help="Force ANSI colors")
+    color_group.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
+    color_group.add_argument("--plain", dest="no_color", action="store_true", help="Alias for --no-color")
     parser.add_argument("--ascii", action="store_true", help="Use ASCII markers and rules only")
     parser.add_argument("--interactive", action="store_true", help="Open the interactive curses view")
     return parser
@@ -145,12 +147,12 @@ def main(argv: list[str] | None = None) -> int:
                 loader=lambda: _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today),
                 view=args.view,
                 initial_date=_parse_date(args.date, fallback=today) if args.date else None,
-                color=color_enabled(requested=False if args.no_color else None),
+                color=color_enabled(requested=True if args.color else False if args.no_color else None),
                 ascii_only=args.ascii or _degraded_terminal(),
             )
             return 0
         snapshot = _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today)
-        color = color_enabled(requested=False if args.no_color else None)
+        color = color_enabled(requested=True if args.color else False if args.no_color else None)
         ascii_only = args.ascii or _degraded_terminal()
         width = _output_width(args.width)
         now_ms = int(dt.datetime.now().timestamp() * 1000)
