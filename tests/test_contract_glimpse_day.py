@@ -44,6 +44,22 @@ class GlimpseDayContractTests(unittest.TestCase):
         self.assertIn("outside work hours", output)
         self.assertIn("L1", output)
 
+    def test_day_view_handles_overnight_task(self) -> None:
+        start = int(dt.datetime(2026, 8, 27, 23, 30, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        task = GlimpseTask("overnight", "Overnight handoff", "pending", "2026-08-27", start, None, start, start + 90 * 60_000, 90, None, (), False)
+        output = render_day(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,)), width=40)
+        self.assertIn("23:00 │", output)
+        self.assertIn("Overnight handoff", output)
+        self.assertTrue(all(len(line) <= 40 for line in output.splitlines()))
+
+    def test_day_view_handles_dst_transition_in_named_timezone(self) -> None:
+        start = int(dt.datetime(2026, 3, 8, 6, 30, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        task = GlimpseTask("dst", "DST morning task", "pending", "2026-03-08", start, None, start, start + 60 * 60_000, 60, None, (), False)
+        output = render_day(GlimpseSnapshot(dt.date(2026, 3, 8), 1, "America/New_York", (task,)), width=40)
+        self.assertIn("Sun 08 Mar 2026", output)
+        self.assertIn("DST morning task", output)
+        self.assertTrue(all(len(line) <= 40 for line in output.splitlines()))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
