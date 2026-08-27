@@ -21,6 +21,16 @@ class GlimpseWeekContractTests(unittest.TestCase):
         output = render_week(GlimpseSnapshot(dt.date(2026, 8, 24), 7, "UTC", ()), width=120, now_ms=now)
         self.assertIn("Wed 26 *", output)
 
+    def test_week_view_shows_band_summary_and_project_context(self) -> None:
+        task = GlimpseTask("a", "Planning", "pending", "2026-08-24", 0, None, 0, 60_000, 1, "work", (), False)
+        snapshot = GlimpseSnapshot(dt.date(2026, 8, 24), 7, "UTC", (task,), 480, 1080)
+        plain = render_week(snapshot, width=80)
+        colored = render_week(snapshot, width=80, color=True)
+        self.assertIn("Bands: Morning", plain)
+        self.assertIn("work", plain)
+        self.assertIn("work", colored)
+        self.assertRegex(colored, r"\x1b\[[0-9;]*mwork\x1b\[0m")
+
     def test_week_view_stacks_days_when_narrow(self) -> None:
         tasks = (
             GlimpseTask("a", "Monday review", "pending", "2026-08-24", 1, None, 1, 1, 30, None, (), False),

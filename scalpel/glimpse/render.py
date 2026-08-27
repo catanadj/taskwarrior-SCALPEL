@@ -249,6 +249,11 @@ def render_week(
     day_tasks = [groups.get(day.isoformat(), []) for day in days]
     day_overlaps = [_overlap_ids(tasks) for tasks in day_tasks]
     lines = [f"{style.bold}SCALPEL · Week · {selected_start.isoformat()}{style.reset}", ""]
+    bands = _default_bands(snapshot)
+    if bands and width >= 72:
+        band_summary = " · ".join(f"{band.label} {band.start_min // 60:02d}:{band.start_min % 60:02d}-{band.end_min // 60:02d}:{band.end_min % 60:02d}" for band in bands)
+        lines.append(f"{style.dim}Bands: {band_summary}{style.reset}")
+        lines.append("")
 
     if width < 100:
         for day, tasks, overlaps in zip(days, day_tasks, day_overlaps, strict=True):
@@ -283,7 +288,11 @@ def render_week(
             marker = "!" if task.uuid in overlaps and ascii_only else "⚠" if task.uuid in overlaps else "@" if task.nautical_preview and ascii_only else "⚓" if task.nautical_preview else "x" if task.status.lower() == "completed" and ascii_only else "✓" if task.status.lower() == "completed" else "."
             time = _local_time(_task_start(task), timezone)
             project = f" · {task.project}" if task.project else ""
-            cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}{project}", column_width)
+            visible_cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}{project}", column_width)
+            cell = visible_cell
+            if task.project and task.project in visible_cell:
+                color_code = project_color(task.project, style=style)
+                cell = visible_cell.replace(task.project, f"{color_code}{task.project}{style.reset}", 1) if color_code else visible_cell
             cells.append(cell.ljust(column_width))
         lines.append("  " + "  ".join(cells).rstrip())
     return "\n".join(lines)
