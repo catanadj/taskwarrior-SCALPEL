@@ -7,7 +7,7 @@ from .model import GlimpseBand, GlimpseSnapshot, GlimpseTask
 
 
 def _optional_int(value: object) -> int | None:
-    return value if isinstance(value, int) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _first_int(*values: object) -> int | None:
@@ -30,6 +30,13 @@ def _tags(value: object) -> tuple[str, ...]:
     return tuple(str(tag) for tag in value if isinstance(tag, str) and tag.strip())
 
 
+def _config_int(value: object, *, default: int, minimum: int, maximum: int) -> int:
+    parsed = _optional_int(value)
+    if parsed is None:
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
 def snapshot_from_payload(
     payload: Payload,
     *,
@@ -39,7 +46,12 @@ def snapshot_from_payload(
 ) -> GlimpseSnapshot:
     """Create the stable Glimpse input model from a validated SCALPEL payload."""
     tasks: list[GlimpseTask] = []
-    for raw_task in payload.get("tasks", []):
+    raw_tasks = payload.get("tasks", [])
+    if not isinstance(raw_tasks, list):
+        raw_tasks = []
+    for raw_task in raw_tasks:
+        if not isinstance(raw_task, dict):
+            continue
         task = raw_task
         uuid = _optional_text(task.get("uuid"))
         if uuid is None:
@@ -66,8 +78,8 @@ def snapshot_from_payload(
         )
     cfg = payload.get("cfg", {})
     cfg = cfg if isinstance(cfg, dict) else {}
-    work_start = max(0, min(1439, int(cfg.get("work_start_min", 0) or 0)))
-    work_end = max(work_start + 1, min(1440, int(cfg.get("work_end_min", 1440) or 1440)))
+    work_start = _config_int(cfg.get("work_start_min"), default=0, minimum=0, maximum=1439)
+    work_end = _config_int(cfg.get("work_end_min"), default=1440, minimum=work_start + 1, maximum=1440)
     bands: list[GlimpseBand] = []
     raw_bands = cfg.get("time_bands", [])
     if isinstance(raw_bands, list):
@@ -81,7 +93,7 @@ def snapshot_from_payload(
                 bands.append(GlimpseBand(label, start, end))
     return GlimpseSnapshot(
         start_date=start_date,
-        days=max(1, int(days)),
+        days=max(1, days if isinstance(days, int) and not isinstance(days, bool) else 1),
         timezone_name=timezone_name,
         tasks=tuple(tasks),
         work_start_min=work_start,

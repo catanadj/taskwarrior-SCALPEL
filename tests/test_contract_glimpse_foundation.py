@@ -73,6 +73,21 @@ class GlimpseFoundationContractTests(unittest.TestCase):
         self.assertEqual((snapshot.work_start_min, snapshot.work_end_min), (480, 1080))
         self.assertEqual([(band.label, band.start_min, band.end_min) for band in snapshot.bands], [("Focus", 540, 720)])
 
+    def test_snapshot_skips_malformed_tasks_and_recovers_invalid_config(self) -> None:
+        snapshot = snapshot_from_payload(
+            {
+                "tasks": [None, "not a task", {"uuid": "valid", "duration_min": True}],
+                "cfg": {"work_start_min": "morning", "work_end_min": False},
+            },
+            start_date=dt.date(2026, 8, 27),
+            days=True,
+            timezone_name="UTC",
+        )
+        self.assertEqual(len(snapshot.tasks), 1)
+        self.assertIsNone(snapshot.tasks[0].duration_min)
+        self.assertEqual((snapshot.work_start_min, snapshot.work_end_min), (0, 1440))
+        self.assertEqual(snapshot.days, 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
