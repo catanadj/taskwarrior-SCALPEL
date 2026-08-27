@@ -373,6 +373,7 @@ class _HeadlessChromium:
                 self.chromium_bin,
                 "--headless=new",
                 "--disable-gpu",
+                "--disable-dev-shm-usage",
                 "--no-sandbox",
                 "--no-first-run",
                 "--no-default-browser-check",
@@ -385,7 +386,7 @@ class _HeadlessChromium:
             text=True,
         )
         try:
-            _wait_until(lambda: _json_request(self.base + "/json/version").get("webSocketDebuggerUrl"), timeout=5.0)
+            _wait_until(lambda: _json_request(self.base + "/json/version").get("webSocketDebuggerUrl"), timeout=15.0)
             return self
         except Exception:
             self.__exit__(None, None, None)
@@ -2833,6 +2834,12 @@ class _ReplanServeHarness(_BrowserServeHarness):
 
 
 class TestServeBrowserLiveContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        if os.environ.get("SCALPEL_RUN_BROWSER_CONTRACTS") != "1":
+            raise unittest.SkipTest("browser contracts require the dedicated browser CI job")
+
     def test_live_browser_refresh_preserves_notes_visibility(self) -> None:
         chromium_bin = shutil.which("chromium")
         node_bin = shutil.which("node")

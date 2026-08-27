@@ -96,6 +96,8 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
+    env:
+      SCALPEL_RUN_BROWSER_CONTRACTS: "1"
 
     steps:
       - name: Checkout
