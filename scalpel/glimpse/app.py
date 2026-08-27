@@ -85,6 +85,16 @@ def _detail_annotations(snapshot: GlimpseSnapshot, task_index: int) -> tuple[str
     return tuple(notes)
 
 
+def _read_search_query(window: curses.window, height: int, width: int) -> str:
+    """Read a search query while guaranteeing terminal echo restoration."""
+    curses.echo()
+    try:
+        window.addstr(height - 1, 0, "Search: ")
+        return window.getstr(height - 1, 8, max(1, width - 9)).decode("utf-8", errors="replace").strip()
+    finally:
+        curses.noecho()
+
+
 def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnapshot] | None = None) -> None:
     """Run the read-only curses shell and always restore the terminal on exit."""
 
@@ -126,10 +136,7 @@ def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnap
             key = window.get_wch()
             if isinstance(key, str):
                 if key == "/":
-                    curses.echo()
-                    window.addstr(height - 1, 0, "Search: ")
-                    query = window.getstr(height - 1, 8, max(1, width - 9)).decode("utf-8", errors="replace")
-                    curses.noecho()
+                    query = _read_search_query(window, height, width)
                     state = replace(state, query=query.strip(), selected=0)
                     continue
                 state = update_state(state, key)

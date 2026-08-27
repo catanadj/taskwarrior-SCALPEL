@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
-from scalpel.glimpse.app import GlimpseState, update_state
+from scalpel.glimpse.app import GlimpseState, _read_search_query, update_state
 
 
 class GlimpseInteractionContractTests(unittest.TestCase):
@@ -33,6 +34,20 @@ class GlimpseInteractionContractTests(unittest.TestCase):
 
     def test_selection_never_moves_before_first_item(self) -> None:
         self.assertEqual(update_state(GlimpseState(), "k").selected, 0)
+
+    def test_search_input_restores_noecho_when_reading_fails(self) -> None:
+        class BrokenWindow:
+            def addstr(self, *_args: object) -> None:
+                return None
+
+            def getstr(self, *_args: object) -> bytes:
+                raise RuntimeError("input failed")
+
+        with patch("scalpel.glimpse.app.curses.echo") as echo, patch("scalpel.glimpse.app.curses.noecho") as noecho:
+            with self.assertRaisesRegex(RuntimeError, "input failed"):
+                _read_search_query(BrokenWindow(), 24, 80)  # type: ignore[arg-type]
+        echo.assert_called_once()
+        noecho.assert_called_once()
 
 
 if __name__ == "__main__":
