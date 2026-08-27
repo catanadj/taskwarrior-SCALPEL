@@ -131,3 +131,57 @@ def render_agenda(
         f"{len(snapshot.tasks)} task{'s' if len(snapshot.tasks) != 1 else ''}{style.reset}"
     )
     return "\n".join(lines)
+
+
+def render_day(
+    snapshot: GlimpseSnapshot,
+    *,
+    day: dt.date | None = None,
+    width: int = 80,
+    color: bool = False,
+    now_ms: int | None = None,
+) -> str:
+    """Render one day as a compact, hourly terminal timeline."""
+    del now_ms  # Reserved for the current-time marker once interactive mode exists.
+    width = max(40, int(width))
+    selected_day = day or snapshot.start_date
+    timezone = resolve_tz(snapshot.timezone_name)
+    style = style_for(color=color)
+    day_key = selected_day.isoformat()
+    tasks = [task for task in snapshot.tasks if task.day_key == day_key]
+    tasks.sort(key=lambda item: (_task_start(item) is None, _task_start(item) or 0, item.description.lower()))
+    overlap_ids = _overlap_ids(tasks)
+    day_start = int(dt.datetime.combine(selected_day, dt.time(), tzinfo=timezone).timestamp() * 1000)
+    hour_ms = 60 * 60_000
+    lines = [f"{style.bold}SCALPEL · Day · {selected_day.strftime('%a %d %b %Y')}{style.reset}", ""]
+    for hour in range(24):
+        slot_start = day_start + hour * hour_ms
+        slot_end = slot_start + hour_ms
+        active = [
+            task
+            for task in tasks
+            if (_task_start(task) is not None and (_task_end(task) or _task_start(task) or 0) > slot_start)
+            and (_task_start(task) or 0) < slot_end
+        ]
+        label = f"{hour:02d}:00"
+        if not active:
+            lines.append(f"{label} {style.dim}│{style.reset}")
+            continue
+        lines.append(f"{label} {style.dim}│{style.reset}")
+        for task in active:
+            start = _task_start(task)
+            end = _task_end(task)
+            duration = max(15, int(((end or start or slot_end) - (start or slot_start)) / 60_000))
+            bar_width = max(1, min(12, duration // 15))
+            marker = _marker(task, overlap=task.uuid in overlap_ids, style=style)
+            description = _truncate(task.description or "(untitled)", max(8, width - 22))
+            lines.append(f"     {marker} {'█' * bar_width} {description}")
+    lines.append("")
+    total_minutes = sum(task.duration_min or 0 for task in tasks if (task.duration_min or 0) > 0)
+    conflicts = len(overlap_ids) // 2
+    lines.append(
+        f"{style.dim}{len(tasks)} task{'s' if len(tasks) != 1 else ''} · "
+        f"{_format_duration(total_minutes) or '0m'} planned · "
+        f"{conflicts} conflict{'s' if conflicts != 1 else ''}{style.reset}"
+    )
+    return "\n".join(lines)

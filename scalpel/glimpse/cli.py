@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from ..api import load_payload_from_json
-from .render import render_agenda
+from .render import render_agenda, render_day
 from .source import snapshot_from_payload
 from .style import color_enabled
 
@@ -23,6 +23,8 @@ def build_parser() -> argparse.ArgumentParser:
         version="scalpel-glimpse (agenda)",
     )
     parser.add_argument("--payload", type=Path, required=True, help="SCALPEL payload JSON to render")
+    parser.add_argument("--view", choices=("agenda", "day"), default="agenda", help="View to render")
+    parser.add_argument("--date", help="Day to render as YYYY-MM-DD (day view only)")
     parser.add_argument("--width", type=int, default=80, help="Maximum output width (default: 80)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
     return parser
@@ -44,7 +46,12 @@ def main(argv: list[str] | None = None) -> int:
             days=int(cfg.get("days", 1)) if isinstance(cfg, dict) else 1,
             timezone_name=timezone_name,
         )
-        print(render_agenda(snapshot, width=args.width, color=color_enabled(requested=not args.no_color)))
+        color = color_enabled(requested=not args.no_color)
+        if args.view == "day":
+            selected_day = dt.date.fromisoformat(args.date) if args.date else start_date
+            print(render_day(snapshot, day=selected_day, width=args.width, color=color))
+        else:
+            print(render_agenda(snapshot, width=args.width, color=color))
         return 0
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         print(f"scalpel-glimpse: {exc}", file=sys.stderr)
