@@ -10,6 +10,7 @@ from ..api import load_payload_from_json
 from .render import render_agenda, render_day, render_week
 from .source import snapshot_from_payload
 from .style import color_enabled
+from .app import run_interactive
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--date", help="Start day to render as YYYY-MM-DD")
     parser.add_argument("--width", type=int, default=80, help="Maximum output width (default: 80)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
+    parser.add_argument("--interactive", action="store_true", help="Open the interactive curses view")
     return parser
 
 
@@ -46,6 +48,11 @@ def main(argv: list[str] | None = None) -> int:
             days=int(cfg.get("days", 1)) if isinstance(cfg, dict) else 1,
             timezone_name=timezone_name,
         )
+        if args.interactive:
+            if not sys.stdin.isatty() or not sys.stdout.isatty():
+                raise ValueError("--interactive requires a terminal")
+            run_interactive(snapshot)
+            return 0
         color = color_enabled(requested=not args.no_color)
         if args.view == "day":
             selected_day = dt.date.fromisoformat(args.date) if args.date else start_date
