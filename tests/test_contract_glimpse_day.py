@@ -103,6 +103,46 @@ class GlimpseDayContractTests(unittest.TestCase):
         self.assertIn("DST morning task", output)
         self.assertTrue(all(len(line) <= 40 for line in output.splitlines()))
 
+    def test_day_view_uses_local_boundaries_on_dst_fall_back(self) -> None:
+        start = int(dt.datetime(2026, 11, 1, 6, 30, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        task = GlimpseTask(
+            "dst-fall",
+            "DST fallback task",
+            "pending",
+            "2026-11-01",
+            start,
+            None,
+            start,
+            start + 60 * 60_000,
+            60,
+            None,
+            (),
+            False,
+        )
+        output = render_day(GlimpseSnapshot(dt.date(2026, 11, 1), 1, "America/New_York", (task,)), width=40)
+        self.assertIn("DST fallback task", output)
+        self.assertTrue(all(len(line) <= 40 for line in output.splitlines()))
+
+    def test_day_view_ignores_invalid_reverse_interval(self) -> None:
+        start = int(dt.datetime(2026, 8, 27, 9, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        task = GlimpseTask(
+            "invalid",
+            "Invalid interval",
+            "pending",
+            "2026-08-27",
+            start,
+            None,
+            start,
+            start - 60 * 60_000,
+            60,
+            None,
+            (),
+            False,
+        )
+        output = render_day(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,)), width=40)
+        self.assertNotIn("Invalid interval", output)
+        self.assertIn("0 conflicts", output)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

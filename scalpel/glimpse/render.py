@@ -46,8 +46,10 @@ def _task_start(task: GlimpseTask) -> int | None:
 def _task_end(task: GlimpseTask) -> int | None:
     start = _task_start(task)
     if task.end_ms is not None:
-        return task.end_ms
-    if start is not None and isinstance(task.duration_min, int):
+        if start is None:
+            return task.end_ms
+        return max(start, task.end_ms)
+    if start is not None and type(task.duration_min) is int:
         return start + task.duration_min * 60_000
     return start
 
@@ -94,6 +96,12 @@ def _local_time(timestamp_ms: int | None, timezone: dt.tzinfo) -> str:
     if timestamp_ms is None:
         return "  --"
     return dt.datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone).strftime("%H:%M")
+
+
+def _local_hour_boundary_ms(day: dt.date, hour: int, timezone: dt.tzinfo) -> int:
+    boundary_day = day + dt.timedelta(days=hour // 24)
+    boundary = dt.datetime.combine(boundary_day, dt.time(hour % 24), tzinfo=timezone)
+    return int(boundary.timestamp() * 1000)
 
 
 def _day_tasks(snapshot: GlimpseSnapshot) -> dict[str, list[GlimpseTask]]:
@@ -221,14 +229,13 @@ def render_day(
     tasks = [task for task in snapshot.tasks if task.day_key == day_key]
     tasks.sort(key=lambda item: (_task_start(item) is None, _task_start(item) or 0, item.description.lower()))
     overlap_ids = _overlap_ids(tasks)
-    day_start = int(dt.datetime.combine(selected_day, dt.time(), tzinfo=timezone).timestamp() * 1000)
-    hour_ms = 60 * 60_000
+    day_start = _local_hour_boundary_ms(selected_day, 0, timezone)
     is_today = now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == selected_day
     bands = _default_bands(snapshot)
     lines = [f"{style.bold}SCALPEL · Day · {selected_day.strftime('%a %d %b %Y')}{style.reset}", ""]
     for hour in range(24):
-        slot_start = day_start + hour * hour_ms
-        slot_end = slot_start + hour_ms
+        slot_start = _local_hour_boundary_ms(selected_day, hour, timezone)
+        slot_end = _local_hour_boundary_ms(selected_day, hour + 1, timezone)
         active = [
             task
             for task in tasks
