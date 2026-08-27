@@ -78,6 +78,13 @@ class GlimpseCliContractTests(unittest.TestCase):
         args = build_parser().parse_args(["--plain"])
         self.assertTrue(args.no_color)
 
+    def test_today_date_alias_and_ascii_mode_are_supported(self) -> None:
+        with patch("scalpel.glimpse.cli.build_payload", return_value=_payload()):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main(["--start", "today", "--date", "today", "--ascii"]), 0)
+        self.assertNotRegex(output.getvalue(), "[⚠✓⚓┃│█─…]")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

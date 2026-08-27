@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import sys
 from pathlib import Path
+from typing import cast
 
 from ..api import load_payload_from_json
 from ..payload import build_payload
@@ -14,6 +15,12 @@ from .render import render_agenda, render_day, render_week
 from .source import snapshot_from_payload
 from .style import color_enabled
 from .app import run_interactive
+
+
+def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
+    if value is None or value.strip().lower() == "today":
+        return fallback
+    return cast(dt.date, parse_date_yyyy_mm_dd(value))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--payload", type=Path, help="Read an existing SCALPEL payload JSON")
     parser.add_argument("--filter", default="status:pending", help="Taskwarrior filter (default: status:pending)")
-    parser.add_argument("--start", help="View start date YYYY-MM-DD (default: today)")
+    parser.add_argument("--start", help="View start date YYYY-MM-DD or today (default: today)")
     parser.add_argument("--days", type=int, default=7, help="Number of days to show (default: 7)")
     parser.add_argument("--workhours", default="06:00-23:00", help="Work hours, for example 06:00-23:00")
     parser.add_argument("--default-duration", type=int, default=10)
@@ -45,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--width", type=int, default=80, help="Maximum output width (default: 80)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
     parser.add_argument("--plain", dest="no_color", action="store_true", help="Alias for --no-color")
+    parser.add_argument("--ascii", action="store_true", help="Use ASCII markers and rules only")
     parser.add_argument("--interactive", action="store_true", help="Open the interactive curses view")
     return parser
 
@@ -54,10 +62,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         tz_name = normalize_tz_name(args.tz)
         display_tz = normalize_tz_name(args.display_tz)
+        today = today_date(resolve_tz(tz_name))
         if args.payload:
             payload = load_payload_from_json(args.payload)
         else:
-            start_date = parse_date_yyyy_mm_dd(args.start) if args.start else today_date(resolve_tz(tz_name))
+            start_date = _parse_date(args.start, fallback=today)
             work_start, work_end = parse_workhours(args.workhours)
             payload = build_payload(
                 filter_str=args.filter,
@@ -95,13 +104,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         color = color_enabled(requested=False if args.no_color else None)
         if args.view == "day":
-            selected_day = dt.date.fromisoformat(args.date) if args.date else start_date
-            print(render_day(snapshot, day=selected_day, width=args.width, color=color))
+            selected_day = _parse_date(args.date, fallback=start_date)
+            print(render_day(snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii))
         elif args.view == "week":
-            selected_day = dt.date.fromisoformat(args.date) if args.date else start_date
-            print(render_week(snapshot, week_start=selected_day, width=args.width, color=color))
+            selected_day = _parse_date(args.date, fallback=start_date)
+            print(render_week(snapshot, week_start=selected_day, width=args.width, color=color, ascii_only=args.ascii))
         else:
-            print(render_agenda(snapshot, width=args.width, color=color))
+            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii))
         return 0
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         print(f"scalpel-glimpse: {exc}", file=sys.stderr)
