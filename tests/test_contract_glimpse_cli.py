@@ -92,6 +92,13 @@ class GlimpseCliContractTests(unittest.TestCase):
             self.assertEqual(main([]), 2)
         self.assertIn("Command not found: task", error.getvalue())
 
+    def test_empty_live_database_renders_a_successful_empty_agenda(self) -> None:
+        output = io.StringIO()
+        with patch("scalpel.payload.run_task_export", return_value=[]), redirect_stdout(output):
+            self.assertEqual(main(["--start", "2026-08-27", "--tz", "UTC", "--plain"]), 0)
+        self.assertIn("No tasks scheduled.", output.getvalue())
+        self.assertIn("Planned 0m", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
