@@ -7,6 +7,8 @@ from typing import Literal
 
 from .model import GlimpseSnapshot
 from .render import render_agenda, render_day, render_week
+from .details import task_details
+from .search import search_snapshot
 
 ViewName = Literal["agenda", "day", "week"]
 
@@ -17,6 +19,8 @@ class GlimpseState:
     day_offset: int = 0
     selected: int = 0
     help_visible: bool = False
+    details_visible: bool = False
+    query: str = ""
     should_quit: bool = False
 
 
@@ -24,6 +28,10 @@ def update_state(state: GlimpseState, key: str) -> GlimpseState:
     """Apply one key without requiring a terminal, making interaction testable."""
     if key in {"q", "Q"}:
         return replace(state, should_quit=True)
+    if key in {"\n", "KEY_ENTER"}:
+        return replace(state, details_visible=not state.details_visible)
+    if key in {"\x1b", "KEY_EXIT"}:
+        return replace(state, details_visible=False, help_visible=False)
     if key in {"a", "A"}:
         return replace(state, view="agenda", selected=0)
     if key in {"d", "D"}:
@@ -46,6 +54,7 @@ def update_state(state: GlimpseState, key: str) -> GlimpseState:
 
 
 def _content(snapshot: GlimpseSnapshot, state: GlimpseState, width: int) -> str:
+    snapshot = search_snapshot(snapshot, state.query)
     day = snapshot.start_date + dt.timedelta(days=state.day_offset)
     if state.view == "day":
         return render_day(snapshot, day=day, width=width, color=False)
@@ -70,6 +79,15 @@ def run_interactive(snapshot: GlimpseSnapshot) -> None:
             if state.help_visible:
                 body = "a agenda · d day · w week · h/l day · j/k select · t today · q quit"
             content = _content(snapshot, state, max(40, width - 1)).splitlines()
+            if state.details_visible:
+                filtered = search_snapshot(snapshot, state.query)
+                if filtered.tasks:
+                    detail_index = min(state.selected, len(filtered.tasks) - 1)
+                    content = task_details(filtered.tasks[detail_index], width=max(32, width - 4)).splitlines()
+                else:
+                    content = ["No matching task selected."]
+            elif state.help_visible:
+                content = [body]
             for row, line in enumerate(content[: max(0, height - 2)]):
                 try:
                     window.addnstr(row, 0, line, max(0, width - 1))
@@ -81,6 +99,13 @@ def run_interactive(snapshot: GlimpseSnapshot) -> None:
                 pass
             key = window.get_wch()
             if isinstance(key, str):
+                if key == "/":
+                    curses.echo()
+                    window.addstr(height - 1, 0, "Search: ")
+                    query = window.getstr(height - 1, 8, max(1, width - 9)).decode("utf-8", errors="replace")
+                    curses.noecho()
+                    state = replace(state, query=query.strip(), selected=0)
+                    continue
                 state = update_state(state, key)
             else:
                 state = update_state(state, str(key))
