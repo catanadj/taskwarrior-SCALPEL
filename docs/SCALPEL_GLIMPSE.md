@@ -49,3 +49,20 @@ Run `scalpel-glimpse --interactive` in a terminal.
 
 The interactive mode is read-only. The terminal is restored by the curses
 wrapper when the application exits or is interrupted.
+
+## Example output
+
+```text
+SCALPEL · Agenda · 2026-08-27
+
+Thu 27 Aug
+  08:00 | Deep work                         1h 30m  work
+  09:30 ! Review overlapping changes           45m  admin
+  10:15 @ Prepare recurring report             30m  nautical
+
+Planned 2h 45m · 1 conflict · 3 tasks
+```
+
+Use `--ascii --plain` when copying output into logs or when the terminal does
+not render Unicode reliably. The markers are `|` for regular tasks, `!` for
+overlaps, `@` for Nautical previews, and `x` for completed tasks.
