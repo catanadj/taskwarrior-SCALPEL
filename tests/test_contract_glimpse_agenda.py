@@ -55,6 +55,15 @@ class GlimpseAgendaContractTests(unittest.TestCase):
         self.assertRegex(output, r"\x1b\[")
         self.assertIn("Colored task", re.sub(r"\x1b\[[0-9;]*m", "", output))
 
+    def test_project_colors_are_stable_and_plain_output_is_unchanged(self) -> None:
+        task = GlimpseTask("a", "Project task", "pending", "2026-08-27", 0, None, 0, 60_000, 1, "work", (), False)
+        snapshot = GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,))
+        colored = render_agenda(snapshot, color=True)
+        plain = render_agenda(snapshot, color=False)
+        self.assertIn("work", re.sub(r"\x1b\[[0-9;]*m", "", colored))
+        self.assertNotRegex(plain, r"\x1b\[")
+        self.assertEqual(render_agenda(snapshot, color=True), colored)
+
     def test_search_matches_are_highlighted(self) -> None:
         task = GlimpseTask("a", "Prepare report", "pending", "2026-08-27", 0, None, 0, 60_000, 1, None, (), False)
         output = render_agenda(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,)), highlight_query="report")

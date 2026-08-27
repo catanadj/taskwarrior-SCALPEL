@@ -7,7 +7,7 @@ from typing import Sequence
 
 from ..util.tz import resolve_tz
 from .model import GlimpseBand, GlimpseSnapshot, GlimpseTask
-from .style import AgendaStyle, style_for
+from .style import AgendaStyle, project_color, style_for
 
 
 def _highlight(value: str, query: str, *, ascii_only: bool = False) -> str:
@@ -107,7 +107,7 @@ def _row(task: GlimpseTask, *, overlap: bool, timezone: dt.tzinfo, width: int, s
     time = _local_time(_task_start(task), timezone)
     marker = _marker(task, overlap=overlap, style=style, ascii_only=ascii_only)
     duration = _format_duration(task.duration_min)
-    project = f"  {task.project}" if task.project else ""
+    project = f"  {project_color(task.project, style=style)}{task.project}{style.reset if task.project else ''}" if task.project else ""
     suffix = f"{duration:>7}{project}"
     description_width = max(8, width - 14 - len(suffix))
     description = _truncate(_highlight(task.description or "(untitled)", highlight_query, ascii_only=ascii_only), description_width)
@@ -282,7 +282,8 @@ def render_week(
             task = tasks[row_index]
             marker = "!" if task.uuid in overlaps and ascii_only else "⚠" if task.uuid in overlaps else "@" if task.nautical_preview and ascii_only else "⚓" if task.nautical_preview else "x" if task.status.lower() == "completed" and ascii_only else "✓" if task.status.lower() == "completed" else "."
             time = _local_time(_task_start(task), timezone)
-            cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}", column_width)
+            project = f" · {task.project}" if task.project else ""
+            cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}{project}", column_width)
             cells.append(cell.ljust(column_width))
         lines.append("  " + "  ".join(cells).rstrip())
     return "\n".join(lines)

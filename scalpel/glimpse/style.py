@@ -33,3 +33,11 @@ def color_enabled(*, requested: bool | None = None, stream: object = sys.stdout)
 
 def style_for(*, color: bool) -> AgendaStyle:
     return AgendaStyle() if color else PLAIN_STYLE
+
+
+def project_color(project: str | None, *, style: AgendaStyle) -> str:
+    """Return a stable ANSI color for a project, or no color in plain mode."""
+    if not project or not style.reset:
+        return ""
+    palette = (style.cyan, style.yellow, style.green, style.magenta, style.red)
+    return palette[sum(ord(char) for char in project) % len(palette)]
