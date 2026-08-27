@@ -8,7 +8,7 @@ SCALPEL exports Taskwarrior tasks into a local browser planner. You can drag, re
 
 ## Status
 
-Stable `1.0.0` release line.
+Stable `1.1.0` release line.
 
 - Payload, schema, rendering, replay, and validation paths are contract-tested.
 - Live mode is the normal day-to-day workflow.

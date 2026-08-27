@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "taskwarrior-scalpel"
-version = "1.0.0"
+version = "1.1.0"
 description = "SCALPEL: Strategic Calendar Action Layer for Planning, Execution, and Logistics."
 readme = "README.md"
 license = { file = "LICENSE" }
