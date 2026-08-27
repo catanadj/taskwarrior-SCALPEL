@@ -54,16 +54,19 @@ def _task_end(task: GlimpseTask) -> int | None:
 
 def _overlap_ids(tasks: Sequence[GlimpseTask]) -> set[str]:
     marked: set[str] = set()
-    for index, current in enumerate(tasks):
-        current_start, current_end = _task_start(current), _task_end(current)
-        if current_start is None or current_end is None:
+    intervals = []
+    for task in tasks:
+        start, end = _task_start(task), _task_end(task)
+        if start is None or end is None or end <= start:
             continue
-        for other in tasks[index + 1 :]:
-            other_start, other_end = _task_start(other), _task_end(other)
-            if other_start is None or other_end is None:
-                continue
-            if current_start < other_end and other_start < current_end:
-                marked.update((current.uuid, other.uuid))
+        intervals.append((start, end, task.uuid))
+
+    active: list[tuple[int, str]] = []
+    for start, end, uuid in sorted(intervals):
+        active = [(active_end, active_uuid) for active_end, active_uuid in active if active_end > start]
+        for _, active_uuid in active:
+            marked.update((uuid, active_uuid))
+        active.append((end, uuid))
     return marked
 
 
