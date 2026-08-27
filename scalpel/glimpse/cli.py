@@ -4,6 +4,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -21,6 +22,14 @@ from .style import color_enabled
 
 def _degraded_terminal() -> bool:
     return os.environ.get("TERM", "").strip().lower() in {"", "dumb", "unknown"}
+
+
+def _output_width(requested: int) -> int:
+    if requested < 0:
+        raise ValueError("--width must be zero (auto) or a positive integer")
+    if requested:
+        return requested
+    return shutil.get_terminal_size(fallback=(80, 24)).columns
 
 
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
@@ -55,7 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-completed", action="store_true")
     parser.add_argument("--view", choices=("agenda", "day", "week"), default="agenda", help="View to render")
     parser.add_argument("--date", help="Start day to render as YYYY-MM-DD")
-    parser.add_argument("--width", type=int, default=80, help="Maximum output width (default: 80)")
+    parser.add_argument(
+        "--width", type=int, default=0, help="Maximum output width (default: terminal width, or 80 when piped)"
+    )
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
     parser.add_argument("--plain", dest="no_color", action="store_true", help="Alias for --no-color")
     parser.add_argument("--ascii", action="store_true", help="Use ASCII markers and rules only")
@@ -122,13 +133,12 @@ def main(argv: list[str] | None = None) -> int:
         snapshot = _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today)
         color = color_enabled(requested=False if args.no_color else None)
         ascii_only = args.ascii or _degraded_terminal()
+        width = _output_width(args.width)
         now_ms = int(dt.datetime.now().timestamp() * 1000)
         if args.view == "day":
             selected_day = _parse_date(args.date, fallback=snapshot.start_date)
             print(
-                render_day(
-                    snapshot, day=selected_day, width=args.width, color=color, ascii_only=ascii_only, now_ms=now_ms
-                )
+                render_day(snapshot, day=selected_day, width=width, color=color, ascii_only=ascii_only, now_ms=now_ms)
             )
         elif args.view == "week":
             selected_day = _parse_date(args.date, fallback=snapshot.start_date)
@@ -136,14 +146,14 @@ def main(argv: list[str] | None = None) -> int:
                 render_week(
                     snapshot,
                     week_start=selected_day,
-                    width=args.width,
+                    width=width,
                     color=color,
                     ascii_only=ascii_only,
                     now_ms=now_ms,
                 )
             )
         else:
-            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=ascii_only, now_ms=now_ms))
+            print(render_agenda(snapshot, width=width, color=color, ascii_only=ascii_only, now_ms=now_ms))
         return 0
     except BrokenPipeError:
         return 0

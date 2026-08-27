@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import os
 import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -79,6 +80,20 @@ class GlimpseCliContractTests(unittest.TestCase):
     def test_plain_is_a_no_color_alias(self) -> None:
         args = build_parser().parse_args(["--plain"])
         self.assertTrue(args.no_color)
+
+    def test_default_width_uses_terminal_columns(self) -> None:
+        with patch("scalpel.glimpse.cli.shutil.get_terminal_size", return_value=os.terminal_size((120, 24))):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                with patch("scalpel.glimpse.cli.build_payload", return_value=_payload()):
+                    self.assertEqual(main(["--plain"]), 0)
+        self.assertTrue(all(len(line) <= 120 for line in output.getvalue().splitlines()))
+
+    def test_negative_width_is_reported_as_a_cli_error(self) -> None:
+        error = io.StringIO()
+        with patch("scalpel.glimpse.cli.build_payload", return_value=_payload()), redirect_stderr(error):
+            self.assertEqual(main(["--width", "-1"]), 2)
+        self.assertIn("--width must be zero", error.getvalue())
 
     def test_today_date_alias_and_ascii_mode_are_supported(self) -> None:
         with patch("scalpel.glimpse.cli.build_payload", return_value=_payload()):
