@@ -15,7 +15,7 @@ ROOT="$(
 command -v git >/dev/null 2>&1 || die "git is required"
 command -v tar >/dev/null 2>&1 || die "tar is required"
 command -v python3 >/dev/null 2>&1 || die "python3 is required"
-[[ -d "$ROOT/.git" ]] || die "expected git checkout at $ROOT"
+[[ -d "$ROOT/.git" || -f "$ROOT/.git" ]] || die "expected git checkout at $ROOT"
 
 SNAP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/scalpel-hygiene.XXXXXX")"
 SNAP_REPO="$SNAP_ROOT/repo"

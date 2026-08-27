@@ -46,6 +46,7 @@ release = [
 
 [project.scripts]
 scalpel = "scalpel.cli:main"
+scalpel-glimpse = "scalpel.glimpse.cli:main"
 scalpel-ci = "scalpel.tools.ci:main"
 scalpel-doctor = "scalpel.tools.doctor:main"
 scalpel-check = "scalpel.tools.check:main"

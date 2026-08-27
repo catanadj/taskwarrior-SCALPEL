@@ -14,6 +14,7 @@ class TestCIHygieneContract(unittest.TestCase):
         self.assertIn('git -C "$ROOT" archive --format=tar HEAD', text)
         self.assertIn('python3 -m scalpel.tools.doctor --root "$SNAP_REPO" --strict', text)
         self.assertIn('PYTHONPATH="$SNAP_REPO"', text)
+        self.assertIn('-f "$ROOT/.git"', text)
 
     def test_ci_workflow_runs_snapshot_hygiene_job(self) -> None:
         text = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8", errors="replace")
