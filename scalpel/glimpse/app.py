@@ -5,9 +5,9 @@ import datetime as dt
 from dataclasses import dataclass, replace
 from typing import Literal
 
+from .details import task_details
 from .model import GlimpseSnapshot
 from .render import render_agenda, render_day, render_week
-from .details import task_details
 from .search import search_snapshot
 
 ViewName = Literal["agenda", "day", "week"]

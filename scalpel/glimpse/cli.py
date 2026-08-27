@@ -12,10 +12,10 @@ from ..payload import build_payload
 from ..process import ProcessError
 from ..util.timeparse import parse_date_yyyy_mm_dd, parse_workhours
 from ..util.tz import normalize_tz_name, resolve_tz, today_date
+from .app import run_interactive
 from .render import render_agenda, render_day, render_week
 from .source import snapshot_from_payload
 from .style import color_enabled
-from .app import run_interactive
 
 
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
