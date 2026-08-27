@@ -17,7 +17,7 @@ from .schema_v1 import apply_schema_v1
 from .taskwarrior import parse_tw_utc_to_epoch_ms, run_task_export
 from .util.console import eprint
 from .util.timeparse import midnight_epoch_ms
-from .util.tz import normalize_tz_name, resolve_tz
+from .util.tz import normalize_tz_name
 from .util.viewkey import make_view_key
 
 

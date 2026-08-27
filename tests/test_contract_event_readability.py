@@ -55,7 +55,6 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('kind: "selection"', init)
 
     def test_mobile_calendar_keeps_day_columns_usable_and_touch_targets_large_enough(self) -> None:
-        calendar_css = read_render_asset("css/part05_calendar.css")
         modal_css = read_render_asset("css/part07_modals_misc.css")
         self.assertIn("min-width: calc(var(--days) * 156px)", modal_css)
         self.assertIn("grid-template-columns: repeat(var(--days), minmax(156px, 1fr))", modal_css)

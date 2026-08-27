@@ -20,7 +20,7 @@ from .style import color_enabled
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
     if value is None or value.strip().lower() == "today":
         return fallback
-    return parse_date_yyyy_mm_dd(value)  # type: ignore[no-any-return]
+    return parse_date_yyyy_mm_dd(value)
 
 
 def build_parser() -> argparse.ArgumentParser:
