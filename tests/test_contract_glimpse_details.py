@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import unittest
 
-from scalpel.glimpse.app import GlimpseState, update_state
+from scalpel.glimpse.app import GlimpseState, _detail_annotations, update_state
 from scalpel.glimpse.details import task_details
 from scalpel.glimpse.model import GlimpseSnapshot, GlimpseTask
 from scalpel.glimpse.search import search_snapshot
@@ -31,6 +31,15 @@ class GlimpseDetailsContractTests(unittest.TestCase):
         opened = update_state(GlimpseState(), "\n")
         self.assertTrue(opened.details_visible)
         self.assertFalse(update_state(opened, "\x1b").details_visible)
+
+    def test_detail_annotations_explain_overlap_and_out_of_hours(self) -> None:
+        base = int(dt.datetime(2026, 8, 27, 7, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        first = self.task.__class__("u1", "First", "pending", "2026-08-27", base, None, base, base + 60 * 60_000, 60, None, (), False)
+        second = self.task.__class__("u2", "Second", "pending", "2026-08-27", base + 30 * 60_000, None, base + 30 * 60_000, base + 90 * 60_000, 60, None, (), False)
+        snapshot = GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (first, second), 8 * 60, 18 * 60)
+        notes = _detail_annotations(snapshot, 0)
+        self.assertIn("Overlaps another task.", notes)
+        self.assertIn("Starts outside configured work hours.", notes)
 
 
 if __name__ == "__main__":

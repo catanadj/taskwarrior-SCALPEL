@@ -46,6 +46,19 @@ class GlimpseFoundationContractTests(unittest.TestCase):
     def test_cli_parser_has_stable_program_identity(self) -> None:
         self.assertEqual(build_parser().prog, "scalpel-glimpse")
 
+    def test_snapshot_preserves_workhours_and_valid_custom_bands(self) -> None:
+        snapshot = snapshot_from_payload(
+            {"cfg": {"work_start_min": 480, "work_end_min": 1080, "time_bands": [
+                {"label": "Focus", "start": 540, "end": 720},
+                {"label": "Invalid", "start": 800, "end": 700},
+            ]}},
+            start_date=dt.date(2026, 8, 27),
+            days=1,
+            timezone_name="UTC",
+        )
+        self.assertEqual((snapshot.work_start_min, snapshot.work_end_min), (480, 1080))
+        self.assertEqual([(band.label, band.start_min, band.end_min) for band in snapshot.bands], [("Focus", 540, 720)])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
