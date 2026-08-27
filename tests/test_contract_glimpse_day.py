@@ -84,6 +84,29 @@ class GlimpseDayContractTests(unittest.TestCase):
         self.assertIn("Overnight handoff", output)
         self.assertTrue(all(len(line) <= 40 for line in output.splitlines()))
 
+    def test_day_view_keeps_continuing_tasks_in_the_same_lane(self) -> None:
+        base = int(dt.datetime(2026, 8, 27, 9, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        tasks = (
+            GlimpseTask(
+                "a", "Long focus", "pending", "2026-08-27", base, None, base, base + 3 * 60 * 60_000,
+                180, None, (), False
+            ),
+            GlimpseTask(
+                "b", "Short task", "pending", "2026-08-27", base + 30 * 60_000, None,
+                base + 30 * 60_000, base + 60 * 60_000, 30, None, (), False
+            ),
+            GlimpseTask(
+                "c", "Late task", "pending", "2026-08-27", base + 75 * 60_000, None,
+                base + 75 * 60_000, base + 90 * 60_000, 15, None, (), False
+            ),
+        )
+        output = render_day(GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", tasks), width=80)
+        hour_10 = output.split("10:00 │", 1)[1].split("11:00 │", 1)[0]
+        self.assertIn("L1", hour_10)
+        self.assertIn("L2", hour_10)
+        self.assertIn("Long focus", output)
+        self.assertEqual(output.count("Long focus"), 1)
+
     def test_day_view_handles_dst_transition_in_named_timezone(self) -> None:
         start = int(dt.datetime(2026, 3, 8, 6, 30, tzinfo=dt.timezone.utc).timestamp() * 1000)
         task = GlimpseTask(

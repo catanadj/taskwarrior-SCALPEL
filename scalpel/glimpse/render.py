@@ -237,6 +237,18 @@ def render_day(
         task.uuid: (_task_start(task), _task_end(task))
         for task in tasks
     }
+    lane_by_uuid: dict[str, int] = {}
+    lane_ends: list[int] = []
+    for task in tasks:
+        start, end = intervals[task.uuid]
+        if start is None or end is None or end <= start:
+            continue
+        lane = next((index for index, lane_end in enumerate(lane_ends) if start >= lane_end), len(lane_ends))
+        if lane == len(lane_ends):
+            lane_ends.append(end)
+        else:
+            lane_ends[lane] = end
+        lane_by_uuid[task.uuid] = lane
     first_visible_hour: dict[str, int] = {}
     for hour in range(24):
         slot_start = _local_hour_boundary_ms(selected_day, hour, timezone)
@@ -273,18 +285,13 @@ def render_day(
             lines.append(f"{label} {style.dim}│{style.reset}{band_label}{current_label}")
             continue
         lines.append(f"{label} {style.dim}│{style.reset}{band_label}{current_label}")
-        lanes: list[int] = []
         for task in active:
             start = _task_start(task)
             end = _task_end(task)
             duration = max(15, int(((end or start or slot_end) - (start or slot_start)) / 60_000))
             bar_width = max(1, min(12, duration // 15))
             marker = _marker(task, overlap=task.uuid in overlap_ids, style=style, ascii_only=ascii_only)
-            lane = next((index for index, lane_end in enumerate(lanes) if (start or 0) >= lane_end), len(lanes))
-            if lane == len(lanes):
-                lanes.append(end or slot_end)
-            else:
-                lanes[lane] = end or slot_end
+            lane = lane_by_uuid.get(task.uuid, 0)
             lane_prefix = f"L{lane + 1} " if width >= 72 else ""
             if first_visible_hour.get(task.uuid) != hour:
                 continuation = "  +-- continues" if ascii_only else "  └─ continues"
