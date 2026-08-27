@@ -233,6 +233,24 @@ def render_day(
     is_today = now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == selected_day
     bands = _default_bands(snapshot)
     lines = [f"{style.bold}SCALPEL · Day · {selected_day.strftime('%a %d %b %Y')}{style.reset}", ""]
+    intervals = {
+        task.uuid: (_task_start(task), _task_end(task))
+        for task in tasks
+    }
+    first_visible_hour: dict[str, int] = {}
+    for hour in range(24):
+        slot_start = _local_hour_boundary_ms(selected_day, hour, timezone)
+        slot_end = _local_hour_boundary_ms(selected_day, hour + 1, timezone)
+        for task in tasks:
+            start, end = intervals[task.uuid]
+            if (
+                start is not None
+                and end is not None
+                and end > slot_start
+                and start < slot_end
+                and task.uuid not in first_visible_hour
+            ):
+                first_visible_hour[task.uuid] = hour
     for hour in range(24):
         slot_start = _local_hour_boundary_ms(selected_day, hour, timezone)
         slot_end = _local_hour_boundary_ms(selected_day, hour + 1, timezone)
@@ -268,6 +286,10 @@ def render_day(
             else:
                 lanes[lane] = end or slot_end
             lane_prefix = f"L{lane + 1} " if width >= 72 else ""
+            if first_visible_hour.get(task.uuid) != hour:
+                continuation = "  +-- continues" if ascii_only else "  └─ continues"
+                lines.append(f"     {lane_prefix}{style.dim}{continuation}{style.reset}")
+                continue
             outside = start is not None and (
                 start < day_start + snapshot.work_start_min * 60_000
                 or start >= day_start + snapshot.work_end_min * 60_000

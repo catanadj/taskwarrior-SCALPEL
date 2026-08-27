@@ -24,7 +24,7 @@ class GlimpseDayContractTests(unittest.TestCase):
         base = int(dt.datetime(2026, 8, 27, 9, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
         tasks = (
             GlimpseTask(
-                "a", "Focus block", "pending", "2026-08-27", base, None, base, base + 3_600_000, 60, "work", (), False
+                "a", "Focus block", "pending", "2026-08-27", base, None, base, base + 7_200_000, 120, "work", (), False
             ),
             GlimpseTask(
                 "b",
@@ -46,6 +46,8 @@ class GlimpseDayContractTests(unittest.TestCase):
         self.assertIn("⚠", output)
         self.assertIn("████", output)
         self.assertIn("Focus block", output)
+        self.assertEqual(output.count("Focus block"), 1)
+        self.assertIn("continues", output)
         self.assertIn("Review", output)
         self.assertIn("1 conflict", output)
 
