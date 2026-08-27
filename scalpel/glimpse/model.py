@@ -14,6 +14,8 @@ class GlimpseTask:
     day_key: str
     scheduled_ms: int | None
     due_ms: int | None
+    start_ms: int | None
+    end_ms: int | None
     duration_min: int | None
     project: str | None
     tags: tuple[str, ...]

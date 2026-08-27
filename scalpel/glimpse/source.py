@@ -10,6 +10,14 @@ def _optional_int(value: object) -> int | None:
     return value if isinstance(value, int) else None
 
 
+def _first_int(*values: object) -> int | None:
+    for value in values:
+        parsed = _optional_int(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _optional_text(value: object) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -44,6 +52,8 @@ def snapshot_from_payload(
                 day_key=str(task.get("day_key") or ""),
                 scheduled_ms=_optional_int(task.get("scheduled_ms")),
                 due_ms=_optional_int(task.get("due_ms")),
+                start_ms=_first_int(task.get("start_calc_ms"), task.get("scheduled_ms"), task.get("due_ms")),
+                end_ms=_first_int(task.get("end_calc_ms"), task.get("end_ms")),
                 duration_min=_optional_int(task.get("duration_min")),
                 project=_optional_text(task.get("project")),
                 tags=_tags(task.get("tags")),
