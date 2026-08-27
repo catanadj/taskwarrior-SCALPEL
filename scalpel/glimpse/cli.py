@@ -5,7 +5,6 @@ import datetime as dt
 import json
 import sys
 from pathlib import Path
-from typing import cast
 
 from ..api import load_payload_from_json
 from ..payload import build_payload
@@ -21,7 +20,7 @@ from .style import color_enabled
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
     if value is None or value.strip().lower() == "today":
         return fallback
-    return cast(dt.date, parse_date_yyyy_mm_dd(value))
+    return parse_date_yyyy_mm_dd(value)  # type: ignore[no-any-return]
 
 
 def build_parser() -> argparse.ArgumentParser:
