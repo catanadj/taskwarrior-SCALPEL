@@ -101,7 +101,38 @@ def main(argv: list[str] | None = None) -> int:
         if args.interactive:
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 raise ValueError("--interactive requires a terminal")
-            run_interactive(snapshot)
+            refresh = None
+            if not args.payload:
+                def refresh_live() -> object:
+                    refreshed = build_payload(
+                        filter_str=args.filter,
+                        start_date=_parse_date(args.start, fallback=today),
+                        days=max(1, args.days),
+                        work_start=parse_workhours(args.workhours)[0],
+                        work_end=parse_workhours(args.workhours)[1],
+                        snap=args.snap,
+                        default_duration_min=args.default_duration,
+                        max_infer_duration_min=args.max_infer_duration,
+                        px_per_min=args.px_per_min,
+                        goals_path=args.goals,
+                        tz=tz_name,
+                        display_tz=display_tz,
+                        nautical_hooks_enabled=not args.no_nautical_hooks,
+                        show_completed=args.show_completed,
+                    )
+                    refreshed_cfg = refreshed.get("cfg", {})
+                    refreshed_start = dt.date.today()
+                    if isinstance(refreshed_cfg, dict) and isinstance(refreshed_cfg.get("view_start_ms"), int):
+                        refreshed_tz = resolve_tz(str(refreshed_cfg.get("tz") or timezone_name))
+                        refreshed_start = dt.datetime.fromtimestamp(refreshed_cfg["view_start_ms"] / 1000, tz=refreshed_tz).date()
+                    return snapshot_from_payload(
+                        refreshed,
+                        start_date=refreshed_start,
+                        days=int(refreshed_cfg.get("days", 1)) if isinstance(refreshed_cfg, dict) else 1,
+                        timezone_name=str(refreshed_cfg.get("display_tz") or refreshed_cfg.get("tz") or timezone_name) if isinstance(refreshed_cfg, dict) else timezone_name,
+                    )
+                refresh = refresh_live
+            run_interactive(snapshot, refresh=refresh)  # type: ignore[arg-type]
             return 0
         color = color_enabled(requested=False if args.no_color else None)
         if args.view == "day":
