@@ -95,7 +95,12 @@ def _read_search_query(window: curses.window, height: int, width: int) -> str:
         curses.noecho()
 
 
-def run_interactive(snapshot: GlimpseSnapshot | None = None, refresh: Callable[[], GlimpseSnapshot] | None = None, loader: Callable[[], GlimpseSnapshot] | None = None) -> None:
+def run_interactive(
+    snapshot: GlimpseSnapshot | None = None,
+    refresh: Callable[[], GlimpseSnapshot] | None = None,
+    loader: Callable[[], GlimpseSnapshot] | None = None,
+    view: ViewName = "agenda",
+) -> None:
     """Run the read-only curses shell and always restore the terminal on exit."""
 
     def loop(screen: object) -> None:
@@ -107,7 +112,7 @@ def run_interactive(snapshot: GlimpseSnapshot | None = None, refresh: Callable[[
         except curses.error:
             pass
         window.keypad(True)
-        state = GlimpseState()
+        state = GlimpseState(view=view)
         status = ""
         if snapshot is None and loader is not None:
             window.erase()

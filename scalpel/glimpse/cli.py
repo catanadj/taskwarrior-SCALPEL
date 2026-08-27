@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.interactive:
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 raise ValueError("--interactive requires a terminal")
-            run_interactive(loader=lambda: _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today))
+            run_interactive(loader=lambda: _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today), view=args.view)
             return 0
         snapshot = _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today)
         color = color_enabled(requested=False if args.no_color else None)
