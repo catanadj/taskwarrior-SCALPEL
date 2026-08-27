@@ -87,6 +87,34 @@ class GlimpseCliContractTests(unittest.TestCase):
                 self.assertEqual(main(["--start", "today", "--date", "today", "--ascii"]), 0)
         self.assertNotRegex(output.getvalue(), "[⚠✓⚓┃│█─…]")
 
+    def test_degraded_terminal_uses_ascii_output(self) -> None:
+        with (
+            patch.dict("os.environ", {"TERM": "dumb"}, clear=False),
+            patch("scalpel.glimpse.cli.build_payload", return_value=_payload()),
+        ):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([]), 0)
+        self.assertNotRegex(output.getvalue(), "[⚠✓⚓┃│█─…]")
+
+    def test_broken_output_pipe_is_a_successful_exit(self) -> None:
+        with (
+            patch("scalpel.glimpse.cli.build_payload", return_value=_payload()),
+            patch("builtins.print", side_effect=BrokenPipeError),
+        ):
+            self.assertEqual(main(["--plain"]), 0)
+
+    def test_degraded_terminal_rejects_interactive_mode_cleanly(self) -> None:
+        error = io.StringIO()
+        with (
+            patch.dict("os.environ", {"TERM": "dumb"}, clear=False),
+            patch.object(sys.stdin, "isatty", return_value=True),
+            patch.object(sys.stdout, "isatty", return_value=True),
+            redirect_stderr(error),
+        ):
+            self.assertEqual(main(["--interactive"]), 2)
+        self.assertIn("curses-capable terminal", error.getvalue())
+
     def test_missing_taskwarrior_is_reported_as_a_concise_cli_error(self) -> None:
         error = io.StringIO()
         with (
@@ -105,6 +133,7 @@ class GlimpseCliContractTests(unittest.TestCase):
 
     def test_interactive_forwards_requested_view_date_and_terminal_style(self) -> None:
         with (
+            patch.dict("os.environ", {"TERM": "xterm-256color"}, clear=False),
             patch("scalpel.glimpse.cli.run_interactive") as interactive,
             patch.object(sys.stdin, "isatty", return_value=True),
             patch.object(sys.stdout, "isatty", return_value=True),

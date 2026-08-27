@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +17,10 @@ from .model import GlimpseSnapshot
 from .render import render_agenda, render_day, render_week
 from .source import snapshot_from_payload
 from .style import color_enabled
+
+
+def _degraded_terminal() -> bool:
+    return os.environ.get("TERM", "").strip().lower() in {"", "dumb", "unknown"}
 
 
 def _parse_date(value: str | None, *, fallback: dt.date) -> dt.date:
@@ -104,22 +109,25 @@ def main(argv: list[str] | None = None) -> int:
         if args.interactive:
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 raise ValueError("--interactive requires a terminal")
+            if _degraded_terminal():
+                raise ValueError("--interactive requires a curses-capable terminal; use normal output instead")
             run_interactive(
                 loader=lambda: _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today),
                 view=args.view,
                 initial_date=_parse_date(args.date, fallback=today) if args.date else None,
                 color=color_enabled(requested=False if args.no_color else None),
-                ascii_only=args.ascii,
+                ascii_only=args.ascii or _degraded_terminal(),
             )
             return 0
         snapshot = _load_snapshot(args, tz_name=tz_name, display_tz=display_tz, today=today)
         color = color_enabled(requested=False if args.no_color else None)
+        ascii_only = args.ascii or _degraded_terminal()
         now_ms = int(dt.datetime.now().timestamp() * 1000)
         if args.view == "day":
             selected_day = _parse_date(args.date, fallback=snapshot.start_date)
             print(
                 render_day(
-                    snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms
+                    snapshot, day=selected_day, width=args.width, color=color, ascii_only=ascii_only, now_ms=now_ms
                 )
             )
         elif args.view == "week":
@@ -130,12 +138,14 @@ def main(argv: list[str] | None = None) -> int:
                     week_start=selected_day,
                     width=args.width,
                     color=color,
-                    ascii_only=args.ascii,
+                    ascii_only=ascii_only,
                     now_ms=now_ms,
                 )
             )
         else:
-            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
+            print(render_agenda(snapshot, width=args.width, color=color, ascii_only=ascii_only, now_ms=now_ms))
+        return 0
+    except BrokenPipeError:
         return 0
     except (OSError, ValueError, TypeError, ProcessError, json.JSONDecodeError) as exc:
         print(f"scalpel-glimpse: {exc}", file=sys.stderr)

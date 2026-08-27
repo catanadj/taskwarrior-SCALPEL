@@ -25,6 +25,8 @@ PLAIN_STYLE = AgendaStyle(*("" for _ in range(8)))
 def color_enabled(*, requested: bool | None = None, stream: object = sys.stdout) -> bool:
     if requested is False or "NO_COLOR" in os.environ:
         return False
+    if os.environ.get("TERM", "").strip().lower() in {"", "dumb", "unknown"}:
+        return False
     if requested is True:
         return True
     isatty = getattr(stream, "isatty", None)
