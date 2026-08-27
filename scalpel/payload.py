@@ -71,7 +71,16 @@ def _query_nautical_occurrences(*, start_date: dt.date, end_date: dt.date) -> di
     command = _nautical_query_command()
     if command is None:
         return {}
-    argv = command + ["occurrences", "--all", "--from", start_date.isoformat(), "--to", end_date.isoformat(), "--omissions", "exclude"]
+    argv = command + [
+        "occurrences",
+        "--all",
+        "--from",
+        start_date.isoformat(),
+        "--to",
+        end_date.isoformat(),
+        "--omissions",
+        "exclude",
+    ]
     try:
         result = run_checked(argv, timeout_s=30.0)
         document = json.loads(result.stdout)
@@ -177,7 +186,10 @@ def _build_nautical_preview_tasks(
     """Build previews through Nautical's versioned public query boundary."""
     if not nautical_hooks_enabled or not _raw_tasks_may_need_nautical(raw_tasks):
         return []
-    if not any(str(task.get("status") or raw.get("status") or "").strip().lower() != "completed" for task, raw in zip(base_tasks, raw_tasks, strict=False)):
+    if not any(
+        str(task.get("status") or raw.get("status") or "").strip().lower() != "completed"
+        for task, raw in zip(base_tasks, raw_tasks, strict=False)
+    ):
         return []
     occurrence_map = _query_nautical_occurrences(
         start_date=start_date,

@@ -18,11 +18,19 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
 
     def test_explicit_disable_skips_home_probe(self) -> None:
         with patch("scalpel.payload.shutil.which", side_effect=AssertionError("disabled query must not probe PATH")):
-            self.assertEqual(payload_mod._build_nautical_preview_tasks(
-                base_tasks=[], raw_tasks=[], start_date=dt.date(2026, 1, 1), days=1,
-                tz_name="UTC", default_duration_min=10, max_infer_duration_min=480,
-                nautical_hooks_enabled=False,
-            ), [])
+            self.assertEqual(
+                payload_mod._build_nautical_preview_tasks(
+                    base_tasks=[],
+                    raw_tasks=[],
+                    start_date=dt.date(2026, 1, 1),
+                    days=1,
+                    tz_name="UTC",
+                    default_duration_min=10,
+                    max_infer_duration_min=480,
+                    nautical_hooks_enabled=False,
+                ),
+                [],
+            )
 
     def test_env_can_disable_default(self) -> None:
         with patch.dict(os.environ, {"SCALPEL_ENABLE_NAUTICAL_HOOKS": "0"}, clear=False):
@@ -58,8 +66,16 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
         self.assertEqual(occurrences["u1"][0]["utc"], "20260102T080000Z")
         run.assert_called_once_with(
             [
-                "nautical", "query", "occurrences", "--all", "--from", "2026-01-01",
-                "--to", "2026-01-07", "--omissions", "exclude",
+                "nautical",
+                "query",
+                "occurrences",
+                "--all",
+                "--from",
+                "2026-01-01",
+                "--to",
+                "2026-01-07",
+                "--omissions",
+                "exclude",
             ],
             timeout_s=30.0,
         )
@@ -92,7 +108,16 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
         ]
 
         occurrence_ms = int(dt.datetime(2026, 1, 2, 8, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
-        occurrences = {"u1": [{"utc": dt.datetime.fromtimestamp(occurrence_ms / 1000, tz=dt.timezone.utc).isoformat().replace("+00:00", "Z")} for _ in range(3)]}
+        occurrences = {
+            "u1": [
+                {
+                    "utc": dt.datetime.fromtimestamp(occurrence_ms / 1000, tz=dt.timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z")
+                }
+                for _ in range(3)
+            ]
+        }
         with patch("scalpel.payload._query_nautical_occurrences", return_value=occurrences):
             out = payload_mod._build_nautical_preview_tasks(
                 base_tasks=base_tasks,
@@ -159,7 +184,9 @@ class TestPayloadNauticalOptInContract(unittest.TestCase):
             }
         ]
 
-        with patch("scalpel.payload._query_nautical_occurrences", side_effect=AssertionError("completed tasks must not query")):
+        with patch(
+            "scalpel.payload._query_nautical_occurrences", side_effect=AssertionError("completed tasks must not query")
+        ):
             out = payload_mod._build_nautical_preview_tasks(
                 base_tasks=base_tasks,
                 raw_tasks=raw_tasks,

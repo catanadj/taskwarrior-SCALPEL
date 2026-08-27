@@ -89,7 +89,10 @@ class GlimpseCliContractTests(unittest.TestCase):
 
     def test_missing_taskwarrior_is_reported_as_a_concise_cli_error(self) -> None:
         error = io.StringIO()
-        with patch("scalpel.glimpse.cli.build_payload", side_effect=CommandNotFoundError(["task"])), redirect_stderr(error):
+        with (
+            patch("scalpel.glimpse.cli.build_payload", side_effect=CommandNotFoundError(["task"])),
+            redirect_stderr(error),
+        ):
             self.assertEqual(main([]), 2)
         self.assertIn("Command not found: task", error.getvalue())
 
@@ -106,7 +109,9 @@ class GlimpseCliContractTests(unittest.TestCase):
             patch.object(sys.stdin, "isatty", return_value=True),
             patch.object(sys.stdout, "isatty", return_value=True),
         ):
-            self.assertEqual(main(["--interactive", "--view", "day", "--date", "2026-08-28", "--ascii", "--no-color"]), 0)
+            self.assertEqual(
+                main(["--interactive", "--view", "day", "--date", "2026-08-28", "--ascii", "--no-color"]), 0
+            )
         self.assertEqual(interactive.call_args.kwargs["view"], "day")
         self.assertEqual(interactive.call_args.kwargs["initial_date"], dt.date(2026, 8, 28))
         self.assertTrue(interactive.call_args.kwargs["ascii_only"])

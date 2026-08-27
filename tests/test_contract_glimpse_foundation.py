@@ -56,10 +56,16 @@ class GlimpseFoundationContractTests(unittest.TestCase):
 
     def test_snapshot_preserves_workhours_and_valid_custom_bands(self) -> None:
         snapshot = snapshot_from_payload(
-            {"cfg": {"work_start_min": 480, "work_end_min": 1080, "time_bands": [
-                {"label": "Focus", "start": 540, "end": 720},
-                {"label": "Invalid", "start": 800, "end": 700},
-            ]}},
+            {
+                "cfg": {
+                    "work_start_min": 480,
+                    "work_end_min": 1080,
+                    "time_bands": [
+                        {"label": "Focus", "start": 540, "end": 720},
+                        {"label": "Invalid", "start": 800, "end": 700},
+                    ],
+                }
+            },
             start_date=dt.date(2026, 8, 27),
             days=1,
             timezone_name="UTC",

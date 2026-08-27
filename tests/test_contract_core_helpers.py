@@ -20,6 +20,7 @@ class PayloadHelperContractTests(unittest.TestCase):
         self.assertTrue(payload._raw_tasks_may_need_nautical([{"anchor": " daily "}]))
         self.assertFalse(payload._raw_tasks_may_need_nautical([{}, {"anchor": " "}]))
 
+
 class ServeHelperContractTests(unittest.TestCase):
     def test_url_host_and_query_helpers(self) -> None:
         self.assertEqual(serve._format_http_url("0.0.0.0", 8080, "status"), "http://127.0.0.1:8080/status")

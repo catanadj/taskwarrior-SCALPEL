@@ -117,10 +117,23 @@ def main(argv: list[str] | None = None) -> int:
         now_ms = int(dt.datetime.now().timestamp() * 1000)
         if args.view == "day":
             selected_day = _parse_date(args.date, fallback=snapshot.start_date)
-            print(render_day(snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
+            print(
+                render_day(
+                    snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms
+                )
+            )
         elif args.view == "week":
             selected_day = _parse_date(args.date, fallback=snapshot.start_date)
-            print(render_week(snapshot, week_start=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
+            print(
+                render_week(
+                    snapshot,
+                    week_start=selected_day,
+                    width=args.width,
+                    color=color,
+                    ascii_only=args.ascii,
+                    now_ms=now_ms,
+                )
+            )
         else:
             print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii, now_ms=now_ms))
         return 0

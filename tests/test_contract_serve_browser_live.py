@@ -361,6 +361,10 @@ class _HeadlessChromium:
         self.chromium_bin = chromium_bin
         self.port = _free_port()
         self.proc: subprocess.Popen[str] | None = None
+        self.profile_dir = tempfile.TemporaryDirectory(
+            prefix="scalpel-chromium-",
+            ignore_cleanup_errors=True,
+        )
         self.base = f"http://127.0.0.1:{self.port}"
 
     def __enter__(self) -> "_HeadlessChromium":
@@ -370,6 +374,9 @@ class _HeadlessChromium:
                 "--headless=new",
                 "--disable-gpu",
                 "--no-sandbox",
+                "--no-first-run",
+                "--no-default-browser-check",
+                f"--user-data-dir={self.profile_dir.name}",
                 f"--remote-debugging-port={self.port}",
                 "about:blank",
             ],
@@ -392,6 +399,7 @@ class _HeadlessChromium:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
             self.proc = None
+        self.profile_dir.cleanup()
 
 
 def _run_cdp_node_script(*, node_bin: str, devtools_port: int, page_url: str, script: str) -> None:

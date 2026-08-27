@@ -16,6 +16,8 @@ def _highlight(value: str, query: str, *, ascii_only: bool = False) -> str:
         return value
     left, right = ("[", "]") if ascii_only else ("⟦", "⟧")
     return re.sub(re.escape(needle), lambda match: f"{left}{match.group(0)}{right}", value, flags=re.IGNORECASE)
+
+
 def _truncate(value: str, width: int) -> str:
     if width <= 0:
         return ""
@@ -69,8 +71,16 @@ def _default_bands(snapshot: GlimpseSnapshot) -> tuple[GlimpseBand, ...]:
     if snapshot.bands:
         return snapshot.bands
     start, end = snapshot.work_start_min, snapshot.work_end_min
-    candidates = (("Morning", start, min(end, start + 240)), ("Focus", start + 240, min(end, start + 480)), ("Afternoon", start + 480, end))
-    return tuple(GlimpseBand(label, max(start, band_start), band_end) for label, band_start, band_end in candidates if band_end > max(start, band_start))
+    candidates = (
+        ("Morning", start, min(end, start + 240)),
+        ("Focus", start + 240, min(end, start + 480)),
+        ("Afternoon", start + 480, end),
+    )
+    return tuple(
+        GlimpseBand(label, max(start, band_start), band_end)
+        for label, band_start, band_end in candidates
+        if band_end > max(start, band_start)
+    )
 
 
 def _band_at(bands: Sequence[GlimpseBand], minute: int) -> GlimpseBand | None:
@@ -93,7 +103,9 @@ def _day_tasks(snapshot: GlimpseSnapshot) -> dict[str, list[GlimpseTask]]:
 
 
 def _marker(task: GlimpseTask, *, overlap: bool, style: AgendaStyle, ascii_only: bool = False) -> str:
-    overlap_glyph, completed_glyph, nautical_glyph, regular_glyph = ("!", "x", "@", "|") if ascii_only else ("⚠", "✓", "⚓", "┃")
+    overlap_glyph, completed_glyph, nautical_glyph, regular_glyph = (
+        ("!", "x", "@", "|") if ascii_only else ("⚠", "✓", "⚓", "┃")
+    )
     if overlap:
         return f"{style.red}{overlap_glyph}{style.reset}"
     if task.status.lower() == "completed":
@@ -103,14 +115,29 @@ def _marker(task: GlimpseTask, *, overlap: bool, style: AgendaStyle, ascii_only:
     return f"{style.magenta}{regular_glyph}{style.reset}"
 
 
-def _row(task: GlimpseTask, *, overlap: bool, timezone: dt.tzinfo, width: int, style: AgendaStyle, ascii_only: bool = False, highlight_query: str = "") -> str:
+def _row(
+    task: GlimpseTask,
+    *,
+    overlap: bool,
+    timezone: dt.tzinfo,
+    width: int,
+    style: AgendaStyle,
+    ascii_only: bool = False,
+    highlight_query: str = "",
+) -> str:
     time = _local_time(_task_start(task), timezone)
     marker = _marker(task, overlap=overlap, style=style, ascii_only=ascii_only)
     duration = _format_duration(task.duration_min)
-    project = f"  {project_color(task.project, style=style)}{task.project}{style.reset if task.project else ''}" if task.project else ""
+    project = (
+        f"  {project_color(task.project, style=style)}{task.project}{style.reset if task.project else ''}"
+        if task.project
+        else ""
+    )
     suffix = f"{duration:>7}{project}"
     description_width = max(8, width - 14 - len(suffix))
-    description = _truncate(_highlight(task.description or "(untitled)", highlight_query, ascii_only=ascii_only), description_width)
+    description = _truncate(
+        _highlight(task.description or "(untitled)", highlight_query, ascii_only=ascii_only), description_width
+    )
     return f"  {time} {marker} {description:<{description_width}}{suffix}".rstrip()
 
 
@@ -136,13 +163,27 @@ def render_agenda(
         day = snapshot.start_date + dt.timedelta(days=offset)
         day_key = day.isoformat()
         tasks = groups.get(day_key, [])
-        today_marker = " · today" if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ""
+        today_marker = (
+            " · today"
+            if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day
+            else ""
+        )
         lines.append(f"{style.bold}{day.strftime('%a %d %b')}{today_marker}{style.reset}")
         if not tasks:
             lines.append(f"  {style.dim}No tasks scheduled.{style.reset}")
         else:
             for task in tasks:
-                lines.append(_row(task, overlap=task.uuid in overlap_ids, timezone=timezone, width=width, style=style, ascii_only=ascii_only, highlight_query=highlight_query))
+                lines.append(
+                    _row(
+                        task,
+                        overlap=task.uuid in overlap_ids,
+                        timezone=timezone,
+                        width=width,
+                        style=style,
+                        ascii_only=ascii_only,
+                        highlight_query=highlight_query,
+                    )
+                )
                 if isinstance(task.duration_min, int) and task.duration_min > 0:
                     total_minutes += task.duration_min
                 conflicts += int(task.uuid in overlap_ids)
@@ -194,7 +235,11 @@ def render_day(
         label = f"{hour:02d}:00"
         band = _band_at(bands, hour * 60 + 30)
         band_label = f" {style.dim}[{band.label}]{style.reset}" if band else ""
-        current = is_today and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).hour == hour if now_ms is not None else False
+        current = (
+            is_today and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).hour == hour
+            if now_ms is not None
+            else False
+        )
         current_label = f" {style.red}◀ now{style.reset}" if current else ""
         if not active:
             lines.append(f"{label} {style.dim}│{style.reset}{band_label}{current_label}")
@@ -213,9 +258,15 @@ def render_day(
             else:
                 lanes[lane] = end or slot_end
             lane_prefix = f"L{lane + 1} " if width >= 72 else ""
-            outside = start is not None and (start < day_start + snapshot.work_start_min * 60_000 or start >= day_start + snapshot.work_end_min * 60_000)
+            outside = start is not None and (
+                start < day_start + snapshot.work_start_min * 60_000
+                or start >= day_start + snapshot.work_end_min * 60_000
+            )
             suffix = " [outside work hours]" if outside else ""
-            description = _truncate(_highlight((task.description or "(untitled)") + suffix, highlight_query, ascii_only=ascii_only), max(8, width - 22 - len(lane_prefix)))
+            description = _truncate(
+                _highlight((task.description or "(untitled)") + suffix, highlight_query, ascii_only=ascii_only),
+                max(8, width - 22 - len(lane_prefix)),
+            )
             bar = "#" if ascii_only else "█"
             lines.append(f"     {lane_prefix}{marker} {bar * bar_width} {description}")
     lines.append("")
@@ -251,7 +302,10 @@ def render_week(
     lines = [f"{style.bold}SCALPEL · Week · {selected_start.isoformat()}{style.reset}", ""]
     bands = _default_bands(snapshot)
     if bands and width >= 72:
-        band_summary = " · ".join(f"{band.label} {band.start_min // 60:02d}:{band.start_min % 60:02d}-{band.end_min // 60:02d}:{band.end_min % 60:02d}" for band in bands)
+        band_summary = " · ".join(
+            f"{band.label} {band.start_min // 60:02d}:{band.start_min % 60:02d}-{band.end_min // 60:02d}:{band.end_min % 60:02d}"
+            for band in bands
+        )
         lines.append(f"{style.dim}Bands: {band_summary}{style.reset}")
         lines.append("")
 
@@ -267,13 +321,27 @@ def render_week(
                 lines.append(f"  {style.dim}—{style.reset}")
             else:
                 for task in tasks:
-                    lines.append(_row(task, overlap=task.uuid in overlaps, timezone=timezone, width=width, style=style, ascii_only=ascii_only, highlight_query=highlight_query))
+                    lines.append(
+                        _row(
+                            task,
+                            overlap=task.uuid in overlaps,
+                            timezone=timezone,
+                            width=width,
+                            style=style,
+                            ascii_only=ascii_only,
+                            highlight_query=highlight_query,
+                        )
+                    )
             lines.append("")
         return "\n".join(lines).rstrip()
 
     column_width = max(4, (width - 14) // 7)
     header = "  " + "  ".join(
-        _truncate(f"{day.strftime('%a')} {day.day:02d}{' *' if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ''}", column_width).ljust(column_width) for day in days
+        _truncate(
+            f"{day.strftime('%a')} {day.day:02d}{' *' if now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == day else ''}",
+            column_width,
+        ).ljust(column_width)
+        for day in days
     )
     lines.append(header.rstrip())
     lines.append("  " + "  ".join(("-" if ascii_only else "─") * column_width for _ in days))
@@ -285,14 +353,35 @@ def render_week(
                 cells.append("".ljust(column_width))
                 continue
             task = tasks[row_index]
-            marker = "!" if task.uuid in overlaps and ascii_only else "⚠" if task.uuid in overlaps else "@" if task.nautical_preview and ascii_only else "⚓" if task.nautical_preview else "x" if task.status.lower() == "completed" and ascii_only else "✓" if task.status.lower() == "completed" else "."
+            marker = (
+                "!"
+                if task.uuid in overlaps and ascii_only
+                else "⚠"
+                if task.uuid in overlaps
+                else "@"
+                if task.nautical_preview and ascii_only
+                else "⚓"
+                if task.nautical_preview
+                else "x"
+                if task.status.lower() == "completed" and ascii_only
+                else "✓"
+                if task.status.lower() == "completed"
+                else "."
+            )
             time = _local_time(_task_start(task), timezone)
             project = f" · {task.project}" if task.project else ""
-            visible_cell = _truncate(f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}{project}", column_width)
+            visible_cell = _truncate(
+                f"{time} {marker} {_highlight(task.description or '(untitled)', highlight_query, ascii_only=ascii_only)}{project}",
+                column_width,
+            )
             cell = visible_cell
             if task.project and task.project in visible_cell:
                 color_code = project_color(task.project, style=style)
-                cell = visible_cell.replace(task.project, f"{color_code}{task.project}{style.reset}", 1) if color_code else visible_cell
+                cell = (
+                    visible_cell.replace(task.project, f"{color_code}{task.project}{style.reset}", 1)
+                    if color_code
+                    else visible_cell
+                )
             cells.append(cell.ljust(column_width))
         lines.append("  " + "  ".join(cells).rstrip())
     return "\n".join(lines)

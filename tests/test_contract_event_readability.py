@@ -37,13 +37,13 @@ class EventReadabilityContractTests(unittest.TestCase):
         notes = read_render_asset("js/part08_notes.js")
         self.assertIn('el.setAttribute("role", "button")', rendering)
         self.assertIn('el.addEventListener("keydown"', rendering)
-        self.assertIn('el.tabIndex = isPreview ? -1 : 0', rendering)
+        self.assertIn("el.tabIndex = isPreview ? -1 : 0", rendering)
         self.assertIn('aria-modal="true"', OVERLAY_MARKUP)
         self.assertEqual(OVERLAY_MARKUP.count('role="dialog"'), 10)
-        self.assertEqual(OVERLAY_MARKUP.count('aria-labelledby='), 10)
+        self.assertEqual(OVERLAY_MARKUP.count("aria-labelledby="), 10)
         self.assertIn('document.addEventListener("keydown", (ev) =>', core)
         self.assertIn('document.addEventListener("focusin", (ev) =>', core)
-        self.assertIn('aria-pressed', OVERLAY_MARKUP)
+        self.assertIn("aria-pressed", OVERLAY_MARKUP)
         self.assertIn("b.setAttribute('aria-pressed'", notes)
 
     def test_frontend_render_telemetry_is_bounded_and_opt_in(self) -> None:
@@ -74,10 +74,10 @@ class EventReadabilityContractTests(unittest.TestCase):
         self.assertIn('role="status"', right_panel)
         self.assertIn('aria-atomic="true"', right_panel)
         self.assertIn('id = "calendarEmpty"', selection)
-        self.assertIn('No tasks match', rendering)
-        self.assertIn('No tasks yet. Add a task to start planning.', rendering)
-        self.assertIn('status-error', core)
-        self.assertIn('.calendar-empty', css)
+        self.assertIn("No tasks match", rendering)
+        self.assertIn("No tasks yet. Add a task to start planning.", rendering)
+        self.assertIn("status-error", core)
+        self.assertIn(".calendar-empty", css)
 
     def test_event_detail_levels_follow_rendered_height(self) -> None:
         rendering = read_render_asset("js/part04_rendering.js")
@@ -103,7 +103,7 @@ class EventReadabilityContractTests(unittest.TestCase):
 
         self.assertIn("__syncCalendarSelectionFocusState", rendering)
         self.assertIn("calendar-selection-focus", rendering)
-        self.assertIn("evNode.dataset.preview !== \"1\"", rendering)
+        self.assertIn('evNode.dataset.preview !== "1"', rendering)
         self.assertIn("body.calendar-selection-focus .evt:not(.selected)", calendar_css)
         self.assertIn("body.calendar-selection-focus .evt:not(.selected):hover", calendar_css)
         self.assertIn("body.calendar-selection-focus .evt.selected", calendar_css)
@@ -158,10 +158,10 @@ class EventReadabilityContractTests(unittest.TestCase):
         rendering = read_render_asset("js/part04_rendering.js")
         self.assertIn('key: "anchor"', rendering)
         self.assertIn('label: "anchor"', rendering)
-        self.assertIn('detailsTask.anchor ?? fallbackTask.anchor', rendering)
+        self.assertIn("detailsTask.anchor ?? fallbackTask.anchor", rendering)
         self.assertIn('key: "cp"', rendering)
         self.assertIn('label: "cp"', rendering)
-        self.assertIn('detailsTask.cp ?? fallbackTask.cp', rendering)
+        self.assertIn("detailsTask.cp ?? fallbackTask.cp", rendering)
         self.assertIn('"anchor", "cp"', rendering)
 
     def test_completed_tasks_render_as_completion_strips_not_planning_blocks(self) -> None:
@@ -172,8 +172,8 @@ class EventReadabilityContractTests(unittest.TestCase):
 
         self.assertIn("markerHPx", rendering)
         self.assertIn('isCompleted ? "8px"', rendering)
-        self.assertIn('layoutOverlapGroups(normalEvents)', rendering)
-        self.assertIn('if (!isCompleted) allByDay[di].push', selection)
+        self.assertIn("layoutOverlapGroups(normalEvents)", rendering)
+        self.assertIn("if (!isCompleted) allByDay[di].push", selection)
         self.assertIn('String(tt.status || "").toLowerCase() === "completed"', drag)
         self.assertIn(".evt.completed-task", css)
         self.assertIn("border-radius: 999px", css)

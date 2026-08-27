@@ -11,12 +11,17 @@ def _format_time(timestamp_ms: int | None, timezone_name: str) -> str:
         return "—"
     try:
         from ..util.tz import resolve_tz
-        return dt.datetime.fromtimestamp(timestamp_ms / 1000, tz=resolve_tz(timezone_name)).strftime("%Y-%m-%d %H:%M %Z")
+
+        return dt.datetime.fromtimestamp(timestamp_ms / 1000, tz=resolve_tz(timezone_name)).strftime(
+            "%Y-%m-%d %H:%M %Z"
+        )
     except (OverflowError, OSError, ValueError):
         return "invalid time"
 
 
-def task_details(task: GlimpseTask, *, width: int = 72, timezone_name: str = "UTC", annotations: Sequence[str] = ()) -> str:
+def task_details(
+    task: GlimpseTask, *, width: int = 72, timezone_name: str = "UTC", annotations: Sequence[str] = ()
+) -> str:
     """Return a readable, width-bounded detail panel for one task."""
     width = max(32, int(width))
     lines = [

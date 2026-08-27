@@ -153,7 +153,9 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                     self._send_json(500, {"ok": False, "error": f"Failed reading HTML: {ex}"})
                     return
                 html = context.inject_bootstrap(html, client_state)
-                set_cookie = bool(self._query_token()) and hmac.compare_digest(self._query_token(), config.required_token)
+                set_cookie = bool(self._query_token()) and hmac.compare_digest(
+                    self._query_token(), config.required_token
+                )
                 self._send_html(200, html, set_auth_cookie=set_cookie)
                 return
 
@@ -261,6 +263,10 @@ def make_handler(context: HttpContext) -> type[BaseHTTPRequestHandler]:
                 self._send_json(400, {"ok": False, "error": "Content-Length must be a valid integer."})
                 return
             if content_length < 0 or content_length > _MAX_JSON_BODY_BYTES:
+                # Consume a bounded prefix before responding so clients that are
+                # already streaming a slightly oversized body receive 413
+                # instead of a connection-level BrokenPipeError.
+                self.rfile.read(min(content_length, _MAX_JSON_BODY_BYTES + (64 * 1024)))
                 self._send_json(413, {"ok": False, "error": "JSON request body is too large."})
                 return
             try:

@@ -136,9 +136,7 @@ def serve(
 
     server = server_factory((cfg.host, cfg.port), handler)
     actual_host, actual_port = server.server_address[:2]
-    serve_url = _format_http_url(
-        str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}"
-    )
+    serve_url = _format_http_url(str(actual_host), int(actual_port), f"/?token={quote(cfg.required_token, safe='')}")
     print(serve_url)
 
     if not getattr(args, "no_open", False) and browser_open is not None:

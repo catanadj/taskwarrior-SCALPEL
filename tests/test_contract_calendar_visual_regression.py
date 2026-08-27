@@ -96,8 +96,8 @@ class CalendarVisualRegressionContractTests(unittest.TestCase):
     def test_completed_tasks_remain_completion_strips_not_full_planning_blocks(self) -> None:
         self.assertIn("markerHPx", self.rendering_js)
         self.assertIn('isCompleted ? "8px"', self.rendering_js)
-        self.assertIn('layoutOverlapGroups(normalEvents)', self.rendering_js)
-        self.assertIn('if (!isCompleted) allByDay[di].push', self.selection_js)
+        self.assertIn("layoutOverlapGroups(normalEvents)", self.rendering_js)
+        self.assertIn("if (!isCompleted) allByDay[di].push", self.selection_js)
         self.assertIn('String(tt.status || "").toLowerCase() === "completed"', self.drag_js)
         self.assertIn(".evt.completed-task", self.calendar_css)
         self.assertIn("border-radius: 999px", self.calendar_css)
