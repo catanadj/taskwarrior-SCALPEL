@@ -13,6 +13,9 @@ python3 -m pip install taskwarrior-scalpel
 scalpel-glimpse
 ```
 
+For Bash completion, source `contrib/completions/scalpel-glimpse.bash` from the
+checkout or install it with your shell's completion files.
+
 Taskwarrior must be available on `PATH`. For offline or reproducible output,
 render a saved payload instead:
 
