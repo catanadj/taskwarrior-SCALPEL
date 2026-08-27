@@ -31,6 +31,34 @@ class GlimpseWeekContractTests(unittest.TestCase):
         self.assertIn("work", colored)
         self.assertRegex(colored, r"\x1b\[[0-9;]*mwork\x1b\[0m")
 
+    def test_week_view_sparse_and_crowded_fixtures(self) -> None:
+        base = int(dt.datetime(2026, 8, 24, 9, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        sparse = GlimpseSnapshot(dt.date(2026, 8, 24), 7, "UTC", ())
+        crowded_tasks = tuple(
+            GlimpseTask(
+                f"crowded-{index}",
+                f"Crowded item {index}",
+                "pending",
+                "2026-08-24",
+                base + index * 15 * 60_000,
+                None,
+                base + index * 15 * 60_000,
+                base + (index + 2) * 15 * 60_000,
+                30,
+                "work",
+                (),
+                False,
+            )
+            for index in range(6)
+        )
+        sparse_output = render_week(sparse, width=80)
+        crowded_output = render_week(GlimpseSnapshot(dt.date(2026, 8, 24), 7, "UTC", crowded_tasks), width=80)
+        self.assertIn("Mon 24", sparse_output)
+        self.assertIn("0 conflict", sparse_output)
+        self.assertIn("6 tasks", crowded_output)
+        self.assertIn("3 conflicts", crowded_output)
+        self.assertIn("⚠", crowded_output)
+
     def test_week_view_stacks_days_when_narrow(self) -> None:
         tasks = (
             GlimpseTask("a", "Monday review", "pending", "2026-08-24", 1, None, 1, 1, 30, None, (), False),
