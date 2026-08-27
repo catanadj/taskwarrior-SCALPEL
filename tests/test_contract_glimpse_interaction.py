@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import datetime as dt
 import unittest
 from unittest.mock import patch
 
-from scalpel.glimpse.app import GlimpseState, _read_search_query, update_state
+from scalpel.glimpse.app import GlimpseState, _read_search_query, run_interactive, update_state
+from scalpel.glimpse.model import GlimpseSnapshot
 
 
 class GlimpseInteractionContractTests(unittest.TestCase):
@@ -48,6 +50,12 @@ class GlimpseInteractionContractTests(unittest.TestCase):
                 _read_search_query(BrokenWindow(), 24, 80)  # type: ignore[arg-type]
         echo.assert_called_once()
         noecho.assert_called_once()
+
+    def test_interrupt_is_left_to_curses_wrapper_for_cleanup(self) -> None:
+        snapshot = GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", ())
+        with patch("scalpel.glimpse.app.curses.wrapper", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                run_interactive(snapshot)
 
 
 if __name__ == "__main__":
