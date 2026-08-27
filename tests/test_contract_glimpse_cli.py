@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -98,6 +99,18 @@ class GlimpseCliContractTests(unittest.TestCase):
             self.assertEqual(main(["--start", "2026-08-27", "--tz", "UTC", "--plain"]), 0)
         self.assertIn("No tasks scheduled.", output.getvalue())
         self.assertIn("Planned 0m", output.getvalue())
+
+    def test_interactive_forwards_requested_view_date_and_terminal_style(self) -> None:
+        with (
+            patch("scalpel.glimpse.cli.run_interactive") as interactive,
+            patch.object(sys.stdin, "isatty", return_value=True),
+            patch.object(sys.stdout, "isatty", return_value=True),
+        ):
+            self.assertEqual(main(["--interactive", "--view", "day", "--date", "2026-08-28", "--ascii", "--no-color"]), 0)
+        self.assertEqual(interactive.call_args.kwargs["view"], "day")
+        self.assertEqual(interactive.call_args.kwargs["initial_date"], dt.date(2026, 8, 28))
+        self.assertTrue(interactive.call_args.kwargs["ascii_only"])
+        self.assertFalse(interactive.call_args.kwargs["color"])
 
 
 if __name__ == "__main__":

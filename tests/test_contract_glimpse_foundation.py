@@ -23,6 +23,10 @@ class GlimpseFoundationContractTests(unittest.TestCase):
                     "project": "work",
                     "tags": ["focus", ""],
                     "nautical_preview": True,
+                    "priority": "H",
+                    "completed_end_ms": 3000,
+                    "anchor": "mon@09:00",
+                    "cp": "work",
                 },
                 {"description": "missing identity"},
             ]
@@ -40,6 +44,10 @@ class GlimpseFoundationContractTests(unittest.TestCase):
         self.assertEqual(len(snapshot.tasks), 1)
         self.assertEqual(snapshot.tasks[0].tags, ("focus",))
         self.assertTrue(snapshot.tasks[0].nautical_preview)
+        self.assertEqual(snapshot.tasks[0].priority, "H")
+        self.assertEqual(snapshot.tasks[0].completed_ms, 3000)
+        self.assertEqual(snapshot.tasks[0].anchor, "mon@09:00")
+        self.assertEqual(snapshot.tasks[0].cp, "work")
         with self.assertRaises(AttributeError):
             snapshot.tasks[0].description = "changed"  # type: ignore[misc]
 

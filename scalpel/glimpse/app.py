@@ -57,14 +57,14 @@ def update_state(state: GlimpseState, key: str) -> GlimpseState:
     return state
 
 
-def _content(snapshot: GlimpseSnapshot, state: GlimpseState, width: int) -> str:
+def _content(snapshot: GlimpseSnapshot, state: GlimpseState, width: int, *, color: bool, ascii_only: bool) -> str:
     snapshot = search_snapshot(snapshot, state.query)
     day = snapshot.start_date + dt.timedelta(days=state.day_offset)
     if state.view == "day":
-        return render_day(snapshot, day=day, width=width, color=False, highlight_query=state.query)
+        return render_day(snapshot, day=day, width=width, color=color, ascii_only=ascii_only, highlight_query=state.query)
     if state.view == "week":
-        return render_week(snapshot, week_start=day, width=width, color=False, highlight_query=state.query)
-    return render_agenda(snapshot, width=width, color=False, highlight_query=state.query)
+        return render_week(snapshot, week_start=day, width=width, color=color, ascii_only=ascii_only, highlight_query=state.query)
+    return render_agenda(snapshot, width=width, color=color, ascii_only=ascii_only, highlight_query=state.query)
 
 
 def _detail_annotations(snapshot: GlimpseSnapshot, task_index: int) -> tuple[str, ...]:
@@ -100,6 +100,9 @@ def run_interactive(
     refresh: Callable[[], GlimpseSnapshot] | None = None,
     loader: Callable[[], GlimpseSnapshot] | None = None,
     view: ViewName = "agenda",
+    initial_date: dt.date | None = None,
+    color: bool = False,
+    ascii_only: bool = False,
 ) -> None:
     """Run the read-only curses shell and always restore the terminal on exit."""
 
@@ -113,6 +116,8 @@ def run_interactive(
             pass
         window.keypad(True)
         state = GlimpseState(view=view)
+        if initial_date is not None and snapshot is not None:
+            state = replace(state, day_offset=(initial_date - snapshot.start_date).days)
         status = ""
         if snapshot is None and loader is not None:
             window.erase()
@@ -122,7 +127,7 @@ def run_interactive(
             window.refresh()
             try:
                 snapshot = loader()
-            except Exception as exc:  # pragma: no cover - terminal-only failure path
+            except (OSError, ValueError, TypeError) as exc:  # pragma: no cover - terminal-only failure path
                 status = f"Load failed: {exc} · press r to retry · q to quit"
         while not state.should_quit:
             height, width = window.getmaxyx()
@@ -130,7 +135,7 @@ def run_interactive(
             body = status or "? for help · q to quit"
             if state.help_visible:
                 body = "a agenda · d day · w week · h/l day · j/k select · r refresh · q quit"
-            content = ["Loading Taskwarrior data…"] if snapshot is None else _content(snapshot, state, max(40, width - 1)).splitlines()
+            content = ["Loading Taskwarrior data…"] if snapshot is None else _content(snapshot, state, max(40, width - 1), color=color, ascii_only=ascii_only).splitlines()
             if state.details_visible and snapshot is not None:
                 filtered = search_snapshot(snapshot, state.query)
                 if filtered.tasks:
@@ -169,7 +174,7 @@ def run_interactive(
                         status = "Loading Taskwarrior data…"
                         snapshot = callback()
                         status = "Refreshed · ? for help · q to quit"
-                    except Exception as exc:  # pragma: no cover - terminal-only failure path
+                    except (OSError, ValueError, TypeError) as exc:  # pragma: no cover - terminal-only failure path
                         status = f"Refresh failed: {exc}"
                 state = replace(state, refresh_requested=False, selected=0)
 

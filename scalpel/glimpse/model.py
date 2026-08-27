@@ -27,6 +27,10 @@ class GlimpseTask:
     project: str | None
     tags: tuple[str, ...]
     nautical_preview: bool
+    priority: str | None = None
+    completed_ms: int | None = None
+    anchor: str | None = None
+    cp: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

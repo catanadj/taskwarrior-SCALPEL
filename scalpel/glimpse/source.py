@@ -58,6 +58,10 @@ def snapshot_from_payload(
                 project=_optional_text(task.get("project")),
                 tags=_tags(task.get("tags")),
                 nautical_preview=bool(task.get("nautical_preview")),
+                priority=_optional_text(task.get("priority")),
+                completed_ms=_first_int(task.get("completed_end_ms"), task.get("completion_ms")),
+                anchor=_optional_text(task.get("anchor")),
+                cp=_optional_text(task.get("cp")),
             )
         )
     cfg = payload.get("cfg", {})
