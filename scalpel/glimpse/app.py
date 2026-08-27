@@ -95,25 +95,38 @@ def _read_search_query(window: curses.window, height: int, width: int) -> str:
         curses.noecho()
 
 
-def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnapshot] | None = None) -> None:
+def run_interactive(snapshot: GlimpseSnapshot | None = None, refresh: Callable[[], GlimpseSnapshot] | None = None, loader: Callable[[], GlimpseSnapshot] | None = None) -> None:
     """Run the read-only curses shell and always restore the terminal on exit."""
 
     def loop(screen: object) -> None:
         nonlocal snapshot
         window = screen  # curses.wrapper supplies a curses window at runtime.
         assert isinstance(window, curses.window)
-        curses.curs_set(0)
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
         window.keypad(True)
         state = GlimpseState()
         status = ""
+        if snapshot is None and loader is not None:
+            window.erase()
+            loading_width = max(0, window.getmaxyx()[1] - 1)
+            window.addnstr(0, 0, "SCALPEL Glimpse", loading_width)
+            window.addnstr(2, 0, "Loading Taskwarrior data…", loading_width)
+            window.refresh()
+            try:
+                snapshot = loader()
+            except Exception as exc:  # pragma: no cover - terminal-only failure path
+                status = f"Load failed: {exc} · press r to retry · q to quit"
         while not state.should_quit:
             height, width = window.getmaxyx()
             window.erase()
             body = status or "? for help · q to quit"
             if state.help_visible:
                 body = "a agenda · d day · w week · h/l day · j/k select · r refresh · q quit"
-            content = _content(snapshot, state, max(40, width - 1)).splitlines()
-            if state.details_visible:
+            content = ["Loading Taskwarrior data…"] if snapshot is None else _content(snapshot, state, max(40, width - 1)).splitlines()
+            if state.details_visible and snapshot is not None:
                 filtered = search_snapshot(snapshot, state.query)
                 if filtered.tasks:
                     detail_index = min(state.selected, len(filtered.tasks) - 1)
@@ -143,11 +156,13 @@ def run_interactive(snapshot: GlimpseSnapshot, refresh: Callable[[], GlimpseSnap
             else:
                 state = update_state(state, str(key))
             if state.refresh_requested:
-                if refresh is None:
+                callback = refresh or loader
+                if callback is None:
                     status = "Refresh unavailable in payload mode"
                 else:
                     try:
-                        snapshot = refresh()
+                        status = "Loading Taskwarrior data…"
+                        snapshot = callback()
                         status = "Refreshed · ? for help · q to quit"
                     except Exception as exc:  # pragma: no cover - terminal-only failure path
                         status = f"Refresh failed: {exc}"
