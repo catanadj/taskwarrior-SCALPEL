@@ -5,6 +5,13 @@ from datetime import date
 
 
 @dataclass(frozen=True, slots=True)
+class GlimpseBand:
+    label: str
+    start_min: int
+    end_min: int
+
+
+@dataclass(frozen=True, slots=True)
 class GlimpseTask:
     """Immutable terminal-facing representation of one planned task."""
 
@@ -30,3 +37,6 @@ class GlimpseSnapshot:
     days: int
     timezone_name: str
     tasks: tuple[GlimpseTask, ...]
+    work_start_min: int = 0
+    work_end_min: int = 1440
+    bands: tuple[GlimpseBand, ...] = ()

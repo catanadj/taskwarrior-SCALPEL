@@ -34,6 +34,16 @@ class GlimpseDayContractTests(unittest.TestCase):
         self.assertIn("Review", output)
         self.assertIn("1 conflict", output)
 
+    def test_day_view_shows_bands_now_marker_and_out_of_hours_tasks(self) -> None:
+        base = int(dt.datetime(2026, 8, 27, 5, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        task = GlimpseTask("early", "Early task", "pending", "2026-08-27", base, None, base, base + 30 * 60_000, 30, None, (), False)
+        snapshot = GlimpseSnapshot(dt.date(2026, 8, 27), 1, "UTC", (task,), 8 * 60, 18 * 60)
+        output = render_day(snapshot, width=80, now_ms=base)
+        self.assertIn("[Morning]", output)
+        self.assertIn("◀ now", output)
+        self.assertIn("outside work hours", output)
+        self.assertIn("L1", output)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

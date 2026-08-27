@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Sequence
 
 from ..util.tz import resolve_tz
-from .model import GlimpseSnapshot, GlimpseTask
+from .model import GlimpseBand, GlimpseSnapshot, GlimpseTask
 from .style import AgendaStyle, style_for
 
 
@@ -58,6 +58,18 @@ def _overlap_ids(tasks: Sequence[GlimpseTask]) -> set[str]:
     return marked
 
 
+def _default_bands(snapshot: GlimpseSnapshot) -> tuple[GlimpseBand, ...]:
+    if snapshot.bands:
+        return snapshot.bands
+    start, end = snapshot.work_start_min, snapshot.work_end_min
+    candidates = (("Morning", start, min(end, start + 240)), ("Focus", start + 240, min(end, start + 480)), ("Afternoon", start + 480, end))
+    return tuple(GlimpseBand(label, max(start, band_start), band_end) for label, band_start, band_end in candidates if band_end > max(start, band_start))
+
+
+def _band_at(bands: Sequence[GlimpseBand], minute: int) -> GlimpseBand | None:
+    return next((band for band in bands if band.start_min <= minute < band.end_min), None)
+
+
 def _local_time(timestamp_ms: int | None, timezone: dt.tzinfo) -> str:
     if timestamp_ms is None:
         return "  --"
@@ -104,7 +116,6 @@ def render_agenda(
     ascii_only: bool = False,
 ) -> str:
     """Render a deterministic, width-bounded read-only agenda."""
-    del now_ms  # Reserved for the current-time marker in the day-view pass.
     width = max(40, int(width))
     timezone = resolve_tz(snapshot.timezone_name)
     style = style_for(color=color)
@@ -145,7 +156,6 @@ def render_day(
     ascii_only: bool = False,
 ) -> str:
     """Render one day as a compact, hourly terminal timeline."""
-    del now_ms  # Reserved for the current-time marker once interactive mode exists.
     width = max(40, int(width))
     selected_day = day or snapshot.start_date
     timezone = resolve_tz(snapshot.timezone_name)
@@ -156,6 +166,8 @@ def render_day(
     overlap_ids = _overlap_ids(tasks)
     day_start = int(dt.datetime.combine(selected_day, dt.time(), tzinfo=timezone).timestamp() * 1000)
     hour_ms = 60 * 60_000
+    is_today = now_ms is not None and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).date() == selected_day
+    bands = _default_bands(snapshot)
     lines = [f"{style.bold}SCALPEL · Day · {selected_day.strftime('%a %d %b %Y')}{style.reset}", ""]
     for hour in range(24):
         slot_start = day_start + hour * hour_ms
@@ -167,19 +179,32 @@ def render_day(
             and (_task_start(task) or 0) < slot_end
         ]
         label = f"{hour:02d}:00"
+        band = _band_at(bands, hour * 60 + 30)
+        band_label = f" {style.dim}[{band.label}]{style.reset}" if band else ""
+        current = is_today and dt.datetime.fromtimestamp(now_ms / 1000, tz=timezone).hour == hour if now_ms is not None else False
+        current_label = f" {style.red}◀ now{style.reset}" if current else ""
         if not active:
-            lines.append(f"{label} {style.dim}│{style.reset}")
+            lines.append(f"{label} {style.dim}│{style.reset}{band_label}{current_label}")
             continue
-        lines.append(f"{label} {style.dim}│{style.reset}")
+        lines.append(f"{label} {style.dim}│{style.reset}{band_label}{current_label}")
+        lanes: list[int] = []
         for task in active:
             start = _task_start(task)
             end = _task_end(task)
             duration = max(15, int(((end or start or slot_end) - (start or slot_start)) / 60_000))
             bar_width = max(1, min(12, duration // 15))
             marker = _marker(task, overlap=task.uuid in overlap_ids, style=style, ascii_only=ascii_only)
-            description = _truncate(task.description or "(untitled)", max(8, width - 22))
+            lane = next((index for index, lane_end in enumerate(lanes) if (start or 0) >= lane_end), len(lanes))
+            if lane == len(lanes):
+                lanes.append(end or slot_end)
+            else:
+                lanes[lane] = end or slot_end
+            lane_prefix = f"L{lane + 1} " if width >= 72 else ""
+            outside = start is not None and (start < day_start + snapshot.work_start_min * 60_000 or start >= day_start + snapshot.work_end_min * 60_000)
+            suffix = " [outside work hours]" if outside else ""
+            description = _truncate((task.description or "(untitled)") + suffix, max(8, width - 22 - len(lane_prefix)))
             bar = "#" if ascii_only else "█"
-            lines.append(f"     {marker} {bar * bar_width} {description}")
+            lines.append(f"     {lane_prefix}{marker} {bar * bar_width} {description}")
     lines.append("")
     total_minutes = sum(task.duration_min or 0 for task in tasks if (task.duration_min or 0) > 0)
     conflicts = len(overlap_ids) // 2

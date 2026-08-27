@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         color = color_enabled(requested=False if args.no_color else None)
         if args.view == "day":
             selected_day = _parse_date(args.date, fallback=start_date)
-            print(render_day(snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii))
+            print(render_day(snapshot, day=selected_day, width=args.width, color=color, ascii_only=args.ascii, now_ms=int(dt.datetime.now().timestamp() * 1000)))
         elif args.view == "week":
             selected_day = _parse_date(args.date, fallback=start_date)
             print(render_week(snapshot, week_start=selected_day, width=args.width, color=color, ascii_only=args.ascii))
