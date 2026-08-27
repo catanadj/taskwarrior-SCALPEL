@@ -9,6 +9,7 @@ from typing import cast
 
 from ..api import load_payload_from_json
 from ..payload import build_payload
+from ..process import ProcessError
 from ..util.timeparse import parse_date_yyyy_mm_dd, parse_workhours
 from ..util.tz import normalize_tz_name, resolve_tz, today_date
 from .render import render_agenda, render_day, render_week
@@ -112,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(render_agenda(snapshot, width=args.width, color=color, ascii_only=args.ascii))
         return 0
-    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, TypeError, ProcessError, json.JSONDecodeError) as exc:
         print(f"scalpel-glimpse: {exc}", file=sys.stderr)
         return 2
 

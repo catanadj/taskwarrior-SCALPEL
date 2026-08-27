@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scalpel.glimpse.cli import build_parser, main
+from scalpel.process import CommandNotFoundError
 
 
 def _payload() -> dict[str, object]:
@@ -84,6 +85,12 @@ class GlimpseCliContractTests(unittest.TestCase):
             with redirect_stdout(output):
                 self.assertEqual(main(["--start", "today", "--date", "today", "--ascii"]), 0)
         self.assertNotRegex(output.getvalue(), "[⚠✓⚓┃│█─…]")
+
+    def test_missing_taskwarrior_is_reported_as_a_concise_cli_error(self) -> None:
+        error = io.StringIO()
+        with patch("scalpel.glimpse.cli.build_payload", side_effect=CommandNotFoundError(["task"])), redirect_stderr(error):
+            self.assertEqual(main([]), 2)
+        self.assertIn("Command not found: task", error.getvalue())
 
 
 if __name__ == "__main__":
