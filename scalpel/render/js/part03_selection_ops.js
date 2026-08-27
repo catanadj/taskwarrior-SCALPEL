@@ -471,6 +471,10 @@
   }
   function _focusCommandsDrawerClose() {
     if (!_isCommandsDrawerOpen() || !elBtnCloseCommands) return;
+    try { elBtnCloseCommands.focus({ preventScroll: true }); }
+    catch (_) {
+      try { elBtnCloseCommands.focus(); } catch (_) {}
+    }
     try {
       requestAnimationFrame(() => {
         if (_isCommandsDrawerOpen()) elBtnCloseCommands.focus({ preventScroll: true });
